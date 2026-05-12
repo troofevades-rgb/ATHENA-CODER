@@ -87,7 +87,7 @@ def _handle_slash(agent: Agent, line: str) -> bool:
             ui.console.print(f" {marker} {n}")
 
     elif cmd == "tools":
-        for t in tools.all_tools(agent.cfg.disabled_tools):
+        for t in tools.all_tools(disabled=agent.cfg.disabled_tools):
             confirm = " [confirm]" if t.requires_confirmation else ""
             kind = " [mcp]" if "__" in t.name else ""
             ui.console.print(f"  • [bold]{t.name}[/]{kind}{confirm} — {t.description.splitlines()[0]}")

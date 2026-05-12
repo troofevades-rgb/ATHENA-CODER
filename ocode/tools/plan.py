@@ -51,6 +51,7 @@ PLAN_MODE_ALLOWED = {
 
 @tool(
     name="ExitPlanMode",
+    toolset="core",
     description=(
         "Use this tool when you are in plan mode and have finished drafting "
         "a plan. Pass the plan text. The user will be shown the plan and "
@@ -81,6 +82,7 @@ def ExitPlanMode(plan: str) -> str:
 
 @tool(
     name="EnterPlanMode",
+    toolset="core",
     description=(
         "Enter plan mode. While in plan mode, write/edit/bash tools are "
         "blocked; only read-only investigation tools work. Use this when "

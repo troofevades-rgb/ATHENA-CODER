@@ -73,6 +73,7 @@ def _extract_text(html: str) -> str:
 
 @tool(
     name="WebFetch",
+    toolset="web",
     aliases=["web_fetch"],
     description=(
         "Fetches content from a specified URL. HTML is converted to readable "
@@ -206,6 +207,7 @@ def _search_searxng(query: str, max_results: int) -> list[dict[str, str]]:
 
 @tool(
     name="WebSearch",
+    toolset="web",
     aliases=["web_search"],
     description=(
         "Allows you to search the web. Returns a numbered list of result "

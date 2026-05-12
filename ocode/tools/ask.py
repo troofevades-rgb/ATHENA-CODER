@@ -70,6 +70,7 @@ def _ask_one(q: dict[str, Any]) -> dict[str, str]:
 
 @tool(
     name="AskUserQuestion",
+    toolset="core",
     description=(
         "Use this tool when you need to ask the user questions during a "
         "task: gather preferences, clarify ambiguous instructions, or get "

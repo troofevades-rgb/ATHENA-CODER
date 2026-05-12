@@ -13,6 +13,7 @@ from ..memory import (
 
 @tool(
     name="write_memory",
+    toolset="memory",
     description=(
         "Save a long-term memory. Use this when the user asks you to "
         "remember something, when they share their role/preferences (type='user'), "
@@ -51,6 +52,7 @@ def write_memory(filename: str, name: str, description: str, type: str, body: st
 
 @tool(
     name="list_memories",
+    toolset="memory",
     description="List all memory files for the current workspace, with their type and description.",
     parameters={"type": "object", "properties": {}},
 )
@@ -68,6 +70,7 @@ def list_memories() -> str:
 
 @tool(
     name="delete_memory",
+    toolset="memory",
     description="Delete a memory file by filename. Use when the user asks you to forget something.",
     parameters={
         "type": "object",

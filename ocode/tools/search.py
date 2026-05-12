@@ -17,6 +17,7 @@ _HAS_RG = shutil.which("rg") is not None
 
 @tool(
     name="Glob",
+    toolset="file",
     aliases=["glob"],
     description=(
         "Find files by glob pattern (e.g. '**/*.py', 'src/**/test_*.ts'). "
@@ -50,6 +51,7 @@ def Glob(pattern: str, max_results: int = 200) -> str:
 
 @tool(
     name="Grep",
+    toolset="file",
     aliases=["grep"],
     description=(
         "Search file contents for a regex. Uses ripgrep when available, "
