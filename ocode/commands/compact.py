@@ -6,7 +6,7 @@ system prompt) with that summary as a single user message.
 """
 from __future__ import annotations
 
-from . import skill
+from . import command
 from .. import ui
 
 
@@ -22,7 +22,7 @@ conversation, so include anything that's load-bearing for what comes next.
 """
 
 
-@skill("compact")
+@command("compact")
 def cmd_compact(agent, arg: str = "") -> str:
     if len(agent.messages) <= 2:
         ui.info("nothing to compact")

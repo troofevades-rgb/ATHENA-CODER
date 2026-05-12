@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from . import skill
+from . import command
 from .. import ui
 from ..config import SESSIONS_DIR
 
 
-@skill("resume")
+@command("resume")
 def cmd_resume(agent, arg: str = "") -> str:
     arg = arg.strip()
     if not arg:

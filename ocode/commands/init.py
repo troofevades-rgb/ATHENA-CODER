@@ -4,7 +4,7 @@ Asks the model to write OCODE.md based on what it finds in the project.
 """
 from __future__ import annotations
 
-from . import skill
+from . import command
 
 
 _PROMPT = """\
@@ -24,6 +24,6 @@ reading the code. After writing it, summarize what you put in it.
 """
 
 
-@skill("init")
+@command("init")
 def cmd_init(agent, arg: str = "") -> str:
     return _PROMPT

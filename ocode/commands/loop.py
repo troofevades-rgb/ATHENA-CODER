@@ -13,7 +13,7 @@ import re
 import threading
 from typing import Any
 
-from . import skill
+from . import command
 from .. import ui
 
 
@@ -61,7 +61,7 @@ def _run_iteration(agent, body: str) -> None:
     _do()
 
 
-@skill("loop")
+@command("loop")
 def cmd_loop(agent, arg: str = "") -> str:
     global _LOOP
     parsed = _parse(arg)
@@ -91,7 +91,7 @@ def cmd_loop(agent, arg: str = "") -> str:
     return ""
 
 
-@skill("loop-stop")
+@command("loop-stop")
 def cmd_loop_stop(agent, arg: str = "") -> str:
     global _LOOP
     if _LOOP is None:
