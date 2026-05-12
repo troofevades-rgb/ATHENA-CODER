@@ -10,7 +10,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
 
-from . import tools, ui, skills
+from . import tools, ui, commands
 from .agent import Agent
 from .config import CONFIG_DIR, SESSIONS_DIR, load_config, mcp_config_paths
 from .mcp import load_mcp_servers, shutdown_all
@@ -179,13 +179,13 @@ def _handle_slash(agent: Agent, line: str) -> bool:
                 ui.info(f"workspace -> {new} (system prompt rebuilt; /clear to reset history)")
 
     else:
-        # Fall through to the skills registry
-        fn = skills.get_skill(cmd)
+        # Fall through to the commands registry
+        fn = commands.get_command(cmd)
         if fn is None:
             ui.error(f"unknown command: /{cmd}. /help for list.")
             return True
         result = fn(agent, arg)
-        # If the skill returned a prompt string, run it as a user turn.
+        # If the command returned a prompt string, run it as a user turn.
         if isinstance(result, str) and result:
             try:
                 agent.run_turn(result)

@@ -1,10 +1,10 @@
 """/review — code review of pending changes (or a specified diff)."""
 from __future__ import annotations
 
-from . import skill
+from . import command
 
 
-@skill("review")
+@command("review")
 def cmd_review(agent, arg: str = "") -> str:
     target = arg.strip() or "the pending uncommitted changes"
     return (
@@ -22,7 +22,7 @@ def cmd_review(agent, arg: str = "") -> str:
     )
 
 
-@skill("security-review")
+@command("security-review")
 def cmd_security_review(agent, arg: str = "") -> str:
     target = arg.strip() or "the pending uncommitted changes"
     return (

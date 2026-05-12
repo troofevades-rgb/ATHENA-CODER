@@ -1,7 +1,7 @@
 """/memory — list, view, or delete persistent memories from the REPL."""
 from __future__ import annotations
 
-from . import skill
+from . import command
 from .. import ui
 from ..memory import (
     list_memories,
@@ -11,7 +11,7 @@ from ..memory import (
 )
 
 
-@skill("memory")
+@command("memory")
 def cmd_memory(agent, arg: str = "") -> str:
     arg = arg.strip()
     sub, _, rest = arg.partition(" ")
