@@ -1,0 +1,44 @@
+# DARE-TIES merge: Qwen2.5-Coder + R1-Distill + Qwen2.5-Instruct
+#
+# DARE (Drop And REscale) sparsifies each model's delta from the base by
+# random pruning, then rescales. TIES (Trim, Elect Sign, Merge) resolves
+# sign conflicts when multiple models disagree about a parameter. Together
+# they outperform naive averaging or SLERP when you're combining 3+ models.
+#
+# Why this trio:
+#   - Qwen2.5-Coder-14B-Instruct: coding, tool-calling
+#   - DeepSeek-R1-Distill-Qwen-14B: reasoning / <think> tags
+#   - Qwen2.5-14B-Instruct: general fluency, broad knowledge
+#
+# All three are Qwen2.5 14B at the weight level. The base (the trunk we
+# compute deltas against) is the non-coder, non-distilled Qwen2.5-14B.
+#
+# Tunable: `weight` controls each model's pull, `density` controls how
+# many of its parameter deltas survive DARE pruning (0.5 = drop half).
+# Higher density = more of that model's character; lower = more of the base.
+
+models:
+  - model: Qwen/Qwen2.5-Coder-14B-Instruct
+    parameters:
+      weight: 0.5
+      density: 0.55
+
+  - model: deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
+    parameters:
+      weight: 0.35
+      density: 0.55
+
+  - model: Qwen/Qwen2.5-14B-Instruct
+    parameters:
+      weight: 0.20
+      density: 0.45
+
+merge_method: dare_ties
+base_model: Qwen/Qwen2.5-14B
+dtype: bfloat16
+
+parameters:
+  # Normalize weights so they sum to 1.0 after sparsification.
+  normalize: true
+  # int8 mask saves RAM during merge — turn off if results look off.
+  int8_mask: true

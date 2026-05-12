@@ -1,0 +1,38 @@
+# venvs
+.venv/
+venv/
+env/
+
+# Python build / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ocode runtime data
+.ocode/
+sessions/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets / local config
+.env
+.env.*
+*.pem
+*.key
+
+# Large model artifacts (if checkpoints land in tree)
+*.gguf
+*.safetensors
+*.bin
+*.ckpt
