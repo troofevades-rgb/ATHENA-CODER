@@ -1,0 +1,127 @@
+"""Minimal self-contained MCP server, stdlib only.
+
+Exists for two reasons:
+  1. Integration test: lets us verify ocode's MCP client works end-to-end
+     without depending on npm / uvx / a network connection.
+  2. Reference: ~120 lines of Python show exactly what an MCP server needs
+     to do. Copy and modify.
+
+Tools exposed:
+  echo(text)              - returns text back
+  add(a, b)               - returns a + b
+  current_time()          - returns ISO-8601 now()
+
+Run standalone:
+    python -m ocode.mcp.demo_server
+(speaks JSON-RPC on stdin/stdout)
+"""
+from __future__ import annotations
+import datetime
+import json
+import sys
+from typing import Any
+
+
+PROTOCOL_VERSION = "2024-11-05"
+
+TOOLS = [
+    {
+        "name": "echo",
+        "description": "Echo the provided text back unchanged. Useful for connectivity tests.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"text": {"type": "string"}},
+            "required": ["text"],
+        },
+    },
+    {
+        "name": "add",
+        "description": "Return the sum of two numbers.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "number"},
+                "b": {"type": "number"},
+            },
+            "required": ["a", "b"],
+        },
+    },
+    {
+        "name": "current_time",
+        "description": "Return the current local time as an ISO-8601 string.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+]
+
+
+def _send(msg: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(msg) + "\n")
+    sys.stdout.flush()
+
+
+def _result(req_id: Any, result: dict[str, Any]) -> None:
+    _send({"jsonrpc": "2.0", "id": req_id, "result": result})
+
+
+def _error(req_id: Any, code: int, message: str) -> None:
+    _send({"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}})
+
+
+def _text_content(text: str, is_error: bool = False) -> dict[str, Any]:
+    return {"content": [{"type": "text", "text": text}], "isError": is_error}
+
+
+def _handle(msg: dict[str, Any]) -> None:
+    method = msg.get("method")
+    req_id = msg.get("id")
+    params = msg.get("params") or {}
+
+    # Notifications have no id; ignore.
+    if req_id is None:
+        return
+
+    if method == "initialize":
+        _result(req_id, {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {"listChanged": False}},
+            "serverInfo": {"name": "ocode-demo", "version": "0.1.0"},
+        })
+    elif method == "tools/list":
+        _result(req_id, {"tools": TOOLS})
+    elif method == "tools/call":
+        name = params.get("name")
+        args = params.get("arguments") or {}
+        try:
+            if name == "echo":
+                _result(req_id, _text_content(str(args.get("text", ""))))
+            elif name == "add":
+                s = float(args["a"]) + float(args["b"])
+                _result(req_id, _text_content(str(s)))
+            elif name == "current_time":
+                _result(req_id, _text_content(datetime.datetime.now().isoformat(timespec="seconds")))
+            else:
+                _result(req_id, _text_content(f"unknown tool: {name}", is_error=True))
+        except (KeyError, TypeError, ValueError) as e:
+            _result(req_id, _text_content(f"bad arguments: {e}", is_error=True))
+    else:
+        _error(req_id, -32601, f"method not found: {method}")
+
+
+def main() -> int:
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        try:
+            _handle(msg)
+        except Exception as e:  # last-ditch — never let the loop die silently
+            print(f"demo_server internal error: {e}", file=sys.stderr, flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

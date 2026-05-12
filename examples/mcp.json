@@ -1,0 +1,34 @@
+{
+  "_comment": "Drop this at ~/.ocode/mcp.json or <project>/mcp.json. Comment fields are ignored.",
+  "mcpServers": {
+    "filesystem": {
+      "_comment": "Anthropic's reference filesystem server. Pulls from npm.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/matt/work"],
+      "disabled": true
+    },
+    "git": {
+      "_comment": "Git operations on the current repo. Python implementation.",
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "disabled": true
+    },
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "./data.db"],
+      "disabled": true
+    },
+    "ocode-demo": {
+      "_comment": "Tiny demo server bundled with ocode — verifies the integration end-to-end.",
+      "command": "python",
+      "args": ["-m", "ocode.mcp.demo_server"],
+      "disabled": false
+    },
+    "fetch": {
+      "_comment": "Web fetcher; useless for air-gapped work. Disabled by default.",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "disabled": true
+    }
+  }
+}

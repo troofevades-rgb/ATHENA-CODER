@@ -1,0 +1,37 @@
+# SLERP merge: Qwen2.5-Coder + DeepSeek-R1-Distill-Qwen
+#
+# SLERP (Spherical Linear intERPolation) interpolates between two models'
+# weights along the great circle of the parameter sphere — produces smooth
+# blends and tends to preserve fluency better than naive linear averaging.
+#
+# Why this pair: identical architecture (both Qwen2.5 14B), tool-call
+# training from Qwen Coder, chain-of-thought reasoning from R1-Distill.
+# Result: a code-aware model that thinks before acting.
+#
+# Tunable: the per-filter `t` values control which slice of weights gets
+# more influence from which model. Lower `t` = more of the base model
+# (Qwen2.5-Coder here). Tweak these by 0.1 increments and re-eval.
+
+slices:
+  - sources:
+      - model: Qwen/Qwen2.5-Coder-14B-Instruct
+        layer_range: [0, 48]
+      - model: deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
+        layer_range: [0, 48]
+
+merge_method: slerp
+base_model: Qwen/Qwen2.5-Coder-14B-Instruct
+
+parameters:
+  t:
+    # Self-attention: 0.4 = 60% Qwen-Coder, 40% R1-Distill.
+    # Tool-calling lives mostly in attention. Bias toward Coder.
+    - filter: self_attn
+      value: 0.4
+    # MLPs: more equal split lets R1's reasoning patterns through.
+    - filter: mlp
+      value: 0.5
+    # Everything else (embeddings, norms): mild bias toward Coder.
+    - value: 0.35
+
+dtype: bfloat16

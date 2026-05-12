@@ -1,0 +1,32 @@
+# Passthrough (frankenmerge): build an architecturally novel model by
+# concatenating layers from different sources.
+#
+# This is the weird-science option. Instead of blending corresponding
+# layers, you stack them — early layers from one model, middle layers
+# from another, late layers from yet another. The resulting model has
+# MORE layers than either source (and thus more parameters and VRAM).
+#
+# Frankenmerges sometimes produce surprisingly capable models; they also
+# sometimes produce broken ones that loop or output garbage. Always
+# test aggressively.
+#
+# This config bumps Qwen2.5-Coder 14B (48 layers) to ~60 layers by
+# duplicating the middle band. Result: ~17B parameters, ~11GB at Q4_K_M,
+# still fits 16GB but tighter on KV cache.
+#
+# DON'T use this with very different architectures. Both models below are
+# Qwen2.5 14B variants, so layer dimensions match.
+
+slices:
+  - sources:
+      - model: Qwen/Qwen2.5-Coder-14B-Instruct
+        layer_range: [0, 24]
+  - sources:
+      - model: deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
+        layer_range: [12, 36]
+  - sources:
+      - model: Qwen/Qwen2.5-Coder-14B-Instruct
+        layer_range: [24, 48]
+
+merge_method: passthrough
+dtype: bfloat16
