@@ -40,6 +40,7 @@ def _next_id() -> str:
 
 @tool(
     name="TaskCreate",
+    toolset="core",
     description=(
         "Use this tool to track multi-step work. Create a task with a clear, "
         "actionable subject (imperative form) and a short description. "
@@ -65,6 +66,7 @@ def TaskCreate(subject: str, description: str, activeForm: str = "") -> str:
 
 @tool(
     name="TaskUpdate",
+    toolset="core",
     description=(
         "Update a task's status, subject, or description. Set status to "
         "'in_progress' when you start work, 'completed' when done. Only "
@@ -115,6 +117,7 @@ def TaskUpdate(
 
 @tool(
     name="TaskList",
+    toolset="core",
     description=(
         "List all current tasks with their status. Use this to see what's "
         "pending, what's in progress, and what's been completed."

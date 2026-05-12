@@ -45,6 +45,7 @@ def _within_workspace(p: Path) -> bool:
 
 @tool(
     name="Read",
+    toolset="file",
     aliases=["read_file"],
     description=(
         "Read a file from the local filesystem. Returns numbered lines so "
@@ -106,6 +107,7 @@ def Read(file_path: str, offset: int | None = None, limit: int | None = None, **
 
 @tool(
     name="Write",
+    toolset="file",
     aliases=["write_file"],
     description=(
         "Write a file to the local filesystem. Overwrites if it exists. "
@@ -136,6 +138,7 @@ def Write(file_path: str = "", content: str = "", **legacy) -> str:
 
 @tool(
     name="Edit",
+    toolset="file",
     aliases=["str_replace"],
     description=(
         "Performs exact string replacement in a file. `old_string` must "
@@ -194,6 +197,7 @@ def Edit(
 
 @tool(
     name="list_dir",
+    toolset="file",
     description="List entries in a directory (one level). Files and dirs marked with trailing /.",
     parameters={
         "type": "object",

@@ -70,6 +70,7 @@ def _make_agent_factory():
 
 @tool(
     name="Agent",
+    toolset="agent",
     description=(
         "Launch a sub-agent to handle a complex task. Each agent type has "
         "specific capabilities. Use general-purpose for open-ended research "

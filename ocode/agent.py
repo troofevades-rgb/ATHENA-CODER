@@ -337,7 +337,7 @@ class Agent:
             for chunk in self.client.chat(
                 model=self.model,
                 messages=self.messages,
-                tools=tools.ollama_schema(self.cfg.disabled_tools),
+                tools=tools.ollama_schema(disabled=self.cfg.disabled_tools),
                 num_ctx=self.cfg.context_window,
             ):
                 if first and (chunk.content or chunk.tool_calls):

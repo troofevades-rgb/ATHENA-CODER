@@ -37,6 +37,7 @@ def _truncate(out: str) -> str:
 
 @tool(
     name="Bash",
+    toolset="shell",
     aliases=["bash"],
     description=(
         "Executes a given bash command and returns its output. The working "
@@ -167,6 +168,7 @@ def _start_background(command: str) -> str:
 
 @tool(
     name="bash_output",
+    toolset="shell",
     description=(
         "Read pending output from a background Bash process started with "
         "run_in_background=true. Returns whatever output has accumulated since "
@@ -204,6 +206,7 @@ def bash_output(bash_id: str) -> str:
 
 @tool(
     name="kill_bash",
+    toolset="shell",
     description="Kill a background Bash process by id. Returns its exit code.",
     parameters={
         "type": "object",
