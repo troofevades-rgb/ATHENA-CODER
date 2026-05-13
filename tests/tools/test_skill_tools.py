@@ -155,9 +155,13 @@ def test_skill_manage_write_file_rejects_bad_path(workspace_set: Path) -> None:
 
 
 def test_skill_manage_curator_delete_requires_absorbed_into(workspace_set: Path) -> None:
-    skill_tools.skill_manage(action="create", name="curatable", frontmatter={"description": "x"})
+    """The curator can only act on skills it (or background_review) authored.
+    Create under CURATOR so the curator can later delete it."""
     token = set_current_write_origin(CURATOR)
     try:
+        skill_tools.skill_manage(
+            action="create", name="curatable", frontmatter={"description": "x"}
+        )
         out = _parse(skill_tools.skill_manage(action="delete", name="curatable"))
         assert out["success"] is False
         assert "CuratorPolicyError" in out["message"]
@@ -171,6 +175,66 @@ def test_skill_manage_curator_delete_requires_absorbed_into(workspace_set: Path)
         assert out2["success"] is True
     finally:
         reset_current_write_origin(token)
+
+
+def test_skill_manage_curator_cannot_patch_foreground_skill(workspace_set: Path) -> None:
+    """Foreground-authored skills are inviolate to autonomous origins."""
+    skill_tools.skill_manage(
+        action="create", name="user-skill", frontmatter={"description": "x"}
+    )  # foreground
+    token = set_current_write_origin(CURATOR)
+    try:
+        out = _parse(skill_tools.skill_manage(
+            action="patch", name="user-skill",
+            frontmatter={"description": "curator wants this"},
+        ))
+        assert out["success"] is False
+        assert "foreground-authored" in out["message"]
+    finally:
+        reset_current_write_origin(token)
+
+
+def test_skill_manage_curator_cannot_pin(workspace_set: Path) -> None:
+    token = set_current_write_origin(CURATOR)
+    try:
+        skill_tools.skill_manage(
+            action="create", name="cur-skill", frontmatter={"description": "x"}
+        )
+        out = _parse(skill_tools.skill_manage(action="pin", name="cur-skill"))
+        assert out["success"] is False
+        assert "foreground-only" in out["message"]
+    finally:
+        reset_current_write_origin(token)
+
+
+def test_skill_manage_background_review_cannot_pin(workspace_set: Path) -> None:
+    from ocode.provenance import BACKGROUND_REVIEW
+    token = set_current_write_origin(BACKGROUND_REVIEW)
+    try:
+        skill_tools.skill_manage(
+            action="create", name="br-skill", frontmatter={"description": "x"}
+        )
+        out = _parse(skill_tools.skill_manage(action="pin", name="br-skill"))
+        assert out["success"] is False
+        assert "foreground-only" in out["message"]
+    finally:
+        reset_current_write_origin(token)
+
+
+def test_skill_manage_foreground_can_do_anything(workspace_set: Path) -> None:
+    skill_tools.skill_manage(
+        action="create", name="multi", frontmatter={"description": "x"}
+    )
+    # create, patch, pin, unpin, delete — all succeed under foreground.
+    out = _parse(skill_tools.skill_manage(action="patch", name="multi",
+                                          frontmatter={"description": "edited"}))
+    assert out["success"] is True
+    out = _parse(skill_tools.skill_manage(action="pin", name="multi"))
+    assert out["success"] is True
+    out = _parse(skill_tools.skill_manage(action="unpin", name="multi"))
+    assert out["success"] is True
+    out = _parse(skill_tools.skill_manage(action="delete", name="multi"))
+    assert out["success"] is True
 
 
 def test_skill_manage_curator_cannot_delete_migration_origin(workspace_set: Path, write_skill) -> None:

@@ -12,7 +12,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..provenance import SYSTEM, get_current_write_origin
+from ..provenance import (
+    BACKGROUND_REVIEW,
+    CURATOR,
+    FOREGROUND,
+    MIGRATION,
+    SYSTEM,
+    get_current_write_origin,
+)
 from . import archive as archive_mod
 from . import loader, pin
 from .archive import SkillNotFoundError
@@ -27,13 +34,43 @@ from .frontmatter import (
 
 _ALLOWED_FILE_SUBDIRS = ("references", "templates", "scripts")
 
+# Write-origins whose existing skills the curator + background_review are
+# *allowed* to mutate. Foreground-authored and pinned skills are off-limits;
+# migration-origin skills are conditionally allowed (see _curator_can_modify).
+_AUTONOMOUS_MUTABLE_ORIGINS = frozenset({BACKGROUND_REVIEW, CURATOR})
+
 
 class SkillExistsError(FileExistsError):
     pass
 
 
 class CuratorPolicyError(PermissionError):
-    """Raised when the curator tries to do something its policy forbids."""
+    """Raised when the curator (or background_review) tries to do something
+    its policy forbids."""
+
+
+def _curator_can_modify(target_fm: SkillFrontmatter) -> tuple[bool, str]:
+    """Return (allowed, reason) for autonomous mutation of an existing skill.
+
+    Pinned skills and foreground-authored skills are inviolate. Migration-
+    origin skills bypass autonomous mutation until they have local activity
+    (last_activity_at strictly newer than imported_at).
+    """
+    if target_fm.pinned:
+        return False, f"skill {target_fm.name!r} is pinned"
+    if target_fm.write_origin == FOREGROUND:
+        return False, f"skill {target_fm.name!r} is foreground-authored"
+    if target_fm.write_origin == MIGRATION:
+        if (
+            target_fm.imported_at is None
+            or target_fm.last_activity_at is None
+            or target_fm.last_activity_at <= target_fm.imported_at
+        ):
+            return False, (
+                f"skill {target_fm.name!r} was imported and has no local "
+                "activity yet; curator must not touch it until the user has used it"
+            )
+    return True, ""
 
 
 def _target_base(workspace: Path | None) -> Path:
@@ -109,12 +146,19 @@ def skill_patch(
         raise SkillNotFoundError(f"no skill named {name!r}")
     skill_md = skill_dir / "SKILL.md"
     existing_fm, existing_body = parse_frontmatter(skill_md)
+
+    origin = get_current_write_origin()
+    if origin in _AUTONOMOUS_MUTABLE_ORIGINS:
+        allowed, reason = _curator_can_modify(existing_fm)
+        if not allowed:
+            raise CuratorPolicyError(reason)
+
     updated = _frontmatter_to_dict(existing_fm)
     if frontmatter_updates:
         updated.update(frontmatter_updates)
         # Name cannot be changed via patch — that would invalidate the dir name.
         updated["name"] = existing_fm.name
-    if get_current_write_origin() != SYSTEM:
+    if origin != SYSTEM:
         updated["last_activity_at"] = datetime.now(timezone.utc)
 
     new_fm = _build_frontmatter(updated)
@@ -132,14 +176,28 @@ def skill_delete(
     workspace: Path | None = None,
     absorbed_into: str | None = None,
 ) -> Path:
-    """Soft-delete by archiving. The curator MUST pass ``absorbed_into`` (a
-    skill name, possibly empty string meaning "pruned"); foreground origin
-    may pass it or not."""
+    """Soft-delete by archiving. Curator and background_review must both pass
+    ``absorbed_into`` (a skill name, or the literal empty string meaning a
+    true prune). Foreground origin may pass it or not.
+
+    Autonomous origins additionally cannot delete foreground / pinned / not-
+    yet-locally-active migration skills — see :func:`_curator_can_modify`.
+    """
     origin = get_current_write_origin()
-    if origin == "curator" and absorbed_into is None:
-        raise CuratorPolicyError(
-            "curator must pass absorbed_into (skill name or empty string)"
-        )
+    if origin in _AUTONOMOUS_MUTABLE_ORIGINS:
+        if absorbed_into is None:
+            raise CuratorPolicyError(
+                f"{origin} must pass absorbed_into (skill name or empty string)"
+            )
+        # Inspect the target skill's frontmatter before archiving so we can
+        # refuse on policy without leaving the workspace mid-mutated.
+        skills = discover_skills(workspace, include_archived=False)
+        entry = skills.get(name)
+        if entry is not None:
+            target_fm, _ = entry
+            allowed, reason = _curator_can_modify(target_fm)
+            if not allowed:
+                raise CuratorPolicyError(reason)
     new_path = archive_mod.archive_skill(name, workspace)
     if absorbed_into is not None:
         meta = {
@@ -158,10 +216,15 @@ def skill_unarchive(name: str, workspace: Path | None = None) -> Path:
 
 
 def skill_pin(name: str, workspace: Path | None = None) -> Path:
+    """Pin is a foreground-only operation; autonomous origins are refused."""
+    if get_current_write_origin() in _AUTONOMOUS_MUTABLE_ORIGINS:
+        raise CuratorPolicyError("pin is a foreground-only operation")
     return pin.pin_skill(name, workspace)
 
 
 def skill_unpin(name: str, workspace: Path | None = None) -> Path:
+    if get_current_write_origin() in _AUTONOMOUS_MUTABLE_ORIGINS:
+        raise CuratorPolicyError("unpin is a foreground-only operation")
     return pin.unpin_skill(name, workspace)
 
 
@@ -192,6 +255,15 @@ def skill_write_file(
     skill_dir = _existing(skill_name, workspace)
     if skill_dir is None:
         raise SkillNotFoundError(f"no skill named {skill_name!r}")
+
+    if get_current_write_origin() in _AUTONOMOUS_MUTABLE_ORIGINS:
+        skill_md = skill_dir / "SKILL.md"
+        parsed = parse_frontmatter(skill_md)
+        if parsed is not None:
+            target_fm, _ = parsed
+            allowed, reason = _curator_can_modify(target_fm)
+            if not allowed:
+                raise CuratorPolicyError(reason)
 
     target = skill_dir / Path(*parts)
     from ..tools.delta_lint import lint_after_write
