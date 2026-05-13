@@ -38,6 +38,18 @@
 - ocode/commands/        slash-command handlers (/loop, /compact, /resume,
                          /plan, /init, /memory, /review). Renamed from
                          ocode/skills/ in Phase 1.
+- ocode/review/          per-turn background review
+  - nudge.py             per-session counter, fires every N tool calls
+  - orchestrator.py      maybe_fire_review — spawns daemon-thread fork
+  - prompts.py           Hermes-adapted MEMORY_REVIEW / SKILL_REVIEW / COMBINED
+  - summary.py           bucket ForkAction → memory_writes / skill_changes
+- ocode/curator/         7-day umbrella consolidation pass
+  - orchestrator.py      maybe_run_curator with interval+idle+paused gates
+  - prompts.py           CURATOR_REVIEW_PROMPT + DRY_RUN_BANNER
+  - state.py             .curator_state persistence (last_run_at, run_count, paused)
+  - yaml_output.py       parse the curator's structured yaml-curator-report
+  - reports.py           run.json + REPORT.md + fork-stdout.log per run
+  - dry_run.py           dry-run helpers
 - ocode/sessions/        per-profile session persistence
   - jsonl.py             append-only JSONL primitives (truth-of-record)
   - sqlite_index.py      SQLite FTS5 mirror (schema + search)
@@ -82,3 +94,5 @@
   migrate a Hermes home into ocode v2
 - `ocode sessions {list,browse,search,purge}` — inspect prior sessions
 - `ocode reindex [--profile NAME]` — rebuild the session FTS5 index from JSONL
+- `ocode curator run [--dry-run] [--force]` — run the umbrella consolidator now
+- `ocode curator {status,pause,resume,inspect-last}` — manage the curator
