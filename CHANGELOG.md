@@ -24,6 +24,13 @@
 - Post-write delta lint for .py / .pyi / .json / .yaml / .yml / .toml (Phase 3)
 - ForkResult.actions extracted from structured tool results (Phase 3)
 - Parent/child session lineage with fork-tree CLI browse (Phase 3)
+- Per-turn background review fork (Phase 4)
+- Curator with structured YAML output (Phase 4)
+- Curator dry-run mode and run reports (run.json + REPORT.md) (Phase 4)
+- Deterministic lifecycle transitions at session start (Phase 4)
+- .curator_state persistence (Phase 4)
+- Provenance enforcement in skill_manage by write_origin (Phase 4)
+- ocode curator {run, status, pause, resume, inspect-last} CLI (Phase 4)
 
 ### Changed
 - Sub-agent dispatch tool now calls Agent.fork() under the hood
