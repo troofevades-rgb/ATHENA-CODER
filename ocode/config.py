@@ -38,6 +38,22 @@ def mcp_config_paths(workspace: Path) -> list[Path]:
 
 
 @dataclass
+class ReviewConfig:
+    """Per-turn background review settings."""
+    nudge_interval: int = 10        # fire review every N tool calls
+    disabled: bool = False
+    max_iterations: int = 8         # fork loop cap
+
+
+@dataclass
+class CuratorConfig:
+    """Curator (umbrella consolidation) settings."""
+    interval_hours: int = 168       # default 7 days between runs
+    min_idle_hours: int = 2         # don't run if a session ended within this window
+    max_iterations: int = 9999      # fork loop cap; effectively unbounded
+
+
+@dataclass
 class Config:
     model: str = "qwen2.5-coder:14b"
     ollama_host: str = "http://127.0.0.1:11434"
@@ -46,6 +62,8 @@ class Config:
     # contexts (default / personal / client-foo) separated without juggling
     # OCODE_HOME values.
     profile: str = "default"
+    review: ReviewConfig = field(default_factory=ReviewConfig)
+    curator: CuratorConfig = field(default_factory=CuratorConfig)
     # Skip the per-tool confirmation prompt for tools that opt into it
     # (Bash, Write to existing files, etc.). Replaces the old auto_approve_bash.
     auto_approve_tools: bool = False

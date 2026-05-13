@@ -193,6 +193,10 @@ class Agent:
         self.session_store: SessionStore | None = None
         self.session_id: str | None = None
         self._owns_session_store = False
+        # The most recent background-review summary, surfaced to the UI on
+        # the next prompt. Populated by ocode.review.orchestrator after each
+        # review fork completes.
+        self.last_review_summary: dict | None = None
         if session_store is not None:
             self.session_store = session_store
             self.session_id = new_session_id()
@@ -355,6 +359,7 @@ class Agent:
 
             if not tool_calls:
                 self._fire_stop("completed")
+                self._maybe_fire_review()
                 return
 
             # Execute each tool call and append a tool message for it.
@@ -379,6 +384,20 @@ class Agent:
 
         ui.warn(f"reached step limit ({max_steps}); stopping for safety.")
         self._fire_stop("step_limit")
+
+    def _maybe_fire_review(self) -> None:
+        """Hand off to the per-turn review orchestrator. Background reviews
+        run on a daemon thread and never block this method."""
+        from ..provenance import is_background
+        # Don't recursively spawn reviews from inside background forks.
+        if is_background():
+            return
+        try:
+            from ..review.orchestrator import maybe_fire_review
+            maybe_fire_review(self)
+        except Exception:
+            # The review path must never break a foreground turn.
+            ui.info("background review failed to fire (logged)")
 
     def _fire_stop(self, reason: str) -> None:
         hooks.fire("Stop", payload={
