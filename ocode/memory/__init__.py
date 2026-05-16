@@ -24,6 +24,14 @@ MEMORY.md is the index, NOT a memory itself. Entries look like:
 
 The agent loads MEMORY.md into the system prompt every session. Individual
 memory files are read on demand by the model via the Read tool.
+
+Phase 5 added :mod:`ocode.memory.providers` and :class:`MemoryProvider` for
+profile-keyed, pluggable backends. This module's workspace-keyed functions
+(``load_memory_index``, ``list_memories``, ``write_memory``,
+``delete_memory``, ``parse_memory_file``, ``render_index_for_display``) are
+the legacy public surface — preserved so existing callers (agent system
+prompt build, ``/memory`` command, migration importer) keep working.
+Phase 14 will migrate them over to the profile-keyed surface.
 """
 from __future__ import annotations
 import hashlib
@@ -31,7 +39,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import CONFIG_DIR
+from ..config import CONFIG_DIR
 
 
 PROJECTS_DIR = CONFIG_DIR / "projects"
