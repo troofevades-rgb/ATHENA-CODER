@@ -50,6 +50,9 @@ SLASH_HELP = """\
 /memory [list|show|delete|dir]  inspect or edit persistent memory
 /plan [prompt]       enter plan mode (read-only investigation)
 /plan-exit           leave plan mode without executing
+/steer MSG           queue MSG; delivered before your next prompt
+/steer clear         drop every pending steer for this session
+/queue               list pending steers
 /hooks               list configured hooks
 /exit                quit
 """

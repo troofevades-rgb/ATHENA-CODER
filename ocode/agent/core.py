@@ -399,6 +399,10 @@ class Agent:
         # plugin returning None is a pass-through. The chained result is
         # what lands in history and goes to the model.
         user_input = self.plugin_hooks.on_user_message(user_input)
+        # Drain any pending /steer messages BEFORE the user prompt so the
+        # model sees in-flight redirects first. Each steer becomes its own
+        # synthetic user message; the actual prompt follows.
+        self._inject_pending_steers()
         user_msg = {"role": "user", "content": user_input}
         self.messages.append(user_msg)
         self._persist_message(user_msg)
@@ -653,6 +657,20 @@ class Agent:
             msg["tool_call_id"] = call["id"]
         self.messages.append(msg)
         self._persist_message(msg)
+
+    def _inject_pending_steers(self) -> None:
+        """Drain any pending /steer messages and append them as synthetic
+        user messages before the next prompt. Steers are delivered in
+        FIFO order.
+        """
+        if self.session_id is None:
+            return
+        from ..steer.queue import GLOBAL_STEER_QUEUE
+        steers = GLOBAL_STEER_QUEUE.drain(self.session_id)
+        for steer in steers:
+            steer_msg = {"role": "user", "content": f"[/steer] {steer}"}
+            self.messages.append(steer_msg)
+            self._persist_message(steer_msg)
 
     def _persist_message(self, message: dict[str, Any]) -> None:
         """Append the message to the session store if one is active."""
