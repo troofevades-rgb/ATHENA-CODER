@@ -3,9 +3,9 @@
 """
 from __future__ import annotations
 import os
-import select
-import shlex
+import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -14,6 +14,41 @@ from typing import Any
 from .registry import tool
 from . import file_ops  # for workspace
 from ..ui import console
+
+_IS_WINDOWS = sys.platform == "win32"
+
+if not _IS_WINDOWS:
+    import select  # type: ignore  # POSIX-only path
+
+
+def _resolve_bash_executable() -> str | None:
+    """Return a path to a bash executable, or ``None`` to let ``shell=True``
+    pick the platform default (cmd.exe on Windows, /bin/sh on POSIX).
+
+    On Windows we prefer Git-for-Windows bash so commands like ``ls``,
+    ``grep``, and POSIX shell quoting still work. We deliberately SKIP
+    ``C:\\Windows\\System32\\bash.exe`` — that's WSL's launcher, which
+    interprets paths as Linux paths and breaks ``shell=True`` invocation
+    against a Windows ``cwd``. If no usable bash is found we fall back
+    to cmd.exe via the default ``shell=True`` resolution.
+    """
+    if not _IS_WINDOWS:
+        return "/bin/bash"
+    # Check Git-for-Windows install locations first.
+    for path in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if os.path.exists(path):
+            return path
+    # Then check PATH, but skip the WSL launcher under System32 /
+    # WindowsApps (the App Execution Alias shim).
+    for name in ("bash.exe", "bash"):
+        found = shutil.which(name)
+        if found and "system32" not in found.lower() and "windowsapps" not in found.lower():
+            return found
+    return None
 
 _MAX_OUTPUT = 64_000
 
@@ -71,21 +106,53 @@ def Bash(
     if run_in_background:
         return _start_background(command)
 
-    proc = subprocess.Popen(
-        command,
-        shell=True,
-        executable="/bin/bash",
-        cwd=str(file_ops._WORKSPACE),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=0,
-    )
+    console.print(f"[dim]$ {command}[/dim]")
+    proc = _spawn(command)
+    if _IS_WINDOWS:
+        return _stream_windows(proc, timeout)
+    return _stream_posix(proc, timeout)
+
+
+def _spawn(command: str, **extra_kwargs: Any) -> subprocess.Popen:
+    """Construct the Popen the right way for the platform.
+
+    POSIX: ``shell=True, executable="/bin/bash"`` works naturally.
+
+    Windows: ``shell=True`` with a non-cmd ``executable=`` is broken — Python
+    appends ``/c`` (cmd.exe's switch) and git-bash misreads it as a path.
+    So we invoke bash explicitly as ``[bash_path, "-c", command]`` with
+    ``shell=False``. If no bash is found, fall back to the default
+    ``shell=True`` resolution (cmd.exe).
+    """
+    base_kwargs: dict[str, Any] = {
+        "cwd": str(file_ops._WORKSPACE),
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.STDOUT,
+        "bufsize": 0,
+    }
+    base_kwargs.update(extra_kwargs)
+    exec_path = _resolve_bash_executable()
+    if _IS_WINDOWS:
+        if exec_path is not None:
+            return subprocess.Popen(
+                [exec_path, "-c", command], shell=False, **base_kwargs
+            )
+        # No bash available — let cmd.exe handle it.
+        return subprocess.Popen(command, shell=True, **base_kwargs)
+    # POSIX
+    if exec_path is not None:
+        return subprocess.Popen(
+            command, shell=True, executable=exec_path, **base_kwargs
+        )
+    return subprocess.Popen(command, shell=True, **base_kwargs)
+
+
+def _stream_posix(proc: subprocess.Popen, timeout: int) -> str:
+    """Live-stream stdout via select() on POSIX."""
     buf: list[str] = []
     pending = b""
     deadline = time.time() + timeout
     timed_out = False
-
-    console.print(f"[dim]$ {command}[/dim]")
     assert proc.stdout is not None
     fd = proc.stdout.fileno()
     try:
@@ -119,7 +186,45 @@ def Bash(
             tail = pending.decode("utf-8", errors="replace")
             console.out(tail, end="", highlight=False)
             buf.append(tail)
+    if timed_out:
+        buf.append(f"\n[ocode] command timed out after {timeout}s\n")
+    out = "".join(buf)
+    return f"exit={rc}\n{_truncate(out)}"
 
+
+def _stream_windows(proc: subprocess.Popen, timeout: int) -> str:
+    """Read stdout on a daemon thread on Windows — select() doesn't accept pipes."""
+    buf: list[str] = []
+    pending = b""
+    lock = threading.Lock()
+
+    def _drain() -> None:
+        nonlocal pending
+        assert proc.stdout is not None
+        try:
+            for raw_line in iter(proc.stdout.readline, b""):
+                with lock:
+                    text = raw_line.decode("utf-8", errors="replace")
+                    console.out(text, end="", highlight=False)
+                    buf.append(text)
+        except Exception:
+            pass
+
+    reader = threading.Thread(target=_drain, name="ocode-bash-reader", daemon=True)
+    reader.start()
+    try:
+        proc.wait(timeout=timeout)
+        timed_out = False
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        timed_out = True
+    # Give the reader a moment to drain final output, then move on.
+    reader.join(timeout=1.0)
+    rc = proc.poll()
     if timed_out:
         buf.append(f"\n[ocode] command timed out after {timeout}s\n")
     out = "".join(buf)
@@ -128,17 +233,8 @@ def Bash(
 
 def _start_background(command: str) -> str:
     global _NEXT_BG_ID
-    proc = subprocess.Popen(
-        command,
-        shell=True,
-        executable="/bin/bash",
-        cwd=str(file_ops._WORKSPACE),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        errors="replace",
-    )
+    proc = _spawn(command, text=True, bufsize=1, errors="replace")
+    # Re-open stdout in text mode for streaming readline iteration.
     with _BG_LOCK:
         bg_id = f"bg{_NEXT_BG_ID}"
         _NEXT_BG_ID += 1
