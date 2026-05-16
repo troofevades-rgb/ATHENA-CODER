@@ -207,6 +207,7 @@ _SUBCOMMANDS = {
     "plugins": "ocode.cli.plugins",
     "cron": "ocode.cli.cron",
     "model": "ocode.cli.model",
+    "train": "ocode.cli.train",
 }
 
 
