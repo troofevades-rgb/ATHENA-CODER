@@ -42,3 +42,4 @@ from . import compact          # noqa: F401
 from . import resume           # noqa: F401
 from . import memory_command   # noqa: F401
 from . import plan_command     # noqa: F401
+from . import steer            # noqa: F401
