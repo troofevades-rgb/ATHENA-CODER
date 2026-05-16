@@ -19,6 +19,7 @@ dev = [
     "pytest>=8.0",
     "pytest-xdist>=3.5",
     "freezegun>=1.4",
+    "respx>=0.21",
     "ruff>=0.4",
     "mypy>=1.10",
 ]
