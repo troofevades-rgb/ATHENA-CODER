@@ -27,15 +27,18 @@ from typing import Any, Callable
 
 from ..tools.registry import Tool, _REGISTRY  # internal: we register Tool objects directly
 from .client import MCPError, MCPStdioClient, format_tool_result
+from .transport_resolver import MCPTransport, open_transport
 
 
-_ACTIVE_CLIENTS: list[MCPStdioClient] = []
+# Anything the resolver returns — stdio or SSE — looks the same here:
+# both expose initialize / list_tools / call_tool / close.
+_ACTIVE_CLIENTS: list[MCPTransport] = []
 
 
 def load_mcp_servers(
     config_paths: list[Path],
     on_message: Callable[[str, str], None] | None = None,
-) -> list[MCPStdioClient]:
+) -> list[MCPTransport]:
     """Read configs, spawn each server, register its tools.
 
     config_paths: list of files to read in order; later overrides earlier.
@@ -65,7 +68,7 @@ def load_mcp_servers(
     if not merged:
         return []
 
-    started: list[MCPStdioClient] = []
+    started: list[MCPTransport] = []
     for name, scfg in merged.items():
         if not isinstance(scfg, dict):
             log("error", f"server '{name}': config must be an object")
@@ -73,25 +76,16 @@ def load_mcp_servers(
         if scfg.get("disabled"):
             log("info", f"mcp server '{name}': disabled, skipping")
             continue
-        # HTTP / SSE not implemented yet
-        if "url" in scfg and "command" not in scfg:
-            log("warn", f"mcp server '{name}': only stdio is supported (need 'command'), skipping")
-            continue
-        if "command" not in scfg:
-            log("error", f"mcp server '{name}': missing 'command'")
-            continue
 
-        client = None
+        client: MCPTransport | None = None
         try:
-            client = MCPStdioClient(
-                name=name,
-                command=scfg["command"],
-                args=scfg.get("args") or [],
-                env=scfg.get("env"),
-                cwd=scfg.get("cwd"),
-            )
+            client = open_transport(name, scfg)
             client.initialize()
             tools = client.list_tools()
+        except ValueError as e:
+            # Bad config (unknown transport, missing required field).
+            log("error", f"mcp server '{name}': {e}")
+            continue
         except MCPError as e:
             log("error", f"mcp server '{name}' failed to start: {e}")
             if client is not None:
@@ -125,7 +119,7 @@ def load_mcp_servers(
 
 def _register_mcp_tool(
     server_name: str,
-    client: MCPStdioClient,
+    client: MCPTransport,
     tool_def: dict[str, Any],
     log: Callable[[str, str], None],
 ) -> None:
@@ -171,5 +165,5 @@ def shutdown_all() -> None:
             pass
 
 
-def active_clients() -> list[MCPStdioClient]:
+def active_clients() -> list[MCPTransport]:
     return list(_ACTIVE_CLIENTS)
