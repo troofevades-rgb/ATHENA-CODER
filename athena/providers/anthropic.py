@@ -122,9 +122,13 @@ class AnthropicProvider(Provider):
         ``{"data": [{"id": ..., "type": "model", ...}], "has_more": bool}``.
         We request a high limit (1000 is the documented max) and ignore
         ``has_more`` since real key catalogs are well under that.
+
+        Note: not every Anthropic key has /models access; some are scoped
+        to /messages only. The error body comes through via _raise_with_
+        body so a 401 / 403 surfaces the API's explanation.
         """
         r = self._client.get("/models", params={"limit": 1000})
-        r.raise_for_status()
+        _raise_with_body(r)
         data = r.json() or {}
         items = data.get("data") or []
         return [

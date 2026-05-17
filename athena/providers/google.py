@@ -121,7 +121,7 @@ class GoogleProvider(Provider):
         same form callers pass to ``stream_chat``.
         """
         r = self._client.get("/models", params={"pageSize": 1000})
-        r.raise_for_status()
+        _raise_with_body(r)
         data = r.json() or {}
         items = data.get("models") or []
         out: list[str] = []
