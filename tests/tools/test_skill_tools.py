@@ -1,6 +1,6 @@
 """Tests for the model-facing skill tools (skills_list, skill_view, skill_manage).
 
-The tools dispatch to ocode.skills.manager; these tests exercise the wiring
+The tools dispatch to athena.skills.manager; these tests exercise the wiring
 plus the per-action contract (response shape, error mapping, write_origin
 policy from the curator)."""
 from __future__ import annotations
@@ -10,14 +10,14 @@ from pathlib import Path
 
 import pytest
 
-from ocode.provenance import (
+from athena.provenance import (
     CURATOR,
     FOREGROUND,
     reset_current_write_origin,
     set_current_write_origin,
 )
-from ocode.skills.frontmatter import parse_frontmatter
-from ocode.tools import file_ops, skill_tools
+from athena.skills.frontmatter import parse_frontmatter
+from athena.tools import file_ops, skill_tools
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def _parse(response: str) -> dict:
 
 
 def test_skills_list_filters_by_state(workspace_set: Path, write_skill) -> None:
-    user = Path.home() / ".ocode" / "skills"
+    user = Path.home() / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "alive")
     write_skill(user, "stale-one", state="stale")
@@ -56,7 +56,7 @@ def test_skills_list_filters_by_state(workspace_set: Path, write_skill) -> None:
 
 
 def test_skills_list_filters_by_pinned(workspace_set: Path, write_skill) -> None:
-    user = Path.home() / ".ocode" / "skills"
+    user = Path.home() / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "p1", pinned=True)
     write_skill(user, "p2", pinned=False)
@@ -66,7 +66,7 @@ def test_skills_list_filters_by_pinned(workspace_set: Path, write_skill) -> None
 
 
 def test_skill_view_returns_full_body(workspace_set: Path, write_skill) -> None:
-    user = Path.home() / ".ocode" / "skills"
+    user = Path.home() / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "viewme", body="body content here\n")
     text = skill_tools.skill_view("viewme")
@@ -87,7 +87,7 @@ def test_skill_manage_create_with_foreground_origin(workspace_set: Path) -> None
     ))
     assert out["success"] is True
     assert out["action"] == "create"
-    skill_md = workspace_set / ".ocode" / "skills" / "from-tool" / "SKILL.md"
+    skill_md = workspace_set / ".athena" / "skills" / "from-tool" / "SKILL.md"
     assert skill_md.exists()
     fm, _ = parse_frontmatter(skill_md)
     assert fm.write_origin == FOREGROUND
@@ -103,7 +103,7 @@ def test_skill_manage_create_duplicate_returns_error(workspace_set: Path) -> Non
 def test_skill_manage_patch_preserves_origin(workspace_set: Path) -> None:
     skill_tools.skill_manage(action="create", name="po", frontmatter={"description": "orig"})
     skill_tools.skill_manage(action="patch", name="po", frontmatter={"description": "edited"})
-    fm, _ = parse_frontmatter(workspace_set / ".ocode" / "skills" / "po" / "SKILL.md")
+    fm, _ = parse_frontmatter(workspace_set / ".athena" / "skills" / "po" / "SKILL.md")
     assert fm.description == "edited"
     assert fm.write_origin == FOREGROUND
 
@@ -112,7 +112,7 @@ def test_skill_manage_delete_archives(workspace_set: Path) -> None:
     skill_tools.skill_manage(action="create", name="bye", frontmatter={"description": "x"})
     out = _parse(skill_tools.skill_manage(action="delete", name="bye"))
     assert out["success"] is True
-    assert (workspace_set / ".ocode" / "skills" / ".archive" / "bye").exists()
+    assert (workspace_set / ".athena" / "skills" / ".archive" / "bye").exists()
 
 
 def test_skill_manage_unarchive_restores(workspace_set: Path) -> None:
@@ -120,13 +120,13 @@ def test_skill_manage_unarchive_restores(workspace_set: Path) -> None:
     skill_tools.skill_manage(action="delete", name="restore")
     out = _parse(skill_tools.skill_manage(action="unarchive", name="restore"))
     assert out["success"] is True
-    assert (workspace_set / ".ocode" / "skills" / "restore").exists()
+    assert (workspace_set / ".athena" / "skills" / "restore").exists()
 
 
 def test_skill_manage_pin_sets_pinned_true(workspace_set: Path) -> None:
     skill_tools.skill_manage(action="create", name="pinning", frontmatter={"description": "x"})
     _parse(skill_tools.skill_manage(action="pin", name="pinning"))
-    fm, _ = parse_frontmatter(workspace_set / ".ocode" / "skills" / "pinning" / "SKILL.md")
+    fm, _ = parse_frontmatter(workspace_set / ".athena" / "skills" / "pinning" / "SKILL.md")
     assert fm.pinned is True
 
 
@@ -139,7 +139,7 @@ def test_skill_manage_write_file_under_references(workspace_set: Path) -> None:
         file_content="hi\n",
     ))
     assert out["success"] is True
-    p = workspace_set / ".ocode" / "skills" / "wf" / "references" / "notes.md"
+    p = workspace_set / ".athena" / "skills" / "wf" / "references" / "notes.md"
     assert p.read_text(encoding="utf-8") == "hi\n"
 
 
@@ -208,7 +208,7 @@ def test_skill_manage_curator_cannot_pin(workspace_set: Path) -> None:
 
 
 def test_skill_manage_background_review_cannot_pin(workspace_set: Path) -> None:
-    from ocode.provenance import BACKGROUND_REVIEW
+    from athena.provenance import BACKGROUND_REVIEW
     token = set_current_write_origin(BACKGROUND_REVIEW)
     try:
         skill_tools.skill_manage(
@@ -242,7 +242,7 @@ def test_skill_manage_curator_cannot_delete_migration_origin(workspace_set: Path
     until they have local activity newer than imported_at — Phase 1 invariant
     7. (For now we assert the curator policy error path; tighter enforcement
     on migration-origin specifically is checked by the state machine.)"""
-    user = workspace_set / ".ocode" / "skills"
+    user = workspace_set / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "imported", write_origin="migration")
 

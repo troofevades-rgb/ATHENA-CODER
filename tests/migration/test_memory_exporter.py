@@ -1,11 +1,11 @@
-"""Tests for ocode.migration.memory_exporter."""
+"""Tests for athena.migration.memory_exporter."""
 from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ocode.migration.memory_exporter import export_memory
+from athena.migration.memory_exporter import export_memory
 
 
 def _build_hermes_db(db_path: Path, rows: list[dict]) -> None:

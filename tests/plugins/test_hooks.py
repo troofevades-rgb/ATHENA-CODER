@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from ocode.plugins.base import Plugin
-from ocode.plugins.hooks import HookDispatcher
+from athena.plugins.base import Plugin
+from athena.plugins.hooks import HookDispatcher
 
 
 class _Probe(Plugin):

@@ -1,10 +1,10 @@
-"""Tests for ocode.migration.mcp_translator."""
+"""Tests for athena.migration.mcp_translator."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from ocode.migration.mcp_translator import translate_mcp
+from athena.migration.mcp_translator import translate_mcp
 
 
 def _write_mcp(src: Path, data: dict) -> Path:

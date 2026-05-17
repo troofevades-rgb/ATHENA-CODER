@@ -1,4 +1,4 @@
-from ocode.__main__ import _model_pulled, _normalize_model_name
+from athena.__main__ import _model_pulled, _normalize_model_name
 
 
 def test_normalize_adds_latest():

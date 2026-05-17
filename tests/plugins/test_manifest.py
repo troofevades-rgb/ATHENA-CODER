@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ocode.plugins.manifest import ManifestError, PluginManifest, parse_manifest
+from athena.plugins.manifest import ManifestError, PluginManifest, parse_manifest
 
 
 def write_manifest(tmp_path: Path, body: str) -> Path:

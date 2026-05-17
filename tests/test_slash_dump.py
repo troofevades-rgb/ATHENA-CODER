@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 from rich.console import Console
 
-from ocode import ui
-from ocode.__main__ import _handle_slash
+from athena import ui
+from athena.__main__ import _handle_slash
 
 
 def _make_fake_agent() -> MagicMock:

@@ -1,7 +1,7 @@
-"""Tests for ocode.curator.orchestrator.maybe_run_curator.
+"""Tests for athena.curator.orchestrator.maybe_run_curator.
 
 These tests exercise the gate logic + YAML round-trip without spinning up
-a real Ollama: ocode.agent.fork.fork is monkey-patched to return a pre-
+a real Ollama: athena.agent.fork.fork is monkey-patched to return a pre-
 canned ForkResult.
 """
 from __future__ import annotations
@@ -13,9 +13,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ocode.agent.fork import ForkResult
-from ocode.config import CONFIG_DIR, Config, CuratorConfig
-from ocode.curator import orchestrator, state
+from athena.agent.fork import ForkResult
+from athena.config import CONFIG_DIR, Config, CuratorConfig
+from athena.curator import orchestrator, state
 
 
 VALID_YAML = """\
@@ -70,7 +70,7 @@ def _patch_fork(monkeypatch, *, response: str, captured: list | None = None):
         calls.append(kwargs)
         return ForkResult(final_response=response)
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
     return calls
 
 

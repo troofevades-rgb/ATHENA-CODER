@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ocode.skills.frontmatter import (
+from athena.skills.frontmatter import (
     FrontmatterError,
     SkillFrontmatter,
     parse_frontmatter,
@@ -38,7 +38,7 @@ name: full-skill
 description: A full skill.
 version: "1.2.3"
 license: MIT
-compatibility: ocode>=0.2
+compatibility: athena>=0.2
 metadata:
   category: workflow
 state: stale
@@ -57,7 +57,7 @@ body
     assert fm.name == "full-skill"
     assert fm.version == "1.2.3"
     assert fm.license == "MIT"
-    assert fm.compatibility == "ocode>=0.2"
+    assert fm.compatibility == "athena>=0.2"
     assert fm.metadata == {"category": "workflow"}
     assert fm.state == "stale"
     assert fm.pinned is True
@@ -157,11 +157,11 @@ def test_serialize_is_deterministic_sorted_keys() -> None:
     out2 = serialize_frontmatter(fm, "body")
     assert out1 == out2
 
-    # agentskills.io group appears before ocode v2 group; within each, sorted.
+    # agentskills.io group appears before athena v2 group; within each, sorted.
     yaml_block = out1.split("---\n")[1]
     lines = [ln.split(":")[0] for ln in yaml_block.splitlines() if ln and not ln.startswith(" ")]
     # description < license < name < version alphabetically (agentskills group)
-    # then pinned < state < write_origin (ocode group)
+    # then pinned < state < write_origin (athena group)
     assert lines.index("description") < lines.index("pinned")
     assert lines.index("name") < lines.index("state")
     # Inside groups, sorted alpha:

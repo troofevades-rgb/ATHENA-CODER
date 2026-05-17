@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from ocode.cron.jobs import CronJob
-from ocode.cron.scheduler import CronScheduler
+from athena.cron.jobs import CronJob
+from athena.cron.scheduler import CronScheduler
 
 
 @pytest.fixture

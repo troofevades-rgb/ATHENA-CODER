@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from ocode.cron.jobs import CronJob, JobStore
+from athena.cron.jobs import CronJob, JobStore
 
 
 # ---- CronJob dataclass --------------------------------------------------

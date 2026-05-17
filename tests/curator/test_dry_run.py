@@ -1,4 +1,4 @@
-"""Tests for curator dry-run behavior and the `ocode curator` CLI."""
+"""Tests for curator dry-run behavior and the `athena curator` CLI."""
 from __future__ import annotations
 
 import json
@@ -9,11 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ocode.agent.fork import ForkResult
-from ocode.config import Config, CuratorConfig
-from ocode.curator import dry_run as dry_run_mod
-from ocode.curator import orchestrator
-from ocode.curator import reports, state
+from athena.agent.fork import ForkResult
+from athena.config import Config, CuratorConfig
+from athena.curator import dry_run as dry_run_mod
+from athena.curator import orchestrator
+from athena.curator import reports, state
 
 
 VALID = """\
@@ -54,7 +54,7 @@ def _patch_fork(monkeypatch, response: str):
             child_session_id="child-1",
         )
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
     return calls
 
 
@@ -91,13 +91,13 @@ def test_dry_run_writes_to_logs_curator_directory(monkeypatch, tmp_path) -> None
 
 
 def test_is_dry_run_addendum_helper() -> None:
-    from ocode.curator.prompts import CURATOR_REVIEW_PROMPT, DRY_RUN_BANNER
+    from athena.curator.prompts import CURATOR_REVIEW_PROMPT, DRY_RUN_BANNER
     assert dry_run_mod.is_dry_run_addendum(DRY_RUN_BANNER + CURATOR_REVIEW_PROMPT)
     assert not dry_run_mod.is_dry_run_addendum(CURATOR_REVIEW_PROMPT)
 
 
 def test_cli_status_reads_state(tmp_path) -> None:
-    from ocode.cli.curator import main
+    from athena.cli.curator import main
     skills_root = tmp_path / "skills"
     state.write_state(skills_root, state.State(
         last_run_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
@@ -109,7 +109,7 @@ def test_cli_status_reads_state(tmp_path) -> None:
 
 
 def test_cli_pause_resume_round_trip(tmp_path) -> None:
-    from ocode.cli.curator import main
+    from athena.cli.curator import main
     main(["--home", str(tmp_path), "pause"])
     s = state.read_state(tmp_path / "skills")
     assert s.paused is True
@@ -124,7 +124,7 @@ def test_cli_inspect_last_prints_latest_report(tmp_path, capsys) -> None:
     run_dir.mkdir(parents=True)
     (run_dir / "REPORT.md").write_text("# fake curator run\n", encoding="utf-8")
 
-    from ocode.cli.curator import main
+    from athena.cli.curator import main
     rc = main(["--home", str(tmp_path), "inspect-last"])
     assert rc == 0
     out = capsys.readouterr().out

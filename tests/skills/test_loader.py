@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from ocode.skills import loader
+from athena.skills import loader
 
 
 def test_load_full_body(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "alpha", body="# alpha\n\nHere is the body.\n")
     body = loader.load_body("alpha")
@@ -22,7 +22,7 @@ def test_load_returns_none_when_missing(isolated_home: Path) -> None:
 
 
 def test_load_with_references_subdir(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     skill_dir = write_skill(user_skills, "withrefs")
     refs = skill_dir / "references"
@@ -35,7 +35,7 @@ def test_load_with_references_subdir(isolated_home: Path, write_skill) -> None:
 
 
 def test_load_caches_body(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     skill_dir = write_skill(user_skills, "cached", body="original\n")
 
@@ -55,7 +55,7 @@ def test_load_caches_body(isolated_home: Path, write_skill) -> None:
 
 
 def test_load_reference_rejects_traversal(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "trav")
     with pytest.raises(ValueError, match="'..'"):
@@ -63,7 +63,7 @@ def test_load_reference_rejects_traversal(isolated_home: Path, write_skill) -> N
 
 
 def test_load_reference_rejects_absolute(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "abs")
     with pytest.raises(ValueError, match="must be relative"):
@@ -71,7 +71,7 @@ def test_load_reference_rejects_absolute(isolated_home: Path, write_skill) -> No
 
 
 def test_load_reference_rejects_unknown_subdir(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "sub")
     with pytest.raises(ValueError, match="must start with"):
@@ -79,7 +79,7 @@ def test_load_reference_rejects_unknown_subdir(isolated_home: Path, write_skill)
 
 
 def test_load_reference_missing_file(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "missing-ref")
     assert loader.load_reference("missing-ref", "references/nope.md") is None

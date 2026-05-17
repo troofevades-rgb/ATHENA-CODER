@@ -1,7 +1,7 @@
 """Shared fixtures for skill tests.
 
 ``isolated_home`` redirects ``~`` to a temp path so tests can populate
-``~/.ocode/skills/`` without touching the developer's real home. ``write_skill``
+``~/.athena/skills/`` without touching the developer's real home. ``write_skill``
 is a tiny helper for fabricating SKILL.md files.
 """
 from __future__ import annotations
@@ -11,8 +11,8 @@ from typing import Callable
 
 import pytest
 
-from ocode.skills import loader
-from ocode.skills.frontmatter import SkillFrontmatter, serialize_frontmatter
+from athena.skills import loader
+from athena.skills.frontmatter import SkillFrontmatter, serialize_frontmatter
 
 
 @pytest.fixture

@@ -1,9 +1,9 @@
-"""Tests for ocode.curator.yaml_output.parse_curator_report."""
+"""Tests for athena.curator.yaml_output.parse_curator_report."""
 from __future__ import annotations
 
 import logging
 
-from ocode.curator.yaml_output import parse_curator_report
+from athena.curator.yaml_output import parse_curator_report
 
 
 _MINIMAL = """\
@@ -57,7 +57,7 @@ def test_parses_full_report() -> None:
 
 def test_rejects_missing_runs_key(caplog) -> None:
     text = "```yaml-curator-report\nother_key: 1\n```"
-    with caplog.at_level(logging.WARNING, logger="ocode.curator.yaml_output"):
+    with caplog.at_level(logging.WARNING, logger="athena.curator.yaml_output"):
         assert parse_curator_report(text) is None
     assert any("runs" in rec.message for rec in caplog.records)
 

@@ -7,8 +7,8 @@ import httpx
 import pytest
 import respx
 
-from ocode.providers import StreamChunk, get_provider_class
-from ocode.providers.anthropic import AnthropicProvider
+from athena.providers import StreamChunk, get_provider_class
+from athena.providers.anthropic import AnthropicProvider
 
 
 def _sse(*events: dict) -> bytes:

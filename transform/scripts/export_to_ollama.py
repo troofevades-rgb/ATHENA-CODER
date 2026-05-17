@@ -156,7 +156,7 @@ def main() -> int:
 
     print("\ndone. test it:")
     print(f"    ollama run {args.ollama_name}")
-    print(f"or in ocode: set model = \"{args.ollama_name}\" in ~/.ocode/config.toml")
+    print(f"or in athena: set model = \"{args.ollama_name}\" in ~/.athena/config.toml")
     return 0
 
 

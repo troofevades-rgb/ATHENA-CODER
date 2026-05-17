@@ -1,4 +1,4 @@
-"""Tests for ocode.migration.config_translator."""
+"""Tests for athena.migration.config_translator."""
 from __future__ import annotations
 
 import json
@@ -12,7 +12,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
-from ocode.migration.config_translator import translate_config
+from athena.migration.config_translator import translate_config
 
 
 def _write_hermes_config(src: Path, data: dict) -> Path:

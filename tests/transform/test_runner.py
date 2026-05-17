@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ocode.transform.runner import (
+from athena.transform.runner import (
     TrainingRun,
     export_to_gguf,
     find_lora_adapter,
@@ -34,7 +34,7 @@ def trun(tmp_path: Path) -> TrainingRun:
 def test_run_lora_calls_train_script_with_args(trun: TrainingRun, tmp_path: Path):
     """Argv must include every flag the existing train_lora.py understands,
     using its actual names (--base, --train, --out, --rank, --alpha, --batch,
-    --lr) — not ocode-side terminology."""
+    --lr) — not athena-side terminology."""
     captured: dict = {}
 
     def fake_call(cmd, cwd=None):
@@ -132,14 +132,14 @@ def test_export_to_gguf_calls_export_script(tmp_path: Path):
 
     rc = export_to_gguf(
         tmp_path / "lora_out",
-        ollama_name="qwen-ocode-1",
+        ollama_name="qwen-athena-1",
         runner=fake_call,
     )
     assert rc == 0
     cmd = captured["cmd"]
     assert any("export_to_ollama.py" in part for part in cmd)
     name_idx = cmd.index("--ollama-name")
-    assert cmd[name_idx + 1] == "qwen-ocode-1"
+    assert cmd[name_idx + 1] == "qwen-athena-1"
     adapter_idx = cmd.index("--adapter")
     assert cmd[adapter_idx + 1] == str(tmp_path / "lora_out")
 

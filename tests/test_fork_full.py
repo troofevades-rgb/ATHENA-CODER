@@ -2,7 +2,7 @@
 
 Replaces the Phase 0 stub tests in tests/test_fork.py. Uses a FakeClient so
 no Ollama backend is required; isolated_home keeps the parent agent's
-SessionStore from touching the real ~/.ocode.
+SessionStore from touching the real ~/.athena.
 """
 from __future__ import annotations
 
@@ -12,18 +12,18 @@ from typing import Any
 
 import pytest
 
-import ocode.agent.core as core_mod
-from ocode.agent import Agent, ForkAction, ForkResult
-from ocode.agent import auxiliary_client as aux_mod
-from ocode.config import Config
-from ocode.providers import StreamChunk
-from ocode.provenance import (
+import athena.agent.core as core_mod
+from athena.agent import Agent, ForkAction, ForkResult
+from athena.agent import auxiliary_client as aux_mod
+from athena.config import Config
+from athena.providers import StreamChunk
+from athena.provenance import (
     BACKGROUND_REVIEW,
     CURATOR,
     FOREGROUND,
     get_current_write_origin,
 )
-from ocode.safety.approval_callback import (
+from athena.safety.approval_callback import (
     AUTO_DENY,
     _interactive_approval,
     get_approval_callback,
@@ -106,7 +106,7 @@ def parent_agent(isolated_home: Path, fake_client: type[FakeClient]) -> Agent:
 
 def test_auxiliary_client_creates_fresh_ollama_instance(parent_agent: Agent) -> None:
     """build_auxiliary_client returns a new client (not the parent's)."""
-    from ocode.agent.auxiliary_client import build_auxiliary_client
+    from athena.agent.auxiliary_client import build_auxiliary_client
     aux = build_auxiliary_client(parent_agent)
     assert aux is not parent_agent.client
     # Host matches the parent's config.
@@ -306,7 +306,7 @@ def test_fork_exception_recorded_in_error_field(parent_agent: Agent) -> None:
 
 def test_fork_actions_extracted_from_tool_results(parent_agent: Agent) -> None:
     """Tool messages with a structured success payload populate actions."""
-    from ocode.agent.fork import _extract_actions
+    from athena.agent.fork import _extract_actions
 
     messages = [
         {"role": "system", "content": "..."},
@@ -351,16 +351,16 @@ def test_fork_thread_is_daemon(parent_agent: Agent, monkeypatch: pytest.MonkeyPa
 
     def capturing_thread(*args, **kwargs):
         name = kwargs.get("name") or ""
-        if name.startswith("ocode-fork"):
+        if name.startswith("athena-fork"):
             seen["daemon"] = kwargs.get("daemon")
             seen["name"] = name
         return real_thread(*args, **kwargs)
 
-    import ocode.agent.fork as fork_mod
+    import athena.agent.fork as fork_mod
     monkeypatch.setattr(fork_mod.threading, "Thread", capturing_thread)
     parent_agent.fork(enabled_toolsets=["core"], system_addendum="")
     assert seen.get("daemon") is True
-    assert seen.get("name", "").startswith("ocode-fork-")
+    assert seen.get("name", "").startswith("athena-fork-")
 
 
 def test_fork_uses_enabled_toolsets(parent_agent: Agent) -> None:

@@ -1,4 +1,4 @@
-"""ocode model CLI."""
+"""athena model CLI."""
 from __future__ import annotations
 
 import io
@@ -13,7 +13,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib  # type: ignore
 
-import ocode.cli.model as model_cli
+import athena.cli.model as model_cli
 
 
 def _run(argv: list[str]) -> tuple[int, str, str]:
@@ -57,15 +57,15 @@ def test_model_list_errors_without_ollama(monkeypatch: pytest.MonkeyPatch):
 def test_model_switch_updates_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    """ocode model switch <name> writes model = "<name>" to config.toml."""
+    """athena model switch <name> writes model = "<name>" to config.toml."""
     fake_config = tmp_path / "config.toml"
     monkeypatch.setattr(model_cli, "CONFIG_PATH", fake_config)
     monkeypatch.setattr(model_cli, "ensure_ollama", lambda: True)
-    rc, stdout, _ = _run(["switch", "qwen-ocode-2"])
+    rc, stdout, _ = _run(["switch", "qwen-athena-2"])
     assert rc == 0
-    assert "qwen-ocode-2" in stdout
+    assert "qwen-athena-2" in stdout
     data = tomllib.loads(fake_config.read_text(encoding="utf-8"))
-    assert data["model"] == "qwen-ocode-2"
+    assert data["model"] == "qwen-athena-2"
 
 
 def test_model_switch_warns_when_ollama_missing(

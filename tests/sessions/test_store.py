@@ -1,4 +1,4 @@
-"""Tests for ocode.sessions.store.SessionStore."""
+"""Tests for athena.sessions.store.SessionStore."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ocode.sessions.store import (
+from athena.sessions.store import (
     SearchHit,
     SessionMeta,
     SessionStore,

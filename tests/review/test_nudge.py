@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-from ocode.review import nudge
+from athena.review import nudge
 
 
 @pytest.fixture(autouse=True)

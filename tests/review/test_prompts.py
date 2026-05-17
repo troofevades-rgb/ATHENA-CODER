@@ -6,7 +6,7 @@ umbrella preference) so a future edit can't silently drop them.
 """
 from __future__ import annotations
 
-from ocode.review.prompts import COMBINED, MEMORY_REVIEW, SKILL_REVIEW
+from athena.review.prompts import COMBINED, MEMORY_REVIEW, SKILL_REVIEW
 
 
 def test_combined_includes_memory_and_skill_blocks() -> None:

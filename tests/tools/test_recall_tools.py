@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from ocode.sessions.store import SessionMeta, SessionStore, new_session_id
-from ocode.tools import recall_tools
+from athena.sessions.store import SessionMeta, SessionStore, new_session_id
+from athena.tools import recall_tools
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def _fake_agent(store: SessionStore, workspace: str = "/proj") -> SimpleNamespac
 def test_search_sessions_returns_top_k(seeded_store, monkeypatch) -> None:
     store, sid1, sid2 = seeded_store
     monkeypatch.setattr(
-        "ocode.agent.core.get_current_agent",
+        "athena.agent.core.get_current_agent",
         lambda: _fake_agent(store, workspace="/proj"),
     )
     out = recall_tools.search_sessions("needle", k=5)
@@ -57,7 +57,7 @@ def test_search_sessions_returns_top_k(seeded_store, monkeypatch) -> None:
 def test_search_sessions_filters_workspace_by_default(seeded_store, monkeypatch) -> None:
     store, sid1, _sid2 = seeded_store
     monkeypatch.setattr(
-        "ocode.agent.core.get_current_agent",
+        "athena.agent.core.get_current_agent",
         lambda: _fake_agent(store, workspace="/proj"),
     )
     out = recall_tools.search_sessions("needle")
@@ -70,7 +70,7 @@ def test_search_sessions_empty_workspace_searches_globally(
 ) -> None:
     store, sid1, sid2 = seeded_store
     monkeypatch.setattr(
-        "ocode.agent.core.get_current_agent",
+        "athena.agent.core.get_current_agent",
         lambda: _fake_agent(store, workspace="/proj"),
     )
     out = recall_tools.search_sessions("needle", workspace="")
@@ -82,7 +82,7 @@ def test_search_sessions_empty_workspace_searches_globally(
 def test_search_sessions_includes_surrounding_context(seeded_store, monkeypatch) -> None:
     store, sid1, _sid2 = seeded_store
     monkeypatch.setattr(
-        "ocode.agent.core.get_current_agent",
+        "athena.agent.core.get_current_agent",
         lambda: _fake_agent(store),
     )
     out = recall_tools.search_sessions("needle", k=1)
@@ -94,7 +94,7 @@ def test_search_sessions_includes_surrounding_context(seeded_store, monkeypatch)
 def test_search_sessions_no_matches_message(seeded_store, monkeypatch) -> None:
     store, _sid1, _sid2 = seeded_store
     monkeypatch.setattr(
-        "ocode.agent.core.get_current_agent",
+        "athena.agent.core.get_current_agent",
         lambda: _fake_agent(store),
     )
     out = recall_tools.search_sessions("zzz_no_such_term")
@@ -102,6 +102,6 @@ def test_search_sessions_no_matches_message(seeded_store, monkeypatch) -> None:
 
 
 def test_search_sessions_without_active_agent(monkeypatch) -> None:
-    monkeypatch.setattr("ocode.agent.core.get_current_agent", lambda: None)
+    monkeypatch.setattr("athena.agent.core.get_current_agent", lambda: None)
     out = recall_tools.search_sessions("anything")
     assert "ERROR" in out

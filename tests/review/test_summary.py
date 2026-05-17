@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ocode.agent.fork import ForkAction, ForkResult
-from ocode.review.summary import extract_summary, format_for_user
+from athena.agent.fork import ForkAction, ForkResult
+from athena.review.summary import extract_summary, format_for_user
 
 
 def _result_with(*actions: ForkAction) -> ForkResult:
