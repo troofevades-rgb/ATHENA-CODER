@@ -211,6 +211,7 @@ _SUBCOMMANDS = {
     "providers": "athena.cli.providers",
     "gateway": "athena.cli.gateway",
     "mcp": "athena.cli.mcp",
+    "acp": "athena.cli.acp",
 }
 
 
