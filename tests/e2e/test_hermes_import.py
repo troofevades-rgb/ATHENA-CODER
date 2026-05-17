@@ -14,7 +14,7 @@ from typing import Callable
 import pytest
 import yaml
 
-from ocode.migration.hermes_import import DEFAULT_DOMAINS, run_import
+from athena.migration.hermes_import import DEFAULT_DOMAINS, run_import
 
 
 @pytest.fixture
@@ -113,7 +113,7 @@ def hermes_home_sample(tmp_path: Path) -> Path:
 def test_full_import_against_fixture_hermes_home(
     hermes_home_sample: Path, tmp_path: Path
 ) -> None:
-    dest = tmp_path / "ocode-out"
+    dest = tmp_path / "athena-out"
     report_dir = run_import(hermes_home_sample, dest)
 
     # Skills are imported
@@ -138,7 +138,7 @@ def test_full_import_against_fixture_hermes_home(
 
 
 def test_dry_run_makes_no_changes(hermes_home_sample: Path, tmp_path: Path) -> None:
-    dest = tmp_path / "ocode-out"
+    dest = tmp_path / "athena-out"
     run_import(hermes_home_sample, dest, dry_run=True)
     # Only the report directory should exist; no skills/memory/etc.
     assert not (dest / "skills").exists()
@@ -154,7 +154,7 @@ def test_dry_run_makes_no_changes(hermes_home_sample: Path, tmp_path: Path) -> N
 def test_report_lists_all_imported_artifacts(
     hermes_home_sample: Path, tmp_path: Path
 ) -> None:
-    dest = tmp_path / "ocode-out"
+    dest = tmp_path / "athena-out"
     report_dir = run_import(hermes_home_sample, dest)
     summary = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
     counts = summary["counts"]
@@ -173,9 +173,9 @@ def test_report_lists_all_imported_artifacts(
 def test_post_import_validation_passes(
     hermes_home_sample: Path, tmp_path: Path
 ) -> None:
-    """Every imported skill must parse via the ocode v2 validator."""
-    from ocode.skills.validation import validate_skill
-    dest = tmp_path / "ocode-out"
+    """Every imported skill must parse via the athena v2 validator."""
+    from athena.skills.validation import validate_skill
+    dest = tmp_path / "athena-out"
     run_import(hermes_home_sample, dest)
     for skill_dir in (dest / "skills").iterdir():
         if skill_dir.is_dir() and not skill_dir.name.startswith("."):
@@ -186,7 +186,7 @@ def test_post_import_validation_passes(
 
 
 def test_second_run_is_idempotent(hermes_home_sample: Path, tmp_path: Path) -> None:
-    dest = tmp_path / "ocode-out"
+    dest = tmp_path / "athena-out"
     run_import(hermes_home_sample, dest)
     report_dir = run_import(hermes_home_sample, dest)
     summary = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
@@ -196,14 +196,14 @@ def test_second_run_is_idempotent(hermes_home_sample: Path, tmp_path: Path) -> N
 
 
 def test_cli_entry_point_dispatches(monkeypatch, hermes_home_sample: Path, tmp_path: Path, capsys) -> None:
-    """ocode import-from-hermes --source X --dest Y --no-confirm dispatches
+    """athena import-from-hermes --source X --dest Y --no-confirm dispatches
     through __main__.main() and returns 0."""
-    from ocode import __main__ as main_mod
-    dest = tmp_path / "ocode-out"
+    from athena import __main__ as main_mod
+    dest = tmp_path / "athena-out"
     monkeypatch.setattr(
         "sys.argv",
         [
-            "ocode", "import-from-hermes",
+            "athena", "import-from-hermes",
             "--source", str(hermes_home_sample),
             "--dest", str(dest),
             "--no-confirm",

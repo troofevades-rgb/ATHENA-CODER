@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from ocode.cron.delivery import deliver
-from ocode.cron.jobs import CronJob
+from athena.cron.delivery import deliver
+from athena.cron.jobs import CronJob
 
 
 def _job(target: str) -> CronJob:
@@ -23,7 +23,7 @@ def _job(target: str) -> CronJob:
 
 def test_log_delivery(caplog):
     job = _job("log")
-    with caplog.at_level(logging.INFO, logger="ocode.cron"):
+    with caplog.at_level(logging.INFO, logger="athena.cron"):
         deliver(job, {"status": "success", "exit_code": 0})
     msgs = [r.message for r in caplog.records]
     assert any(job.id in m and "success" in m for m in msgs)
@@ -61,7 +61,7 @@ def test_file_delivery_appends_existing_content(tmp_path: Path):
 
 def test_gateway_delivery_logs_warning_and_falls_back(caplog):
     job = _job("gateway://telegram/12345")
-    with caplog.at_level(logging.WARNING, logger="ocode.cron"):
+    with caplog.at_level(logging.WARNING, logger="athena.cron"):
         deliver(job, {"status": "success"})
     warnings = [r for r in caplog.records if r.levelname == "WARNING"]
     assert any("gateway" in r.message.lower() for r in warnings)
@@ -69,7 +69,7 @@ def test_gateway_delivery_logs_warning_and_falls_back(caplog):
 
 def test_unknown_target_falls_back_to_log(caplog):
     job = _job("not-a-real-target://oops")
-    with caplog.at_level(logging.WARNING, logger="ocode.cron"):
+    with caplog.at_level(logging.WARNING, logger="athena.cron"):
         deliver(job, {"status": "success"})
     msgs = [r.message for r in caplog.records]
     assert any("unknown delivery target" in m for m in msgs)
@@ -82,7 +82,7 @@ def test_delivery_failure_is_swallowed(monkeypatch, caplog):
     def boom(*args, **kwargs):
         raise RuntimeError("disk full")
 
-    monkeypatch.setattr("ocode.cron.delivery._deliver_file", boom)
-    with caplog.at_level(logging.WARNING, logger="ocode.cron"):
+    monkeypatch.setattr("athena.cron.delivery._deliver_file", boom)
+    with caplog.at_level(logging.WARNING, logger="athena.cron"):
         deliver(job, {"status": "success"})  # must not raise
     assert any("delivery failed" in r.message for r in caplog.records)

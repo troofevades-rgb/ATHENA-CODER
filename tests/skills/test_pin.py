@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from ocode.skills.archive import SkillNotFoundError
-from ocode.skills.discovery import discover_skills
-from ocode.skills.frontmatter import parse_frontmatter
-from ocode.skills.pin import pin_skill, unpin_skill
-from ocode.skills.state_machine import apply_transitions
+from athena.skills.archive import SkillNotFoundError
+from athena.skills.discovery import discover_skills
+from athena.skills.frontmatter import parse_frontmatter
+from athena.skills.pin import pin_skill, unpin_skill
+from athena.skills.state_machine import apply_transitions
 
 
 def test_pin_and_unpin(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     skill_dir = write_skill(user_skills, "pinme")
 
@@ -28,7 +28,7 @@ def test_pin_and_unpin(isolated_home: Path, write_skill) -> None:
 
 
 def test_pin_idempotent(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     skill_dir = write_skill(user_skills, "twice")
 
@@ -40,7 +40,7 @@ def test_pin_idempotent(isolated_home: Path, write_skill) -> None:
 
 
 def test_pin_unknown_raises(isolated_home: Path) -> None:
-    (isolated_home / ".ocode" / "skills").mkdir(parents=True)
+    (isolated_home / ".athena" / "skills").mkdir(parents=True)
     with pytest.raises(SkillNotFoundError):
         pin_skill("ghost")
 
@@ -49,7 +49,7 @@ def test_pinned_skill_skips_state_transitions(
     isolated_home: Path, write_skill
 ) -> None:
     """A pinned skill that is *very* stale must not be archived or marked stale."""
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     long_ago = datetime.now(timezone.utc) - timedelta(days=365)
     write_skill(

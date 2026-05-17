@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ocode.agent.fork import ForkAction, ForkResult
+from athena.agent.fork import ForkAction, ForkResult
 
 
 # ---- 1. Per-turn review -----------------------------------------------
@@ -30,8 +30,8 @@ def test_per_turn_review_creates_memory_entry_after_user_preference(
     Agent.fork() with the memory + skills toolsets and the COMBINED
     addendum. We verify the call shape end-to-end (config → nudge → fork)
     without spinning up a real model."""
-    from ocode.config import Config
-    from ocode.review import nudge as nudge_mod, orchestrator as orch_mod
+    from athena.config import Config
+    from athena.review import nudge as nudge_mod, orchestrator as orch_mod
 
     nudge_mod.reset_all()
 
@@ -65,7 +65,7 @@ def test_per_turn_review_creates_memory_entry_after_user_preference(
             )],
         )
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
 
     # First two ticks don't fire; the third does.
     assert orch_mod.maybe_fire_review(agent) is None
@@ -91,13 +91,13 @@ def test_curator_consolidates_two_session_codename_skills_into_umbrella(
 ) -> None:
     """A curator run that returns valid YAML is committed: report files
     appear under the configured logs root and .curator_state advances."""
-    from ocode.config import Config, CuratorConfig
-    from ocode.curator import orchestrator
-    from ocode.curator import state as curator_state
+    from athena.config import Config, CuratorConfig
+    from athena.curator import orchestrator
+    from athena.curator import state as curator_state
 
     # Pre-create two session-codename skills under curator origin so the
     # curator's modifiability gates allow them.
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "foo-task-aug-12", write_origin="curator")
     write_skill(user_skills, "foo-task-aug-15", write_origin="curator")
@@ -146,7 +146,7 @@ runs:
             child_session_id="curator-child",
         )
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
 
     summary = orchestrator.maybe_run_curator(agent, force=True)
     assert summary is not None
@@ -173,7 +173,7 @@ def test_lifecycle_transitions_archive_unused_skill_after_90_days(
 ) -> None:
     """A background-review-origin skill last touched >90 days ago must be
     archived on the lifecycle pass."""
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     long_ago = datetime.now(timezone.utc) - timedelta(days=120)
     write_skill(
@@ -184,7 +184,7 @@ def test_lifecycle_transitions_archive_unused_skill_after_90_days(
         last_activity_at=long_ago,
     )
 
-    from ocode.skills.state_machine_runner import run_lifecycle
+    from athena.skills.state_machine_runner import run_lifecycle
     actions = run_lifecycle()
     assert "abandoned" in actions["archived"]
     assert not (user_skills / "abandoned").exists()

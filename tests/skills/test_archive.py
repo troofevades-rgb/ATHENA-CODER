@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from ocode.skills import archive
-from ocode.skills.archive import SkillNotFoundError, archive_skill, unarchive_skill
-from ocode.skills.discovery import discover_skills
-from ocode.skills.frontmatter import parse_frontmatter
+from athena.skills import archive
+from athena.skills.archive import SkillNotFoundError, archive_skill, unarchive_skill
+from athena.skills.discovery import discover_skills
+from athena.skills.frontmatter import parse_frontmatter
 
 
 def test_skill_delete_moves_to_archive(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "to-archive")
 
@@ -25,7 +25,7 @@ def test_skill_delete_moves_to_archive(isolated_home: Path, write_skill) -> None
 
 
 def test_skill_unarchive_restores(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "round")
     archive_skill("round")
@@ -37,7 +37,7 @@ def test_skill_unarchive_restores(isolated_home: Path, write_skill) -> None:
 
 
 def test_archive_collision_renames(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     archive_dir = user_skills / ".archive"
     archive_dir.mkdir()
@@ -53,13 +53,13 @@ def test_archive_collision_renames(isolated_home: Path, write_skill) -> None:
 
 
 def test_archive_missing_skill_raises(isolated_home: Path) -> None:
-    (isolated_home / ".ocode" / "skills").mkdir(parents=True)
+    (isolated_home / ".athena" / "skills").mkdir(parents=True)
     with pytest.raises(SkillNotFoundError):
         archive_skill("nope")
 
 
 def test_unarchive_non_archived_raises(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "active-skill")
     with pytest.raises(SkillNotFoundError, match="not archived"):

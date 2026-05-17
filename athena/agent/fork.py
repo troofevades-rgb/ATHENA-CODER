@@ -1,0 +1,219 @@
+"""Agent.fork() — the daemon-thread sub-agent primitive.
+
+A fork is a fresh ``Agent`` instance run on a daemon thread with:
+
+- a scoped tool set (``enabled_toolsets``) plus optional per-name disables,
+- an injected ``system_addendum`` describing what the fork should do,
+- a write-origin ContextVar bound for the duration of the work,
+- the ``AUTO_DENY`` approval callback so confirmation prompts can't deadlock,
+- an isolated provider client (so the parent's connection pool / KV cache
+  is undisturbed), and
+- a child session in the parent's ``SessionStore`` with ``parent_session_id``
+  set, so ``athena sessions browse`` shows the fork tree.
+
+Stdout and stderr captured by the fork's thread are surfaced via
+:class:`ForkResult` so callers can inspect them after the join.
+
+Two signature additions vs. the design doc:
+
+- ``user_prompt: str = ""`` lets sub-agent dispatch pass the user's brief as
+  a normal user message without synthesizing an empty turn.
+- ``disabled_tools: list[str] | None = None`` lets callers subtract specific
+  tool names within the chosen toolsets (the Explore / Plan sub-agents need
+  this — the ``"file"`` toolset includes Write / Edit).
+"""
+from __future__ import annotations
+
+import contextlib
+import dataclasses
+import io
+import json
+import logging
+import threading
+import time
+from dataclasses import dataclass, field
+from typing import Any, TYPE_CHECKING
+
+from ..provenance import (
+    BACKGROUND_REVIEW,
+    reset_current_write_origin,
+    set_current_write_origin,
+)
+from ..safety.approval_callback import (
+    AUTO_DENY,
+    reset_approval_callback,
+    set_approval_callback,
+)
+from .auxiliary_client import build_auxiliary_client
+
+if TYPE_CHECKING:
+    from .core import Agent
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ForkAction:
+    """A structured action record extracted from a tool result.
+
+    Tools that return ``{"success": true, "target": ..., "action": ...}`` JSON
+    (notably ``skill_manage``) produce one of these per call. The parent agent
+    uses ``ForkResult.actions`` to summarize what a background review or
+    curator fork did without re-reading every tool message.
+    """
+    action: str           # "created" | "updated" | "deleted" | "patched" | "pin" | ...
+    target: str           # "skill" | "memory" | "file"
+    name: str
+    detail: str | None = None
+
+
+@dataclass
+class ForkResult:
+    final_response: str
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    actions: list[ForkAction] = field(default_factory=list)
+    stdout: str = ""
+    stderr: str = ""
+    error: str | None = None
+    duration_s: float = 0.0
+    child_session_id: str | None = None
+
+
+def fork(
+    self: "Agent",
+    *,
+    enabled_toolsets: list[str],
+    system_addendum: str,
+    user_prompt: str = "",
+    conversation_history: list[dict] | None = None,
+    max_iterations: int = 16,
+    write_origin: str = BACKGROUND_REVIEW,
+    auxiliary_client: bool = True,
+    quiet: bool = True,
+    disabled_tools: list[str] | None = None,
+) -> ForkResult:
+    """Spawn a forked Agent on a daemon thread."""
+    start = time.monotonic()
+
+    # 1. Build child Config inheriting from parent. cfg.profile is preserved
+    #    so the child session lands under the same profile root as the
+    #    parent — we share the parent's SessionStore object below.
+    child_cfg = dataclasses.replace(
+        self.cfg,
+        enabled_toolsets=list(enabled_toolsets),
+        disabled_tools=list(disabled_tools) if disabled_tools is not None else list(self.cfg.disabled_tools),
+        auto_approve_tools=True,
+        lean_prompt=True,
+        max_turn_steps=max_iterations,
+    )
+
+    # 2. Construct child agent — defer import so module load order is safe.
+    from .core import Agent, _current_agent
+    client = build_auxiliary_client(self) if auxiliary_client else self.client
+    child = Agent(
+        child_cfg,
+        self.workspace,
+        model=self.model,
+        client=client,
+        session_store=self.session_store,
+        parent_session_id=self.session_id,
+    )
+    # If we built an auxiliary client, the child owns it (close on shutdown).
+    # If we passed the parent's client, the child does NOT own it.
+    child._owns_client = auxiliary_client
+
+    result = ForkResult(final_response="", child_session_id=child.session_id)
+
+    try:
+        # 3. Inject system_addendum (preserve messages[0] as the system prompt).
+        if system_addendum:
+            child.messages[0]["content"] = (
+                child.messages[0]["content"].rstrip() + "\n\n" + system_addendum
+            )
+
+        # 4. Replace history if provided.
+        if conversation_history is not None:
+            child.messages = [child.messages[0], *conversation_history]
+
+        stdout_buf = io.StringIO()
+        stderr_buf = io.StringIO()
+
+        def _runner() -> None:
+            origin_token = set_current_write_origin(write_origin)
+            approval_token = set_approval_callback(AUTO_DENY)
+            agent_token = _current_agent.set(child)
+            try:
+                cm = contextlib.ExitStack()
+                if quiet:
+                    cm.enter_context(contextlib.redirect_stdout(stdout_buf))
+                    cm.enter_context(contextlib.redirect_stderr(stderr_buf))
+                with cm:
+                    child.run_until_done(user_prompt, max_iterations=max_iterations)
+            except Exception as exc:
+                logger.exception("fork failed")
+                result.error = f"{type(exc).__name__}: {exc}"
+            finally:
+                _current_agent.reset(agent_token)
+                reset_approval_callback(approval_token)
+                reset_current_write_origin(origin_token)
+
+        t = threading.Thread(
+            target=_runner,
+            daemon=True,
+            name=f"athena-fork-{(child.session_id or 'anon')[:8]}",
+        )
+        t.start()
+        t.join()
+
+        # 5. Gather results from child state.
+        result.final_response = child.last_assistant_message()
+        result.tool_calls = child.tool_call_trace()
+        result.actions = _extract_actions(child.messages)
+        result.stdout = stdout_buf.getvalue()
+        result.stderr = stderr_buf.getvalue()
+        return result
+    finally:
+        try:
+            child.close()
+        except Exception:
+            pass
+        result.duration_s = time.monotonic() - start
+
+
+def _extract_actions(messages: list[dict[str, Any]]) -> list[ForkAction]:
+    """Walk tool result messages, extract structured ``ForkAction`` records.
+
+    Tools that opt into the shape ``{"success": bool, "target": ...,
+    "action": ..., "skill_name"|"memory_name"|"path": ...}`` yield one record
+    per successful call. Free-form text tool results are skipped silently
+    rather than failing — only structured results are summarizable.
+    """
+    actions: list[ForkAction] = []
+    for m in messages:
+        if m.get("role") != "tool":
+            continue
+        content = m.get("content", "")
+        if not isinstance(content, str) or not content.startswith("{"):
+            continue
+        try:
+            parsed = json.loads(content)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        if not parsed.get("success"):
+            continue
+        if "action" not in parsed:
+            continue
+        actions.append(ForkAction(
+            action=str(parsed.get("action") or ""),
+            target=str(parsed.get("target") or "unknown"),
+            name=str(
+                parsed.get("skill_name")
+                or parsed.get("memory_name")
+                or parsed.get("path")
+                or ""
+            ),
+            detail=parsed.get("message"),
+        ))
+    return actions

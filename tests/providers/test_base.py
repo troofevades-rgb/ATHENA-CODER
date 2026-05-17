@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-import ocode.providers as providers_pkg
-from ocode.providers import (
+import athena.providers as providers_pkg
+from athena.providers import (
     Provider,
     StreamChunk,
     get_provider_class,

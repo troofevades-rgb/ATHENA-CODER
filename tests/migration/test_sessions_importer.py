@@ -1,10 +1,10 @@
-"""Tests for ocode.migration.sessions_importer."""
+"""Tests for athena.migration.sessions_importer."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from ocode.migration.sessions_importer import import_sessions
+from athena.migration.sessions_importer import import_sessions
 
 
 def _write_session(hermes_source: Path, name: str, lines: list[dict]) -> Path:

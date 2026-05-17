@@ -5,7 +5,7 @@ import threading
 
 import pytest
 
-from ocode.steer.queue import GLOBAL_STEER_QUEUE, SteerQueue
+from athena.steer.queue import GLOBAL_STEER_QUEUE, SteerQueue
 
 
 @pytest.fixture

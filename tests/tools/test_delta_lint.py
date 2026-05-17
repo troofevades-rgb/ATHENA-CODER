@@ -1,9 +1,9 @@
-"""Tests for ocode.tools.delta_lint.lint_after_write."""
+"""Tests for athena.tools.delta_lint.lint_after_write."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from ocode.tools.delta_lint import lint_after_write
+from athena.tools.delta_lint import lint_after_write
 
 
 def test_python_valid_returns_none() -> None:
@@ -81,7 +81,7 @@ def test_trailing_whitespace_is_fine() -> None:
 
 def test_lint_called_from_file_write_tool(tmp_path: Path, monkeypatch) -> None:
     """The Write tool surfaces lint errors as part of its result."""
-    from ocode.tools import file_ops
+    from athena.tools import file_ops
     monkeypatch.setattr(file_ops, "_WORKSPACE", tmp_path)
     result = file_ops.Write(file_path="bad.json", content="{not valid")
     assert "failed validation" in result
@@ -89,7 +89,7 @@ def test_lint_called_from_file_write_tool(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_lint_called_from_edit_tool(tmp_path: Path, monkeypatch) -> None:
-    from ocode.tools import file_ops
+    from athena.tools import file_ops
     monkeypatch.setattr(file_ops, "_WORKSPACE", tmp_path)
     p = tmp_path / "f.py"
     p.write_text("x = 1\n", encoding="utf-8")
@@ -101,7 +101,7 @@ def test_lint_called_from_edit_tool(tmp_path: Path, monkeypatch) -> None:
 def test_lint_error_surfaces_to_caller(tmp_path: Path, monkeypatch) -> None:
     """The Write tool returns an error string that names the file AND the
     underlying syntax problem so the model can fix it."""
-    from ocode.tools import file_ops
+    from athena.tools import file_ops
     monkeypatch.setattr(file_ops, "_WORKSPACE", tmp_path)
     result = file_ops.Write(file_path="b.py", content="def f(:\n")
     assert "b.py" in result
@@ -116,7 +116,7 @@ def test_lint_called_from_skill_manage_create(
 ) -> None:
     """skill_manage create must reject content that would yield invalid YAML
     in the frontmatter — and not leave a half-built skill dir."""
-    from ocode.tools import file_ops, skill_tools
+    from athena.tools import file_ops, skill_tools
     monkeypatch.setattr(file_ops, "_WORKSPACE", tmp_path)
 
     # Description containing a YAML-breaking control char (unbalanced quote +
@@ -133,7 +133,7 @@ def test_lint_called_from_skill_manage_create(
     # if it failed. If it succeeded, validation passed (description was
     # actually well-formed once YAML escaped it), which is also fine.
     if not out["success"]:
-        assert not (tmp_path / ".ocode" / "skills" / "bad-skill").exists()
+        assert not (tmp_path / ".athena" / "skills" / "bad-skill").exists()
 
 
 def test_lint_error_in_skill_manage_does_not_corrupt_existing_skill(
@@ -141,7 +141,7 @@ def test_lint_error_in_skill_manage_does_not_corrupt_existing_skill(
 ) -> None:
     """If skill_manage patch is given content that fails frontmatter lint,
     the existing SKILL.md must be unchanged."""
-    from ocode.tools import file_ops, skill_tools
+    from athena.tools import file_ops, skill_tools
     import json as _json
 
     monkeypatch.setattr(file_ops, "_WORKSPACE", tmp_path)
@@ -152,7 +152,7 @@ def test_lint_error_in_skill_manage_does_not_corrupt_existing_skill(
         body="ORIGINAL_BODY\n",
     ))
 
-    original_text = (tmp_path / ".ocode" / "skills" / "precious" / "SKILL.md").read_text(encoding="utf-8")
+    original_text = (tmp_path / ".athena" / "skills" / "precious" / "SKILL.md").read_text(encoding="utf-8")
 
     # Try to patch with a name that violates the schema. Forces the manager
     # to attempt a write that fails validation.
@@ -165,7 +165,7 @@ def test_lint_error_in_skill_manage_does_not_corrupt_existing_skill(
     # The patch may succeed (state isn't yaml-invalid, just semantically odd
     # — frontmatter has no enum check) OR fail. Either way the file on disk
     # must remain valid YAML.
-    final_text = (tmp_path / ".ocode" / "skills" / "precious" / "SKILL.md").read_text(encoding="utf-8")
+    final_text = (tmp_path / ".athena" / "skills" / "precious" / "SKILL.md").read_text(encoding="utf-8")
     assert final_text.startswith("---")
     assert "name: precious" in final_text
     # If validation rejected it, ORIGINAL_BODY must still be present.

@@ -4,8 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ocode.skills.frontmatter import parse_frontmatter
-from ocode.skills.state_machine_runner import run_lifecycle
+from athena.skills.frontmatter import parse_frontmatter
+from athena.skills.state_machine_runner import run_lifecycle
 
 
 def _ago(days: int) -> datetime:
@@ -13,7 +13,7 @@ def _ago(days: int) -> datetime:
 
 
 def test_runs_at_session_init(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -30,7 +30,7 @@ def test_runs_at_session_init(isolated_home: Path, write_skill) -> None:
 def test_writes_frontmatter_changes_atomically(isolated_home: Path, write_skill) -> None:
     """An apply pass that fails partway should still leave each individual
     skill's frontmatter in a valid state — the unit of atomicity is per-skill."""
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "a", write_origin="curator", last_activity_at=_ago(100))
     write_skill(user_skills, "b", write_origin="curator", last_activity_at=_ago(5))
@@ -44,7 +44,7 @@ def test_writes_frontmatter_changes_atomically(isolated_home: Path, write_skill)
 def test_logs_action_counts(
     isolated_home: Path, write_skill, caplog
 ) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -53,13 +53,13 @@ def test_logs_action_counts(
         last_activity_at=_ago(45),
     )
     import logging
-    with caplog.at_level(logging.INFO, logger="ocode.skills.state_machine_runner"):
+    with caplog.at_level(logging.INFO, logger="athena.skills.state_machine_runner"):
         run_lifecycle()
     assert any("lifecycle" in rec.message for rec in caplog.records)
 
 
 def test_no_action_returns_empty_lists(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -76,7 +76,7 @@ def test_no_action_returns_empty_lists(isolated_home: Path, write_skill) -> None
 def test_failure_is_swallowed(monkeypatch, isolated_home: Path) -> None:
     """If apply_transitions raises, run_lifecycle returns empty lists rather
     than letting the exception bubble into Agent init."""
-    import ocode.skills.state_machine_runner as runner_mod
+    import athena.skills.state_machine_runner as runner_mod
 
     def boom(*a, **k):
         raise RuntimeError("simulated")

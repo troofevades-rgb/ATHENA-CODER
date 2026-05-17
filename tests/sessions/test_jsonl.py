@@ -1,10 +1,10 @@
-"""Tests for ocode.sessions.jsonl."""
+"""Tests for athena.sessions.jsonl."""
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-from ocode.sessions.jsonl import append_jsonl, count_lines, read_jsonl
+from athena.sessions.jsonl import append_jsonl, count_lines, read_jsonl
 
 
 def test_jsonl_round_trip(tmp_path: Path) -> None:
@@ -40,7 +40,7 @@ def test_jsonl_skips_malformed_lines_with_warning(
         '{"role": "user", "content": "ok2"}\n',
         encoding="utf-8",
     )
-    with caplog.at_level(logging.WARNING, logger="ocode.sessions.jsonl"):
+    with caplog.at_level(logging.WARNING, logger="athena.sessions.jsonl"):
         rows = list(read_jsonl(path))
     contents = [r["content"] for r in rows]
     assert contents == ["ok1", "ok2"]

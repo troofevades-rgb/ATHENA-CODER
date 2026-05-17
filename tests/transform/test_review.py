@@ -8,9 +8,9 @@ from typing import Iterator
 
 import pytest
 
-from ocode.sessions.store import SessionMeta, SessionStore
-from ocode.transform.classifier import Label, Trajectory
-from ocode.transform.review import (
+from athena.sessions.store import SessionMeta, SessionStore
+from athena.transform.classifier import Label, Trajectory
+from athena.transform.review import (
     ReviewSession,
     load_labels,
     save_label,

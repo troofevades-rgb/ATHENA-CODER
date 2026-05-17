@@ -4,8 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ocode.skills.frontmatter import parse_frontmatter
-from ocode.skills.state_machine import apply_transitions
+from athena.skills.frontmatter import parse_frontmatter
+from athena.skills.state_machine import apply_transitions
 
 
 def _ago(days: int) -> datetime:
@@ -13,7 +13,7 @@ def _ago(days: int) -> datetime:
 
 
 def test_active_to_stale_after_30_days(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -29,7 +29,7 @@ def test_active_to_stale_after_30_days(isolated_home: Path, write_skill) -> None
 
 
 def test_stale_to_archived_after_90_days(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -51,7 +51,7 @@ def test_stale_to_archived_after_90_days(isolated_home: Path, write_skill) -> No
 def test_stale_reactivates_on_recent_activity(
     isolated_home: Path, write_skill
 ) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -70,7 +70,7 @@ def test_stale_reactivates_on_recent_activity(
 def test_pinned_skips_all_transitions(isolated_home: Path, write_skill) -> None:
     """Covered by test_pin.py::test_pinned_skill_skips_state_transitions, but
     re-asserted here as part of the state machine's contract."""
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -89,7 +89,7 @@ def test_foreground_origin_skills_not_touched(
     isolated_home: Path, write_skill
 ) -> None:
     """Skills written by the user (foreground) are off-limits to the machine."""
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,
@@ -111,7 +111,7 @@ def test_migration_origin_skills_not_touched_until_local_activity(
     """Migration-origin skills with no last_activity newer than imported_at
     are skipped — the curator should leave imports alone until the user
     actually starts using them."""
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(
         user_skills,

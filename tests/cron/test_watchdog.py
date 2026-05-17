@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from ocode.cron.jobs import CronJob, JobStore
-from ocode.cron.watchdog import run_watchdog_job
+from athena.cron.jobs import CronJob, JobStore
+from athena.cron.watchdog import run_watchdog_job
 
 
 def _job(script: str, *, target: str = "log") -> CronJob:
@@ -66,7 +66,7 @@ def test_captures_stdout_and_stderr(store: JobStore):
 
 def test_timeout_marks_error(store: JobStore, monkeypatch):
     """A very short timeout should surface as status=error."""
-    import ocode.cron.watchdog as wd
+    import athena.cron.watchdog as wd
     monkeypatch.setattr(wd, "_DEFAULT_TIMEOUT_S", 1)
     # Sleep longer than the timeout. Use python -c for portability.
     job = _job(f'{sys.executable} -c "import time; time.sleep(10)"')
@@ -100,7 +100,7 @@ def test_missing_script_marks_error(store: JobStore):
 
 def test_run_watchdog_job_by_id_executes(store: JobStore, tmp_path: Path):
     """The APScheduler entry point: re-loads the job from the store and runs it."""
-    from ocode.cron.watchdog import run_watchdog_job_by_id
+    from athena.cron.watchdog import run_watchdog_job_by_id
     job = _job(f'{sys.executable} -c "print(\'by_id\')"')
     store.upsert(job)
     # Run via the by-id path; uses the explicit jobs_db_path override.
@@ -112,7 +112,7 @@ def test_run_watchdog_job_by_id_executes(store: JobStore, tmp_path: Path):
 def test_run_watchdog_job_by_id_missing_id_is_silent(store: JobStore, caplog):
     """If APScheduler fires a job whose metadata was deleted, log + skip."""
     import logging
-    from ocode.cron.watchdog import run_watchdog_job_by_id
+    from athena.cron.watchdog import run_watchdog_job_by_id
     with caplog.at_level(logging.WARNING):
         run_watchdog_job_by_id("nonexistent-id", jobs_db_path=store.db_path)
     assert any("not found" in r.message for r in caplog.records)
@@ -120,7 +120,7 @@ def test_run_watchdog_job_by_id_missing_id_is_silent(store: JobStore, caplog):
 
 def test_output_is_truncated(store: JobStore, monkeypatch):
     """Large stdout is truncated at the configured cap, not unbounded."""
-    import ocode.cron.watchdog as wd
+    import athena.cron.watchdog as wd
     monkeypatch.setattr(wd, "_OUTPUT_TRUNC", 100)
     # Emit 1000 characters of output.
     job = _job(f'{sys.executable} -c "print(\'x\' * 1000)"')

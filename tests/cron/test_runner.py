@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import ocode.cron.runner as runner_mod
-from ocode.cron.jobs import CronJob, JobStore
+import athena.cron.runner as runner_mod
+from athena.cron.jobs import CronJob, JobStore
 
 
 class _FakeAgent:
@@ -38,8 +38,8 @@ class _FakeAgent:
 def patched_agent(monkeypatch: pytest.MonkeyPatch):
     """Replace runner_mod's lazy Agent import with our fake."""
     _FakeAgent.last_instance = None
-    import ocode.agent
-    monkeypatch.setattr(ocode.agent, "Agent", _FakeAgent)
+    import athena.agent
+    monkeypatch.setattr(athena.agent, "Agent", _FakeAgent)
     # load_config still runs; it's harmless.
     return _FakeAgent
 
@@ -94,8 +94,8 @@ def test_agent_job_records_error_on_exception(monkeypatch, store: JobStore):
         def __init__(self, cfg, workspace, **kwargs):
             raise RuntimeError("boom")
 
-    import ocode.agent
-    monkeypatch.setattr(ocode.agent, "Agent", _BrokenAgent)
+    import athena.agent
+    monkeypatch.setattr(athena.agent, "Agent", _BrokenAgent)
     job = CronJob(cron_expr="* * * * *", mode="agent", prompt="x")
     store.upsert(job)
     result = runner_mod.run_agent_job(job, store=store)
@@ -106,7 +106,7 @@ def test_agent_job_records_error_on_exception(monkeypatch, store: JobStore):
 
 def test_run_agent_job_by_id_executes(patched_agent, store: JobStore):
     """APScheduler entry point: re-loads job from store and runs it."""
-    from ocode.cron.runner import run_agent_job_by_id
+    from athena.cron.runner import run_agent_job_by_id
     job = CronJob(cron_expr="* * * * *", mode="agent", prompt="hello")
     store.upsert(job)
     run_agent_job_by_id(job.id, jobs_db_path=store.db_path)
@@ -116,7 +116,7 @@ def test_run_agent_job_by_id_executes(patched_agent, store: JobStore):
 
 def test_run_agent_job_by_id_missing_id_is_silent(store: JobStore, caplog):
     import logging
-    from ocode.cron.runner import run_agent_job_by_id
+    from athena.cron.runner import run_agent_job_by_id
     with caplog.at_level(logging.WARNING):
         run_agent_job_by_id("nope", jobs_db_path=store.db_path)
     assert any("not found" in r.message for r in caplog.records)

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from ocode.commands import get_command
-from ocode.goal.invariant import (
+from athena.commands import get_command
+from athena.goal.invariant import (
     GOAL_HEADER,
     clear_goal,
     format_for_system_prompt,
@@ -62,7 +62,7 @@ def test_goal_persists_across_reload(tmp_path: Path):
 
 def test_goal_appears_in_system_prompt(tmp_path: Path):
     """build_system_prompt appends the goal block when ``goal`` is passed."""
-    from ocode.prompts.system import build_system_prompt
+    from athena.prompts.system import build_system_prompt
     prompt = build_system_prompt(
         workspace=tmp_path,
         model="qwen2.5-coder:14b",
@@ -75,7 +75,7 @@ def test_goal_appears_in_system_prompt(tmp_path: Path):
 
 
 def test_no_goal_no_block_in_system_prompt(tmp_path: Path):
-    from ocode.prompts.system import build_system_prompt
+    from athena.prompts.system import build_system_prompt
     prompt = build_system_prompt(
         workspace=tmp_path,
         model="qwen2.5-coder:14b",

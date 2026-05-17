@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ocode.config import Config
-from ocode.review import nudge
-from ocode.review.orchestrator import maybe_fire_review
+from athena.config import Config
+from athena.review import nudge
+from athena.review.orchestrator import maybe_fire_review
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +42,7 @@ def _agent_stub(
 def test_does_not_fire_below_interval(monkeypatch: pytest.MonkeyPatch) -> None:
     spawned: list[bool] = []
     monkeypatch.setattr(
-        "ocode.agent.fork.fork",
+        "athena.agent.fork.fork",
         lambda *a, **k: spawned.append(True) or None,
     )
     agent = _agent_stub()
@@ -58,10 +58,10 @@ def test_fires_at_interval_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_fork(parent, **kwargs):
         calls.append(kwargs)
-        from ocode.agent.fork import ForkResult
+        from athena.agent.fork import ForkResult
         return ForkResult(final_response="ok")
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
 
     agent = _agent_stub()
     agent.cfg.review.nudge_interval = 3
@@ -78,10 +78,10 @@ def test_review_fork_uses_correct_toolsets(monkeypatch: pytest.MonkeyPatch) -> N
 
     def fake_fork(parent, **kwargs):
         calls.append(kwargs)
-        from ocode.agent.fork import ForkResult
+        from athena.agent.fork import ForkResult
         return ForkResult(final_response="")
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
     agent = _agent_stub(cfg=Config())
     agent.cfg.review.nudge_interval = 1
     t = maybe_fire_review(agent)
@@ -96,10 +96,10 @@ def test_review_fork_write_origin_is_background_review(
 
     def fake_fork(parent, **kwargs):
         calls.append(kwargs)
-        from ocode.agent.fork import ForkResult
+        from athena.agent.fork import ForkResult
         return ForkResult(final_response="")
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
     agent = _agent_stub()
     agent.cfg.review.nudge_interval = 1
     t = maybe_fire_review(agent)
@@ -112,10 +112,10 @@ def test_review_fork_inherits_last_messages(monkeypatch: pytest.MonkeyPatch) -> 
 
     def fake_fork(parent, **kwargs):
         calls.append(kwargs)
-        from ocode.agent.fork import ForkResult
+        from athena.agent.fork import ForkResult
         return ForkResult(final_response="")
 
-    monkeypatch.setattr("ocode.agent.fork.fork", fake_fork)
+    monkeypatch.setattr("athena.agent.fork.fork", fake_fork)
     msgs = [
         {"role": "system", "content": "sys"},
         {"role": "user", "content": "u1"},
@@ -136,7 +136,7 @@ def test_review_fork_inherits_last_messages(monkeypatch: pytest.MonkeyPatch) -> 
 def test_review_disabled_via_config_skips_fire(monkeypatch: pytest.MonkeyPatch) -> None:
     fired: list[bool] = []
     monkeypatch.setattr(
-        "ocode.agent.fork.fork",
+        "athena.agent.fork.fork",
         lambda *a, **k: fired.append(True) or None,
     )
     agent = _agent_stub()
@@ -150,8 +150,8 @@ def test_review_fork_fire_and_forget(monkeypatch: pytest.MonkeyPatch) -> None:
     """The orchestrator must return a daemon thread that the caller is NOT
     required to join — it's a fire-and-forget contract."""
     monkeypatch.setattr(
-        "ocode.agent.fork.fork",
-        lambda *a, **k: __import__("ocode.agent.fork", fromlist=["ForkResult"]).ForkResult(final_response=""),
+        "athena.agent.fork.fork",
+        lambda *a, **k: __import__("athena.agent.fork", fromlist=["ForkResult"]).ForkResult(final_response=""),
     )
     agent = _agent_stub()
     agent.cfg.review.nudge_interval = 1
@@ -165,7 +165,7 @@ def test_review_skipped_when_session_id_missing(
 ) -> None:
     fired: list[bool] = []
     monkeypatch.setattr(
-        "ocode.agent.fork.fork",
+        "athena.agent.fork.fork",
         lambda *a, **k: fired.append(True) or None,
     )
     agent = _agent_stub(session_id=None)

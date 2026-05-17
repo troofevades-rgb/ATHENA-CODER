@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from ocode.sessions import sqlite_index as idx
+from athena.sessions import sqlite_index as idx
 
 
 def _meta(session_id: str, **over) -> dict:

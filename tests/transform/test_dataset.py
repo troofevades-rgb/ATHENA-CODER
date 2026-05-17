@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from ocode.transform.classifier import Trajectory
-from ocode.transform.dataset import (
+from athena.transform.classifier import Trajectory
+from athena.transform.dataset import (
     build_dpo_dataset,
     build_sft_dataset,
     write_jsonl,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ocode.memory.providers.base import MemoryEntry, MemoryProvider
+from athena.memory.providers.base import MemoryEntry, MemoryProvider
 
 
 def test_abc_cannot_be_instantiated():

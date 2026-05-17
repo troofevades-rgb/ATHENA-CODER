@@ -1,13 +1,13 @@
-"""Tests for ocode.skills.validation.validate_skill."""
+"""Tests for athena.skills.validation.validate_skill."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from ocode.skills.validation import validate_skill
+from athena.skills.validation import validate_skill
 
 
 def test_validate_clean_skill(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     skill_dir = write_skill(user_skills, "clean")
     assert validate_skill(skill_dir) == []

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from ocode.transform.classifier import (
+from athena.transform.classifier import (
     Trajectory,
     auto_classify,
     extract_trajectories,

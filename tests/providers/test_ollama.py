@@ -7,8 +7,8 @@ import httpx
 import pytest
 import respx
 
-from ocode.providers import StreamChunk, get_provider_class
-from ocode.providers.ollama import OllamaProvider
+from athena.providers import StreamChunk, get_provider_class
+from athena.providers.ollama import OllamaProvider
 
 
 def _ndjson(*objs: dict) -> bytes:
@@ -23,7 +23,7 @@ def provider():
 
 
 def test_registered_under_name_ollama():
-    """Importing ocode.providers.ollama side-effects the registry."""
+    """Importing athena.providers.ollama side-effects the registry."""
     assert get_provider_class("ollama") is OllamaProvider
 
 

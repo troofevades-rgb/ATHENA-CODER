@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from ocode.memory.providers.builtin_file import BuiltinFileProvider
+from athena.memory.providers.builtin_file import BuiltinFileProvider
 
 
 @pytest.fixture
 def provider(tmp_path: Path) -> BuiltinFileProvider:
-    """Provider rooted under a tmp home so tests can't touch the real ~/.ocode."""
+    """Provider rooted under a tmp home so tests can't touch the real ~/.athena."""
     return BuiltinFileProvider(home=tmp_path / "fake-home")
 
 

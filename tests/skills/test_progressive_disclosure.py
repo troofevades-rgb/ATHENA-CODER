@@ -1,9 +1,9 @@
-"""Tests for ocode.skills.progressive_disclosure.build_catalog."""
+"""Tests for athena.skills.progressive_disclosure.build_catalog."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from ocode.skills.progressive_disclosure import build_catalog
+from athena.skills.progressive_disclosure import build_catalog
 
 
 def test_catalog_empty_when_no_skills(isolated_home: Path) -> None:
@@ -13,7 +13,7 @@ def test_catalog_empty_when_no_skills(isolated_home: Path) -> None:
 def test_catalog_only_includes_active_and_stale(
     isolated_home: Path, write_skill
 ) -> None:
-    user = isolated_home / ".ocode" / "skills"
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "live")
     write_skill(user, "old", state="stale")
@@ -29,7 +29,7 @@ def test_catalog_only_includes_active_and_stale(
 
 
 def test_catalog_one_line_per_skill(isolated_home: Path, write_skill) -> None:
-    user = isolated_home / ".ocode" / "skills"
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "a", description="alpha")
     write_skill(user, "b", description="beta")
@@ -41,7 +41,7 @@ def test_catalog_one_line_per_skill(isolated_home: Path, write_skill) -> None:
 
 
 def test_catalog_truncated_at_max_length(isolated_home: Path, write_skill) -> None:
-    user = isolated_home / ".ocode" / "skills"
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     for i in range(20):
         write_skill(user, f"sk-{i:02d}", description=f"description {i}")
@@ -53,7 +53,7 @@ def test_catalog_truncated_at_max_length(isolated_home: Path, write_skill) -> No
 
 
 def test_pinned_skills_top_of_catalog(isolated_home: Path, write_skill) -> None:
-    user = isolated_home / ".ocode" / "skills"
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "zzz-also", pinned=False)
     write_skill(user, "aaa-normal", pinned=False)
@@ -67,7 +67,7 @@ def test_pinned_skills_top_of_catalog(isolated_home: Path, write_skill) -> None:
 
 
 def test_catalog_marks_stale_explicitly(isolated_home: Path, write_skill) -> None:
-    user = isolated_home / ".ocode" / "skills"
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "fresh")
     write_skill(user, "tired", state="stale")
@@ -82,7 +82,7 @@ def test_catalog_active_pinned_then_active_then_stale(
     isolated_home: Path, write_skill
 ) -> None:
     """Order is: pinned active first, then unpinned active, then stale."""
-    user = isolated_home / ".ocode" / "skills"
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "stale-x", state="stale")
     write_skill(user, "active-y")
@@ -99,8 +99,8 @@ def test_catalog_active_pinned_then_active_then_stale(
 
 def test_catalog_in_system_prompt(isolated_home: Path, write_skill) -> None:
     """The agent's build_system_prompt() must include the catalog when given."""
-    from ocode.prompts import build_system_prompt
-    user = isolated_home / ".ocode" / "skills"
+    from athena.prompts import build_system_prompt
+    user = isolated_home / ".athena" / "skills"
     user.mkdir(parents=True)
     write_skill(user, "in-prompt", description="should appear in prompt")
     catalog = build_catalog()

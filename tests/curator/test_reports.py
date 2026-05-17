@@ -1,12 +1,12 @@
-"""Tests for ocode.curator.reports.write_run."""
+"""Tests for athena.curator.reports.write_run."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from ocode.agent.fork import ForkResult
-from ocode.curator.reports import write_run
+from athena.agent.fork import ForkResult
+from athena.curator.reports import write_run
 
 
 def _parsed(*runs: dict) -> dict:

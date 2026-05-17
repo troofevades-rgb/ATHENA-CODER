@@ -1,11 +1,11 @@
-"""Tests for ocode.migration.skills_mapper.import_skills."""
+"""Tests for athena.migration.skills_mapper.import_skills."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ocode.migration.skills_mapper import import_skills
-from ocode.skills.frontmatter import parse_frontmatter
+from athena.migration.skills_mapper import import_skills
+from athena.skills.frontmatter import parse_frontmatter
 
 
 def test_imports_hermes_skill_with_full_frontmatter(

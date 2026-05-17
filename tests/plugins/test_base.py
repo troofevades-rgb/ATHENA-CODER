@@ -1,7 +1,7 @@
 """Plugin ABC: defaults are no-ops; subclasses can override each hook."""
 from __future__ import annotations
 
-from ocode.plugins.base import Plugin
+from athena.plugins.base import Plugin
 
 
 def test_default_hooks_are_noops():

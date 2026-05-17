@@ -1,9 +1,9 @@
-"""Tests for ocode.provenance — the write-origin ContextVar."""
+"""Tests for athena.provenance — the write-origin ContextVar."""
 import threading
 
 import pytest
 
-from ocode.provenance import (
+from athena.provenance import (
     BACKGROUND_REVIEW,
     CURATOR,
     FOREGROUND,

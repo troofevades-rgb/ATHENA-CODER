@@ -1,10 +1,10 @@
-"""Tests for ocode.curator.state."""
+"""Tests for athena.curator.state."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ocode.curator.state import State, read_state, write_state
+from athena.curator.state import State, read_state, write_state
 
 
 def test_default_state_when_file_missing(tmp_path: Path) -> None:

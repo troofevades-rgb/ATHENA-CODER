@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ocode.plugins.discovery import discover
+from athena.plugins.discovery import discover
 
 
 def _make_plugin(

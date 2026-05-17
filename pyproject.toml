@@ -1,5 +1,5 @@
 [project]
-name = "ocode"
+name = "athena"
 version = "0.2.0"
 description = "Self-improving terminal-first AI agent with closed training loop"
 requires-python = ">=3.10"
@@ -35,14 +35,16 @@ train = [
 ]
 
 [project.scripts]
-ocode = "ocode.__main__:main"
+athena = "athena.__main__:main"
+# Legacy alias; remove one release after the rename lands.
+ocode = "athena.__main__:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["ocode*"]
+include = ["athena*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -59,7 +61,7 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
-files = ["ocode"]
+files = ["athena"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

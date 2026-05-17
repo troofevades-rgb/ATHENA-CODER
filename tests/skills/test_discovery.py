@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ocode.skills.discovery import discover_skills, search_paths
+from athena.skills.discovery import discover_skills, search_paths
 
 
 def test_discover_user_skills(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "alpha", description="alpha")
     write_skill(user_skills, "beta", description="beta")
@@ -19,9 +19,9 @@ def test_discover_user_skills(isolated_home: Path, write_skill) -> None:
 def test_discover_workspace_overrides_user(
     isolated_home: Path, workspace: Path, write_skill
 ) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
-    ws_skills = workspace / ".ocode" / "skills"
+    ws_skills = workspace / ".athena" / "skills"
     ws_skills.mkdir(parents=True)
 
     write_skill(user_skills, "shared", description="user version")
@@ -37,7 +37,7 @@ def test_discover_workspace_overrides_user(
 
 
 def test_discover_skips_archived_by_default(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     archive = user_skills / ".archive"
     archive.mkdir()
@@ -50,7 +50,7 @@ def test_discover_skips_archived_by_default(isolated_home: Path, write_skill) ->
 
 
 def test_discover_include_archived(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     archive = user_skills / ".archive"
     archive.mkdir()
@@ -65,7 +65,7 @@ def test_discover_include_archived(isolated_home: Path, write_skill) -> None:
 def test_discover_skips_malformed_skill_md(
     isolated_home: Path, write_skill, caplog
 ) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "good")
     bad = user_skills / "bad"
@@ -81,7 +81,7 @@ def test_discover_empty_search_path(isolated_home: Path) -> None:
 
 
 def test_discover_ignores_loose_files(isolated_home: Path, write_skill) -> None:
-    user_skills = isolated_home / ".ocode" / "skills"
+    user_skills = isolated_home / ".athena" / "skills"
     user_skills.mkdir(parents=True)
     write_skill(user_skills, "real")
     (user_skills / "loose.txt").write_text("not a skill", encoding="utf-8")
@@ -94,5 +94,5 @@ def test_search_paths_filters_to_existing(isolated_home: Path, workspace: Path) 
     # Neither dir exists yet.
     assert search_paths(workspace) == []
     # Create just the user dir.
-    (isolated_home / ".ocode" / "skills").mkdir(parents=True)
-    assert search_paths(workspace) == [isolated_home / ".ocode" / "skills"]
+    (isolated_home / ".athena" / "skills").mkdir(parents=True)
+    assert search_paths(workspace) == [isolated_home / ".athena" / "skills"]

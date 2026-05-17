@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from ocode.commands import get_command
-from ocode.steer.queue import GLOBAL_STEER_QUEUE
+from athena.commands import get_command
+from athena.steer.queue import GLOBAL_STEER_QUEUE
 
 
 class _FakeAgent:
@@ -66,8 +66,8 @@ def test_agent_pops_steer_before_user_prompt(monkeypatch: pytest.MonkeyPatch, tm
     user messages before the actual user prompt lands in history."""
     # Build a minimal Agent and exercise _inject_pending_steers directly.
     # Avoid spinning Ollama: we never invoke the chat loop.
-    from ocode.agent import Agent
-    from ocode.config import Config
+    from athena.agent import Agent
+    from athena.config import Config
 
     # Patch OllamaProvider so Agent.__init__ doesn't try a real HTTP call.
     class _NullClient:
@@ -79,10 +79,10 @@ def test_agent_pops_steer_before_user_prompt(monkeypatch: pytest.MonkeyPatch, tm
                 yield
         def close(self): pass
 
-    import ocode.agent.core as core_mod
+    import athena.agent.core as core_mod
     monkeypatch.setattr(core_mod, "OllamaProvider", _NullClient)
 
-    # Isolate ~/.ocode so SessionStore writes go to tmp_path:
+    # Isolate ~/.athena so SessionStore writes go to tmp_path:
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
@@ -109,8 +109,8 @@ def test_agent_pops_steer_before_user_prompt(monkeypatch: pytest.MonkeyPatch, tm
 
 def test_agent_handles_empty_queue_silently(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """No steers pending → _inject_pending_steers is a no-op."""
-    from ocode.agent import Agent
-    from ocode.config import Config
+    from athena.agent import Agent
+    from athena.config import Config
 
     class _NullClient:
         def __init__(self, *a, **k): pass
@@ -121,7 +121,7 @@ def test_agent_handles_empty_queue_silently(monkeypatch: pytest.MonkeyPatch, tmp
                 yield
         def close(self): pass
 
-    import ocode.agent.core as core_mod
+    import athena.agent.core as core_mod
     monkeypatch.setattr(core_mod, "OllamaProvider", _NullClient)
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))

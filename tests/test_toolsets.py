@@ -3,8 +3,8 @@ from typing import Any
 
 import pytest
 
-from ocode.tools import registry
-from ocode.tools.registry import (
+from athena.tools import registry
+from athena.tools.registry import (
     all_tools,
     ollama_schema,
     tool,
@@ -13,7 +13,7 @@ from ocode.tools.registry import (
 
 @pytest.fixture
 def isolated_registry(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Swap in fresh registry dicts so tests don't see real ocode tools."""
+    """Swap in fresh registry dicts so tests don't see real athena tools."""
     monkeypatch.setattr(registry, "_REGISTRY", {})
     monkeypatch.setattr(registry, "_TOOLSETS", {})
     monkeypatch.setattr(registry, "_ALIASES", {})

@@ -11,7 +11,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib  # type: ignore
 
-from ocode.transform.deploy import (
+from athena.transform.deploy import (
     list_local_models,
     register_with_ollama,
     show_model,
@@ -51,9 +51,9 @@ def test_calls_ollama_create(tmp_path: Path):
         captured["cmd"] = list(cmd)
         return 0
 
-    rc = register_with_ollama(gguf, "qwen-ocode-1", runner=fake_call)
+    rc = register_with_ollama(gguf, "qwen-athena-1", runner=fake_call)
     assert rc == 0
-    assert captured["cmd"][:3] == ["ollama", "create", "qwen-ocode-1"]
+    assert captured["cmd"][:3] == ["ollama", "create", "qwen-athena-1"]
     assert "-f" in captured["cmd"]
 
 
@@ -68,9 +68,9 @@ def test_register_returns_exit_code(tmp_path: Path):
 
 def test_switch_model_creates_config_when_missing(tmp_path: Path):
     cfg = tmp_path / "config.toml"
-    switch_model(cfg, "qwen2.5-coder:14b-ocode-1")
+    switch_model(cfg, "qwen2.5-coder:14b-athena-1")
     data = tomllib.loads(cfg.read_text(encoding="utf-8"))
-    assert data["model"] == "qwen2.5-coder:14b-ocode-1"
+    assert data["model"] == "qwen2.5-coder:14b-athena-1"
 
 
 def test_switch_model_updates_existing_config(tmp_path: Path):

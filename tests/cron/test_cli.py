@@ -1,4 +1,4 @@
-"""End-to-end tests for ``ocode cron`` CLI subcommands."""
+"""End-to-end tests for ``athena cron`` CLI subcommands."""
 from __future__ import annotations
 
 import io
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-import ocode.cli.cron as cron_cli
-from ocode.cron.jobs import JobStore
+import athena.cli.cron as cron_cli
+from athena.cron.jobs import JobStore
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 import logging
 import threading
 
-from ocode.safety.approval_callback import (
+from athena.safety.approval_callback import (
     AUTO_DENY,
     _interactive_approval,
     get_approval_callback,
@@ -28,7 +28,7 @@ def test_set_and_reset_callback():
 
 
 def test_auto_deny_logs_warning(caplog):
-    with caplog.at_level(logging.WARNING, logger="ocode.safety.approval_callback"):
+    with caplog.at_level(logging.WARNING, logger="athena.safety.approval_callback"):
         AUTO_DENY("DangerousTool", {"x": 1})
     assert any(
         "fork auto-denied" in rec.message and "DangerousTool" in rec.message

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ocode.prompts.system import (
+from athena.prompts.system import (
     LEAN_KEEP,
     SECTIONS,
     TIGHT_RULES,

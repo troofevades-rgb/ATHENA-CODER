@@ -1,4 +1,4 @@
-"""Tests for ocode.sessions.reindex.reindex()."""
+"""Tests for athena.sessions.reindex.reindex()."""
 from __future__ import annotations
 
 import json
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from ocode.sessions.reindex import reindex
-from ocode.sessions.store import SessionMeta, SessionStore, new_session_id
+from athena.sessions.reindex import reindex
+from athena.sessions.store import SessionMeta, SessionStore, new_session_id
 
 
 @pytest.fixture

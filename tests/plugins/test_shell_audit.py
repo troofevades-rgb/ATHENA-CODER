@@ -12,7 +12,7 @@ def _load_shell_audit_class():
     """Importlib the bundled plugin.py the same way the loader does."""
     plugin_py = (
         Path(__file__).resolve().parents[2]
-        / "ocode" / "plugins" / "bundled" / "shell_audit" / "plugin.py"
+        / "athena" / "plugins" / "bundled" / "shell_audit" / "plugin.py"
     )
     spec = importlib.util.spec_from_file_location(
         "ocode_plugin__shell_audit_test", plugin_py
@@ -96,12 +96,12 @@ def test_appends_across_multiple_calls(plugin, tmp_path):
 
 
 def test_default_log_root_is_under_home(tmp_path, monkeypatch):
-    """Without a log_root config override, the plugin uses ~/.ocode/logs/shell_audit/."""
+    """Without a log_root config override, the plugin uses ~/.athena/logs/shell_audit/."""
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     cls = _load_shell_audit_class()
     p = cls()
     p.name = "shell_audit"
     p.on_session_start("default-root", "default")
     p.post_tool_call("Bash", {"command": "ls"}, "ok")
-    log_file = tmp_path / ".ocode" / "logs" / "shell_audit" / "default-root.jsonl"
+    log_file = tmp_path / ".athena" / "logs" / "shell_audit" / "default-root.jsonl"
     assert log_file.exists()

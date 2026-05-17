@@ -7,8 +7,8 @@ import httpx
 import pytest
 import respx
 
-from ocode.providers import StreamChunk, get_provider_class
-from ocode.providers.google import GoogleProvider
+from athena.providers import StreamChunk, get_provider_class
+from athena.providers.google import GoogleProvider
 
 
 def _sse(*events: dict) -> bytes:

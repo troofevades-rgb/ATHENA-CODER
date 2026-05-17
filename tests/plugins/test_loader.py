@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from ocode.plugins.loader import (
+from athena.plugins.loader import (
     PluginDependencyError,
     _toposort,
     load_plugins,
 )
-from ocode.plugins.manifest import PluginManifest
+from athena.plugins.manifest import PluginManifest
 
 
 def _make_plugin_files(
@@ -25,7 +25,7 @@ def _make_plugin_files(
     plugin_dir.mkdir(parents=True, exist_ok=True)
     if plugin_body is None:
         plugin_body = f"""
-from ocode.plugins.base import Plugin
+from athena.plugins.base import Plugin
 class TestPlugin(Plugin):
     INSTANTIATED_FOR = "{name}"
 """
@@ -85,7 +85,7 @@ def test_self_dependency_is_a_cycle():
 
 def test_missing_dependency_is_tolerated():
     """A plugin depending on a missing plugin still loads — the dep just
-    isn't enforced. (Real ocode flow: that dep may be installed later.)"""
+    isn't enforced. (Real athena flow: that dep may be installed later.)"""
     a = PluginManifest(
         name="a", version="0.1.0", depends_on=["not-installed"], path=Path("/tmp/a")
     )
@@ -126,7 +126,7 @@ def test_on_install_called_only_on_first_activation(tmp_path: Path):
 
     plugin_body = f"""
 from pathlib import Path
-from ocode.plugins.base import Plugin
+from athena.plugins.base import Plugin
 
 class Tracker(Plugin):
     def on_install(self):
@@ -159,7 +159,7 @@ def test_module_with_no_plugin_subclass_is_skipped(tmp_path: Path, caplog):
 
 def test_module_with_multiple_plugin_subclasses_is_skipped(tmp_path: Path, caplog):
     body = """
-from ocode.plugins.base import Plugin
+from athena.plugins.base import Plugin
 class A(Plugin): pass
 class B(Plugin): pass
 """
@@ -173,7 +173,7 @@ class B(Plugin): pass
 def test_name_and_version_rebound_from_manifest(tmp_path: Path):
     """Subclasses that hard-code name='wrong' must get overridden by manifest."""
     body = """
-from ocode.plugins.base import Plugin
+from athena.plugins.base import Plugin
 class P(Plugin):
     name = "wrong"
     version = "wrong"

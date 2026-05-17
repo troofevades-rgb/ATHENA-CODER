@@ -1,4 +1,4 @@
-"""ocode train CLI."""
+"""athena train CLI."""
 from __future__ import annotations
 
 import io
@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-import ocode.cli.train as train_cli
-from ocode.sessions.store import SessionMeta, SessionStore
-from ocode.transform.review import save_label
+import athena.cli.train as train_cli
+from athena.sessions.store import SessionMeta, SessionStore
+from athena.transform.review import save_label
 
 
 def _run(argv: list[str]) -> tuple[int, str, str]:
@@ -34,10 +34,10 @@ def isolated_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
-    config_dir = home / ".ocode"
+    config_dir = home / ".athena"
     monkeypatch.setattr(train_cli, "TRAINING_STATE_PATH", config_dir / "training_state.json")
     # Also redirect CONFIG_DIR / profile_dir if anything reads them.
-    monkeypatch.setattr("ocode.config.CONFIG_DIR", config_dir)
+    monkeypatch.setattr("athena.config.CONFIG_DIR", config_dir)
     return home
 
 
@@ -47,11 +47,11 @@ def isolated_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def test_train_review_subcommand(
     isolated_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    """ocode train review walks pending trajectories using the default prompt;
+    """athena train review walks pending trajectories using the default prompt;
     we replace the prompt with a script and verify the labels persist."""
     # Build a session under the isolated home so the CLI's _profile_dir
     # resolves to it.
-    profile = isolated_home / ".ocode" / "profiles" / "default"
+    profile = isolated_home / ".athena" / "profiles" / "default"
     store = SessionStore(profile)
     meta = SessionMeta(
         session_id="s1",
@@ -90,7 +90,7 @@ def test_train_build_dataset_subcommand(
     isolated_home: Path, tmp_path: Path
 ):
     """build-dataset walks user-labeled sessions and writes SFT JSONL."""
-    profile = isolated_home / ".ocode" / "profiles" / "default"
+    profile = isolated_home / ".athena" / "profiles" / "default"
     store = SessionStore(profile)
     meta = SessionMeta(
         session_id="s1",
@@ -263,7 +263,7 @@ def test_status_shows_last_run(isolated_home: Path):
         "runs": [{
             "timestamp": "2026-05-16T12:00:00+00:00",
             "base_model": "Qwen/x",
-            "output_name": "qwen-ocode-1",
+            "output_name": "qwen-athena-1",
             "output_dir": "/tmp/out",
             "sft_dataset": "/tmp/sft.jsonl",
             "dpo_dataset": None,
@@ -272,7 +272,7 @@ def test_status_shows_last_run(isolated_home: Path):
     }), encoding="utf-8")
     rc, stdout, _ = _run(["status"])
     assert rc == 0
-    assert "qwen-ocode-1" in stdout
+    assert "qwen-athena-1" in stdout
     assert "Qwen/x" in stdout
 
 
@@ -281,7 +281,7 @@ def test_status_shows_last_run(isolated_home: Path):
 
 def test_next_output_name_strips_org_prefix(isolated_home: Path):
     name = train_cli._next_output_name("Qwen/Qwen2.5-Coder-1.5B")
-    assert name == "Qwen2.5-Coder-1.5B-ocode-1"
+    assert name == "Qwen2.5-Coder-1.5B-athena-1"
 
 
 def test_next_output_name_increments(isolated_home: Path):
@@ -289,8 +289,8 @@ def test_next_output_name_increments(isolated_home: Path):
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps({
         "runs": [
-            {"output_name": "X-ocode-1"},
-            {"output_name": "X-ocode-2"},
+            {"output_name": "X-athena-1"},
+            {"output_name": "X-athena-2"},
         ],
     }), encoding="utf-8")
-    assert train_cli._next_output_name("X") == "X-ocode-3"
+    assert train_cli._next_output_name("X") == "X-athena-3"
