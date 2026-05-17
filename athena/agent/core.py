@@ -170,6 +170,7 @@ class Agent:
         client: Provider | None = None,
         provider: Provider | None = None,
         plugin_hooks: HookDispatcher | None = None,
+        resume_session_id: str | None = None,
     ):
         self.cfg = cfg
         self.workspace = workspace.resolve()
@@ -223,18 +224,38 @@ class Agent:
         self.goal: str | None = self._load_goal()
         if session_store is not None:
             self.session_store = session_store
-            self.session_id = new_session_id()
-            try:
-                self.session_store.open_session(SessionMeta(
-                    session_id=self.session_id,
-                    profile=cfg.profile or "default",
-                    model=self.model,
-                    workspace=str(self.workspace),
-                    parent_session_id=parent_session_id,
-                ))
-            except Exception as e:
-                ui.warn(f"session store open failed: {e}")
-                self.session_id = None
+            if resume_session_id is not None:
+                # Gateway resume path: attach to an existing session id,
+                # don't mint a new one. open_session is idempotent on a
+                # session_id that already exists (it overwrites the meta
+                # sidecar with current model/workspace, which is what we
+                # want for a "warm pickup" after a model change). The
+                # JSONL stays untouched so history reload below sees it.
+                self.session_id = resume_session_id
+                try:
+                    self.session_store.open_session(SessionMeta(
+                        session_id=self.session_id,
+                        profile=cfg.profile or "default",
+                        model=self.model,
+                        workspace=str(self.workspace),
+                        parent_session_id=parent_session_id,
+                    ))
+                except Exception as e:
+                    ui.warn(f"session store resume failed: {e}")
+                    self.session_id = None
+            else:
+                self.session_id = new_session_id()
+                try:
+                    self.session_store.open_session(SessionMeta(
+                        session_id=self.session_id,
+                        profile=cfg.profile or "default",
+                        model=self.model,
+                        workspace=str(self.workspace),
+                        parent_session_id=parent_session_id,
+                    ))
+                except Exception as e:
+                    ui.warn(f"session store open failed: {e}")
+                    self.session_id = None
         elif cfg.profile:
             try:
                 self.session_store = SessionStore(_profile_dir(cfg.profile))
@@ -787,6 +808,46 @@ class Agent:
             ui.info(f"session append failed (continuing): {e}")
 
     # -- introspection helpers used by Agent.fork() ---------------------
+
+    def load_history_from_session(self, session_id: str) -> int:
+        """Replace conversation history with the JSONL for ``session_id``.
+
+        Used by the gateway agent pool to rehydrate a warm agent from
+        a persisted session: keeps :attr:`messages[0]` (the system
+        prompt) and appends every saved turn from
+        ``<session_store>/<session_id>.jsonl``.
+
+        Returns the number of turns loaded (excluding the system
+        prompt). Returns 0 — and leaves history unchanged — when the
+        store is not configured or the JSONL doesn't exist.
+        """
+        if self.session_store is None:
+            return 0
+        jsonl_path = self.session_store.sessions_dir / f"{session_id}.jsonl"
+        if not jsonl_path.exists():
+            return 0
+        try:
+            text = jsonl_path.read_text(encoding="utf-8")
+        except OSError:
+            return 0
+
+        loaded: list[dict[str, Any]] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                loaded.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+        # Preserve the system prompt (already cached + pinned by
+        # whatever path constructed this agent) and replace history.
+        system = self.messages[0] if self.messages else None
+        self.messages = [system] if system else []
+        self.messages.extend(loaded)
+        self.session_id = session_id
+        return len(loaded)
 
     def last_assistant_message(self) -> str:
         """Return the most recent assistant message's content (or empty string)."""
