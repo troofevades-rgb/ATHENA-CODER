@@ -110,12 +110,19 @@ class ApprovalRequest:
     handed to the adapter for rendering, and resolved (with
     ``decision``/``answered_at`` set) when the user clicks allow/deny —
     or when the router times the request out.
+
+    ``platform`` + ``chat_id`` tell the router which adapter should
+    render the prompt and where to send it. Both default to empty so
+    legacy single-renderer setups (tests, in-process tools) keep
+    working without specifying a target.
     """
 
     session_id: str
     tool_name: str
     tool_args: dict[str, Any]
     request_id: str
+    platform: str = ""
+    chat_id: str = ""
     asked_at: datetime = field(default_factory=_utcnow)
     answered_at: datetime | None = None
     decision: Literal["allow", "deny"] | None = None

@@ -65,6 +65,7 @@ class ApprovalRouter:
         self._default_timeout = default_timeout
         self._loop: asyncio.AbstractEventLoop | None = None
         self._renderer: Renderer | None = None
+        self._platform_renderers: dict[str, Renderer] = {}
         self._pending: dict[str, asyncio.Future[Decision]] = {}
         self._pending_records: dict[str, ApprovalRequest] = {}
 
@@ -76,8 +77,34 @@ class ApprovalRouter:
         self._loop = loop
 
     def set_renderer(self, renderer: Renderer | None) -> None:
-        """Adapter installs (or clears) the render callback."""
+        """Install (or clear) the *default* render callback.
+
+        Used when no platform-scoped renderer is registered for the
+        request's platform. The multi-platform path
+        (:meth:`register_platform_renderer`) takes priority.
+        """
         self._renderer = renderer
+
+    def register_platform_renderer(
+        self, platform: str, renderer: Renderer | None
+    ) -> None:
+        """Install a renderer scoped to one platform name. Each
+        adapter calls this from its ``start()`` so dispatch is keyed
+        on :attr:`ApprovalRequest.platform`.
+
+        Pass ``renderer=None`` to remove the binding (adapter shutdown).
+        """
+        if renderer is None:
+            self._platform_renderers.pop(platform, None)
+        else:
+            self._platform_renderers[platform] = renderer
+
+    def _renderer_for(self, request: ApprovalRequest) -> Renderer | None:
+        if request.platform:
+            r = self._platform_renderers.get(request.platform)
+            if r is not None:
+                return r
+        return self._renderer
 
     # ---- async request (loop-side) ----
 
@@ -87,22 +114,29 @@ class ApprovalRouter:
         session_id: str,
         tool_name: str,
         tool_args: dict,
+        platform: str = "",
+        chat_id: str = "",
         timeout: float | None = None,
     ) -> Decision:
         """Await user decision. Returns ``"deny"`` on any failure path."""
-        if self._renderer is None:
-            logger.warning(
-                "approval request with no renderer installed; auto-denying"
-            )
-            return "deny"
-
         request_id = secrets.token_hex(8)
         request = ApprovalRequest(
             session_id=session_id,
             tool_name=tool_name,
             tool_args=tool_args,
             request_id=request_id,
+            platform=platform,
+            chat_id=chat_id,
         )
+
+        renderer = self._renderer_for(request)
+        if renderer is None:
+            logger.warning(
+                "approval request with no renderer installed (platform=%r); "
+                "auto-denying",
+                platform or "<unset>",
+            )
+            return "deny"
         loop = asyncio.get_running_loop()
         future: asyncio.Future[Decision] = loop.create_future()
         self._pending[request_id] = future
@@ -110,7 +144,7 @@ class ApprovalRouter:
 
         try:
             try:
-                await self._renderer(request)
+                await renderer(request)
             except Exception:
                 logger.exception(
                     "renderer raised for approval request %s; auto-denying",
@@ -145,6 +179,8 @@ class ApprovalRouter:
         session_id: str,
         tool_name: str,
         tool_args: dict,
+        platform: str = "",
+        chat_id: str = "",
         timeout: float | None = None,
     ) -> Decision:
         """Submit :meth:`request_async` to the daemon's loop and block
@@ -171,6 +207,8 @@ class ApprovalRouter:
                     session_id=session_id,
                     tool_name=tool_name,
                     tool_args=tool_args,
+                    platform=platform,
+                    chat_id=chat_id,
                     timeout=timeout,
                 ),
                 self._loop,

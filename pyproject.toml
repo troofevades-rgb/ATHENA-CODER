@@ -24,6 +24,13 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
 ]
+# Platform SDKs for ``athena gateway run``. Optional so a headless
+# install (CLI-only, no chat exposure) doesn't pull them in.
+gateway = [
+    "aiogram>=3.0",
+    "slack-sdk>=3.27",
+    "discord.py>=2.4",
+]
 # Heavy GPU-only deps for the closed training loop. Install with
 # ``pip install -e ".[train]"`` only on a workstation with CUDA.
 train = [
