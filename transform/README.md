@@ -88,7 +88,7 @@ ollama create troofevades -f Modelfile
 ollama run troofevades
 ```
 
-Or point ocode at it: `model = "troofevades"` in `~/.ocode/config.toml`.
+Or point athena at it: `model = "troofevades"` in `~/.athena/config.toml`.
 
 If layer-1 output is still close enough to "generic Qwen" after a couple
 weeks of use, you have a real motivation to go to layer 2.
@@ -162,7 +162,7 @@ Fine-tuning is supervised — the model imitates patterns. If "I don't know"
 isn't in your training set, it won't be in the model's behavior.
 
 **Tool-use examples.** If you want the fine-tuned model to keep working
-inside ocode, your training data needs tool-call examples. The sample
+inside athena, your training data needs tool-call examples. The sample
 dataset includes three (read_file, bash, grep) showing the assistant
 producing a tool_calls payload with empty content. Without these, the
 fine-tune may displace tool-calling patterns from the base model in favor
@@ -229,7 +229,7 @@ python scripts/export_to_ollama.py \
 
 Then test: `ollama run troofevades-tuned`.
 
-For ocode: set `model = "troofevades-tuned"` in `~/.ocode/config.toml`.
+For athena: set `model = "troofevades-tuned"` in `~/.athena/config.toml`.
 
 ### Step 5: evaluate honestly
 
@@ -237,7 +237,7 @@ Side-by-side with the base model on 20 held-out prompts. Score qualitatively:
 
 - Did voice transfer? (Should feel like reading your own writing)
 - Did the model lose general capabilities? (Run a few non-domain questions)
-- Are tool calls still working? (Test inside ocode)
+- Are tool calls still working? (Test inside athena)
 
 If voice didn't transfer: dataset too small, or too inconsistent in style.
 If tool calls broke: rank too high (try 16) or training data lacked any
@@ -250,7 +250,7 @@ For factual grounding (case files, exact methodology steps, prior findings):
 - Embed your corpus with `sentence-transformers/all-MiniLM-L6-v2` or larger
 - Store in chromadb / sqlite-vss / faiss locally
 - At query time, retrieve top-k chunks, inject into the system prompt
-- Tool-call from ocode: add a `search_corpus` tool
+- Tool-call from athena: add a `search_corpus` tool
 
 This is a separate kit. Different concern: facts, not voice.
 

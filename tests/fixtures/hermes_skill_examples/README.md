@@ -1,7 +1,7 @@
 # `hermes_skill_examples/` — Hermes-format SKILL.md samples
 
 Anonymized SKILL.md files in the Hermes Agent format, used by Phase 1
-tests to verify that ocode's skill loader and the `ocode import-from-hermes`
+tests to verify that athena's skill loader and the `athena import-from-hermes`
 tool handle the full surface area of real-world skills: normal cases,
 edge cases (long descriptions, multi-section bodies, unicode), and
 malformed frontmatter (missing fields, invalid YAML, conflicting keys).

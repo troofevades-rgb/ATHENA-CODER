@@ -1,8 +1,8 @@
 # `hermes_memory_db_sample/` — synthetic Hermes memory SQLite DBs
 
 Synthetic SQLite database files matching the Hermes Agent memory schema,
-used by Phase 1 to test `ocode/migration/memory_exporter.py` — the tool
-that converts a Hermes memory database into ocode's plain-file memory
+used by Phase 1 to test `athena/migration/memory_exporter.py` — the tool
+that converts a Hermes memory database into athena's plain-file memory
 format.
 
 These DBs are intentionally **synthetic**, not anonymized copies of real

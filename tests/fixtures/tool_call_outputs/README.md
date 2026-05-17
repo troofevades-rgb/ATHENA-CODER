@@ -5,7 +5,7 @@ used by Phase 9's tool-call parser tests. Different providers and even
 different models within a provider emit tool calls in noticeably
 different shapes (Anthropic XML, OpenAI function-call JSON, Ollama
 native, Qwen's leaked `<tool_call>` tags, harmony's `<function>` tags,
-JSON-fenced content, etc.). Each parser in `ocode/providers/parsers/`
+JSON-fenced content, etc.). Each parser in `athena/providers/parsers/`
 is verified against the corpus to lock in robustness.
 
 ## Layout
@@ -20,7 +20,7 @@ tool_call_outputs/
         └── pathological/            # Real cases that broke a parser once
 ```
 
-Provider names match `ocode/providers/` module names: `ollama`,
+Provider names match `athena/providers/` module names: `ollama`,
 `anthropic`, `openai`, `google`, `openai_compat`, `openrouter`, `nous`.
 Model names match what the provider returns when asked (e.g.
 `claude-sonnet-4-5`, `gpt-4o-2024-08-06`, `qwen2.5-coder-32b-instruct`).

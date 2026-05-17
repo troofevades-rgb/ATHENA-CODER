@@ -1,4 +1,4 @@
-# ocode — local Claude Code alternative on Ollama
+# athena — local Claude Code alternative on Ollama
 
 A terminal-based agentic coding assistant that runs entirely against a local Ollama server. No cloud calls, no API keys, no telemetry. Designed for offline / air-gapped use.
 
@@ -9,16 +9,16 @@ A terminal-based agentic coding assistant that runs entirely against a local Oll
 - File read / write / surgical edit via `str_replace`
 - Bash execution with per-call confirmation for destructive ops; works on Linux, macOS, and Windows (git-bash auto-detected)
 - Glob + ripgrep-style search
-- Project context loaded from `OCODE.md` (analogous to `CLAUDE.md`)
+- Project context loaded from `ATHENA.md` (analogous to `CLAUDE.md`)
 - Slash commands: `/clear`, `/cost`, `/model`, `/tools`, `/help`, `/exit`, `/dump`, `/cwd`, `/loop`, `/compact`, `/resume`, `/memory`, `/plan`, `/review`, `/security-review`, `/init`, `/steer`, `/queue`, `/goal`
-- Session transcript saved to `~/.ocode/profiles/<profile>/sessions/` with SQLite FTS5 search
+- Session transcript saved to `~/.athena/profiles/<profile>/sessions/` with SQLite FTS5 search
 - Sub-agent forks via `Agent.fork()` (daemon-thread; isolated provider client; auto-deny approval callback)
 - File-based skill system (agentskills.io standard), plus `import-from-hermes`
 - Per-turn background review and 7-day curator pass — autonomous memory/skill consolidation
-- Plugin system with lifecycle hooks (`ocode plugins list|enable|disable|info`)
-- APScheduler-backed cron with watchdog and agent modes (`ocode cron ...`)
+- Plugin system with lifecycle hooks (`athena plugins list|enable|disable|info`)
+- APScheduler-backed cron with watchdog and agent modes (`athena cron ...`)
 - In-flight redirection (`/steer`) and persistent invariant (`/goal`)
-- Closed training loop: review trajectories, build SFT+DPO datasets, train a new LoRA, register with Ollama (`ocode train review|build-dataset|run|status`, `ocode model switch`)
+- Closed training loop: review trajectories, build SFT+DPO datasets, train a new LoRA, register with Ollama (`athena train review|build-dataset|run|status`, `athena model switch`)
 - Rich terminal UI with diff rendering for edits
 
 ## Requirements
@@ -35,7 +35,7 @@ A terminal-based agentic coding assistant that runs entirely against a local Oll
 ## Install
 
 ```bash
-cd ocode
+cd athena
 pip install -e .
 ollama pull qwen2.5-coder:14b
 ```
@@ -43,14 +43,14 @@ ollama pull qwen2.5-coder:14b
 ## Run
 
 ```bash
-ocode                       # interactive REPL in current directory
-ocode -m qwen2.5-coder:32b  # pick a different model
-ocode -p "fix the failing test in test_parser.py"   # one-shot prompt
+athena                       # interactive REPL in current directory
+athena -m qwen2.5-coder:32b  # pick a different model
+athena -p "fix the failing test in test_parser.py"   # one-shot prompt
 ```
 
 ## Configuration
 
-`~/.ocode/config.toml`:
+`~/.athena/config.toml`:
 
 ```toml
 model = "qwen2.5-coder:14b"
@@ -61,7 +61,7 @@ context_window = 32768
 
 ## Project memory
 
-Drop an `OCODE.md` at the repo root. It gets prepended to the system prompt every session — same idea as `CLAUDE.md`. Keep it terse: build commands, conventions, gotchas.
+Drop an `ATHENA.md` at the repo root. It gets prepended to the system prompt every session — same idea as `CLAUDE.md`. Keep it terse: build commands, conventions, gotchas.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ Single loop in `agent.py`. Tools are registered in `tools/registry.py` with a JS
 
 ## Extending
 
-Add a tool in `ocode/tools/`:
+Add a tool in `athena/tools/`:
 
 ```python
 from .registry import tool
@@ -95,10 +95,10 @@ Import it in `tools/__init__.py` and it's live next session.
 
 ## MCP integration
 
-ocode reads `mcp.json` files in the standard Claude Desktop / Claude Code format and registers each server's tools alongside the built-in ones. Lookup order (later overrides earlier):
+athena reads `mcp.json` files in the standard Claude Desktop / Claude Code format and registers each server's tools alongside the built-in ones. Lookup order (later overrides earlier):
 
-1. `~/.ocode/mcp.json`
-2. `<workspace>/.ocode/mcp.json`
+1. `~/.athena/mcp.json`
+2. `<workspace>/.athena/mcp.json`
 3. `<workspace>/mcp.json`
 
 Example:
@@ -118,7 +118,7 @@ Example:
 }
 ```
 
-Per-server config supports the standard fields (`command`, `args`, `env`, `cwd`, `disabled`) plus two ocode extensions for trimming what the model sees:
+Per-server config supports the standard fields (`command`, `args`, `env`, `cwd`, `disabled`) plus two athena extensions for trimming what the model sees:
 
 - `allowed_tools`: whitelist of tool names to expose
 - `disabled_tools`: blacklist of tool names to hide
@@ -129,7 +129,7 @@ Only the **stdio** transport is supported. HTTP/SSE servers are skipped with a w
 
 ### Writing your own MCP server
 
-`ocode/mcp/demo_server.py` is a complete ~120-line stdlib-only MCP server. Copy it as a starting point — it exposes `echo`, `add`, and `current_time`, and is the test fixture that proves the integration works without external dependencies.
+`athena/mcp/demo_server.py` is a complete ~120-line stdlib-only MCP server. Copy it as a starting point — it exposes `echo`, `add`, and `current_time`, and is the test fixture that proves the integration works without external dependencies.
 
 ### Limitations
 
