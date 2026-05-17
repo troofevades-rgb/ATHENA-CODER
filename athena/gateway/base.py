@@ -69,6 +69,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Cadence for the typing-heartbeat refresh loop. Telegram's typing
+# indicator persists ~5s; Discord's ~10s. 4s gives a comfortable
+# refresh window for both without spamming Slack's rate limiter.
+_TYPING_REFRESH_SECONDS = 4.0
+
+# Default chat-body cap when an adapter doesn't override.
+# Sized below Telegram's 4096 hard cap with headroom for Markdown
+# formatting (the parse-mode markers, code-fence delimiters, etc.).
+# Adapters with tighter limits override via :attr:`body_cap`.
+_DEFAULT_BODY_CAP = 3500
+
+
 # Commands that bypass the active-session guard entirely. Without this,
 # /stop or /approve typed while the agent is mid-turn either leak into
 # the next prompt as user text (/stop, /new) or deadlock (/approve,
@@ -533,20 +545,228 @@ class GatewayAdapter(ABC):
         event: MessageEvent,
         session_id: str,
     ) -> None:
-        """Background task that actually processes the message.
+        """Run one inbound message to completion: warm the agent,
+        install the gateway approval bridge, fire ``run_until_done``
+        on a worker thread, stream the result back to the chat, and
+        drain pending follow-ups.
 
-        Implemented in Prompt 10.8 once the agent pool, approval
-        router, and streaming protocol exist. The task is expected to:
+        Lifecycle, in order:
 
-        - Poll ``self._active_sessions[session_id]`` (the interrupt
-          event) at safe checkpoints between tool calls and exit early
-          if set, leaving its pending-merge for the next turn to pick
-          up.
-        - On normal completion, drain ``self._pending_messages`` for
-          this session and either re-spawn or finalize.
-        - In its ``finally``, release the guard so the session is
-          ready for the next inbound message.
+        1. Acquire the agent from the pool (warm-cache hit reuses an
+           in-memory instance; miss instantiates and replays JSONL).
+        2. Spawn a "typing heartbeat" task that keeps the platform's
+           typing indicator alive while the worker thread runs.
+        3. Install :func:`build_gateway_approval_callback` via a
+           context-var. The worker thread inherits the context, so
+           tool dispatch sees this callback instead of the default
+           terminal ``ui.confirm``.
+        4. ``asyncio.to_thread(agent.run_until_done, event.text)`` —
+           the agent loop runs synchronously; tool calls that need
+           approval cross back into the loop via
+           ``ApprovalRouter.request_sync``.
+        5. Send the final assistant message (chunked to the
+           platform's body cap) via :meth:`send_text`.
+        6. ``finally``: cancel the typing task, reset the approval
+           context, release the session guard, drain any pending
+           follow-up into a fresh task.
+
+        Cancellation: if a follow-up message sets
+        ``self._active_sessions[session_id]`` (the interrupt event)
+        mid-run, the agent's tool loop won't know about it (it's
+        running synchronously on a worker thread), so the interrupt
+        only takes effect at the START of the next turn — when the
+        base's ``handle_inbound`` sees the merged pending event and
+        decides whether to spawn a new task. The merged event is
+        consumed in the drain step below.
         """
-        raise NotImplementedError(
-            "GatewayAdapter._process_message_background is implemented in Phase 10.8"
+        import asyncio
+
+        from ..safety.approval_callback import (
+            reset_approval_callback,
+            set_approval_callback,
         )
+        from .agent_factory import build_gateway_approval_callback
+
+        guard = self._active_sessions.get(session_id)
+        try:
+            try:
+                agent = await self.daemon.pool.get(session_id)
+            except Exception:
+                logger.exception(
+                    "[%s] agent pool.get failed for %s",
+                    self.name, session_id,
+                )
+                await self._safe_send(
+                    event.chat_id,
+                    "_failed to load session; check logs_",
+                )
+                return
+
+            heartbeat_task = asyncio.create_task(
+                self._typing_heartbeat(event.chat_id),
+                name=f"gateway-typing-{session_id[:8]}",
+            )
+            approval_callback = build_gateway_approval_callback(
+                self.daemon,
+                session_id=session_id,
+                platform=self.name,
+                chat_id=event.chat_id,
+            )
+            approval_token = set_approval_callback(approval_callback)
+
+            user_text = _build_user_text(event)
+
+            try:
+                await asyncio.to_thread(
+                    agent.run_until_done, user_text,
+                )
+            except Exception:
+                logger.exception(
+                    "[%s] agent run failed for %s", self.name, session_id,
+                )
+                await self._safe_send(
+                    event.chat_id,
+                    "_processing failed; see logs_",
+                )
+                return
+            finally:
+                reset_approval_callback(approval_token)
+                heartbeat_task.cancel()
+                try:
+                    await heartbeat_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+            response = agent.last_assistant_message()
+            if response:
+                await self._send_chunked(event.chat_id, response)
+        finally:
+            self._session_tasks.pop(session_id, None)
+            pending = self._pending_messages.pop(session_id, None)
+            if guard is not None:
+                self._release_session_guard(session_id, guard=guard)
+            if pending is not None:
+                # A follow-up arrived while we were running — kick off
+                # a fresh processing task so it doesn't sit waiting for
+                # someone to send another message before being picked up.
+                self._start_session_processing(pending, session_id)
+
+    # ---- typing heartbeat ----
+
+    async def _typing_heartbeat(self, chat_id: str) -> None:
+        """Keep the platform's typing indicator alive while the agent
+        runs. Each call to :meth:`show_typing` is one-shot — Telegram
+        shows ~5s, Discord ~10s — so we re-fire on a short cadence.
+
+        Cancelled by :meth:`_process_message_background` once the
+        worker thread returns.
+        """
+        import asyncio
+
+        try:
+            while True:
+                show = getattr(self, "show_typing", None)
+                if show is not None:
+                    try:
+                        await show(chat_id)
+                    except Exception:
+                        logger.debug(
+                            "[%s] show_typing raised", self.name, exc_info=True,
+                        )
+                await asyncio.sleep(_TYPING_REFRESH_SECONDS)
+        except asyncio.CancelledError:
+            return
+
+    # ---- send helpers ----
+
+    async def _safe_send(self, chat_id: str, text: str) -> None:
+        try:
+            await self.send_text(chat_id, text)
+        except Exception:
+            logger.exception(
+                "[%s] error-path send failed for %s", self.name, chat_id,
+            )
+
+    async def _send_chunked(self, chat_id: str, text: str) -> None:
+        """Send a long body in platform-respecting chunks.
+
+        Default ceiling is :data:`_DEFAULT_BODY_CAP` (~3500 chars —
+        below Telegram's 4096 hard cap with headroom for parse_mode
+        markers). Subclasses can override :attr:`body_cap` for tighter
+        platform limits (Discord is 2000).
+
+        Chunks split on the nearest paragraph or sentence boundary
+        when possible; on no boundary in the budget, hard-cut.
+        """
+        cap = getattr(self, "body_cap", _DEFAULT_BODY_CAP)
+        for chunk in _chunk_text(text, cap):
+            try:
+                await self.send_text(chat_id, chunk)
+            except Exception:
+                logger.exception(
+                    "[%s] send_text failed mid-stream for %s",
+                    self.name, chat_id,
+                )
+                return
+
+
+# ---- module-level helpers ----------------------------------------------
+
+
+def _build_user_text(event: MessageEvent) -> str:
+    """Compose the user-text the agent sees.
+
+    For text events: ``event.text`` straight through. For events with
+    attachments, append a short note listing the cached file paths so
+    the agent can read them with file tools — the tool layer doesn't
+    know about Telegram / Slack / Discord media URLs, but it can
+    happily ``cat`` a local file the adapter saved into the per-chat
+    attachment dir.
+    """
+    text = event.text or ""
+    if not event.attachments:
+        return text
+    note_lines = ["", "[attached files — read via file tools]"]
+    for path in event.attachments:
+        note_lines.append(f"  {path}")
+    return text + "\n".join(note_lines) if text else "\n".join(note_lines[1:])
+
+
+def _chunk_text(text: str, cap: int) -> list[str]:
+    """Split ``text`` into chunks no longer than ``cap`` characters.
+
+    Prefers paragraph (``\\n\\n``) boundaries, then single-newline,
+    then sentence-end punctuation, then word boundaries; falls back
+    to a hard slice if no boundary fits.
+    """
+    if not text:
+        return []
+    if len(text) <= cap:
+        return [text]
+
+    chunks: list[str] = []
+    remaining = text
+    # Tiny-chunk floor avoids splitting on a punctuation/space that
+    # lands very early in the budget. Paragraph boundaries are
+    # exempt — those are intentional structural breaks the agent
+    # author chose, and respecting them matters more than chunk
+    # balance.
+    tiny_floor = int(cap * 0.6)
+    while len(remaining) > cap:
+        window = remaining[:cap]
+        split_at = cap
+        for sep, floor in (
+            ("\n\n", 1),
+            ("\n", tiny_floor),
+            (". ", tiny_floor),
+            (" ", tiny_floor),
+        ):
+            idx = window.rfind(sep)
+            if idx >= floor:
+                split_at = idx + len(sep)
+                break
+        chunks.append(remaining[:split_at].rstrip())
+        remaining = remaining[split_at:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks

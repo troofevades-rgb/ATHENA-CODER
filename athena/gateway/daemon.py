@@ -87,11 +87,14 @@ class GatewayDaemon:
             provider=_default_provider_name(cfg),
             continuity=gw.continuity,
         )
-        # Phase 10.8 plugs in a real factory that loads conversation
-        # history from the session's JSONL. The stub factory exists so
-        # AgentPool can be tested in isolation here.
+        # Real factory loads conversation history from the session's
+        # JSONL and binds the agent to the daemon's shared SessionStore.
+        # Tests can override via the agent_factory kwarg.
+        if agent_factory is None:
+            from .agent_factory import build_agent_factory
+            agent_factory = build_agent_factory(self)
         self.pool = AgentPool(
-            agent_factory or _stub_agent_factory,
+            agent_factory,
             max_size=gw.max_warm_agents,
         )
         self.approvals = ApprovalRouter()
@@ -222,17 +225,6 @@ async def _bounded_stop(adapter: "GatewayAdapter") -> None:
             "adapter %s.stop() exceeded 10s; continuing shutdown",
             adapter.name,
         )
-
-
-async def _stub_agent_factory(session_id: str) -> "Agent":
-    """Phase 10.2 placeholder. Phase 10.8 ships the real factory.
-
-    Raising rather than constructing avoids accidentally booting a
-    half-wired agent during the pre-streaming phases."""
-    raise NotImplementedError(
-        f"agent_factory not configured (session_id={session_id}); "
-        "the real factory lands in Phase 10.8 alongside _process wire-up"
-    )
 
 
 def _default_provider_name(cfg: Config) -> str:
