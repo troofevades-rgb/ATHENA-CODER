@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Known limitations
+- Phase 8's provider fallback chain (e.g. `[providers.anthropic] fallback = ["openrouter"]`) is not yet wired through the resolver. When a hosted provider's credentials are exhausted (all in 429 cooldown), the resolver raises rather than falling through to the configured fallback chain. The config key is documented but inert until a follow-up commit lands the chain-walking.
+
 ### Renamed
 - Project renamed `ocode` → `athena`. The Python package, the `athena`
   CLI command, `~/.athena/` config home, and the `ATHENA.md` project
@@ -16,7 +19,13 @@
 ### Added
 - `Provider` ABC, `StreamChunk` shape, and name-keyed registry under `athena/providers/` (Phase 8)
 - `OllamaProvider` (replaces `OllamaClient`) on the new ABC; `ollama_client.py` is now a back-compat shim (Phase 8)
-- `AnthropicProvider`, `OpenAIProvider`, `GoogleProvider` (Phase 8)
+- `AnthropicProvider`, `OpenAIProvider`, `GoogleProvider` first-class providers with respx-mocked SSE parsing (Phase 8)
+- `OpenAICompatProvider`, `OpenRouterProvider`, `NousProvider` — thin OpenAI-compat subclasses for vLLM/llama.cpp/openrouter.ai/portal.nousresearch.com (Phase 8)
+- `CredentialPool` at `~/.athena/credentials.json` — per-provider round-robin with cooldown on 429, atomic JSON persistence, thread-safe, redacted listing (Phase 8)
+- `resolve_provider(model, cfg, pool)` runtime resolver — prefix routing (anthropic/ openai/ google/ openrouter/ nous/), gemini- bare prefix, host:port/model → openai_compat, default ollama (Phase 8)
+- `athena providers {list,test,add-key,remove-key}` CLI (Phase 8)
+- `respx>=0.21` added to `[dev]` extras for httpx mocking in provider tests (Phase 8)
+- Trajectory extraction + auto-classifier (`good` / `bad` / `preference_pair` / `unreviewed`) (Phase 7)
 - Trajectory extraction + auto-classifier (`good` / `bad` / `preference_pair` / `unreviewed`) (Phase 7)
 - SFT and DPO dataset construction in JSONL with the qwen-coder chat template (Phase 7)
 - Interactive trajectory review TUI with resume; labels persist to `<profile_dir>/labels/<session_id>.json` (Phase 7)
