@@ -38,6 +38,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_test.add_argument("--provider", default=None,
                         help="Limit the test to one provider name.")
+    p_test.add_argument("--model", default=None,
+                        help="Probe this specific model instead of the "
+                             "built-in sample. Useful when the bundled sample "
+                             "is stale (provider retired the model).")
 
     p_add = sub.add_parser("add-key", help="Add a credential for a provider.")
     p_add.add_argument("provider")
@@ -137,8 +141,9 @@ def _cmd_test(args) -> int:
         targets = sorted(registered)
 
     any_failed = False
+    model_override = getattr(args, "model", None)
     for name in targets:
-        ok, detail = _probe_provider(name, cfg, pool)
+        ok, detail = _probe_provider(name, cfg, pool, model_override=model_override)
         marker = "ok " if ok else "FAIL"
         print(f"  [{marker}] {name:<14} {detail}")
         if not ok:
@@ -146,7 +151,9 @@ def _cmd_test(args) -> int:
     return 0 if not any_failed else 1
 
 
-def _probe_provider(name: str, cfg, pool: CredentialPool) -> tuple[bool, str]:
+def _probe_provider(
+    name: str, cfg, pool: CredentialPool, *, model_override: str | None = None,
+) -> tuple[bool, str]:
     """Send the smallest possible probe to ``name``. Returns
     (ok, one-line-detail)."""
     from ..providers.runtime_resolver import resolve_provider
@@ -177,9 +184,12 @@ def _probe_provider(name: str, cfg, pool: CredentialPool) -> tuple[bool, str]:
         return False, "no credential in pool"
     # Resolve via the routing rules — we want to exercise the same path
     # the agent uses.
-    sample_model = _SAMPLE_MODELS.get(name)
+    sample_model = model_override or _SAMPLE_MODELS.get(name)
     if sample_model is None:
-        return False, "no sample model known for this provider"
+        return False, (
+            "no sample model known for this provider; "
+            "pass --model <name> to probe a specific model"
+        )
     try:
         provider, bare = resolve_provider(sample_model, cfg, pool)
     except Exception as e:

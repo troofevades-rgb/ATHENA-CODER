@@ -31,6 +31,26 @@ _DEFAULT_VERSION = "2023-06-01"
 _DEFAULT_BASE_URL = "https://api.anthropic.com/v1"
 
 
+def _raise_with_body(response: httpx.Response) -> None:
+    """Like ``response.raise_for_status()`` but reads the response body
+    first so the error message includes the API's own explanation. For
+    a streaming response the body is otherwise lost.
+    """
+    if response.status_code < 400:
+        return
+    try:
+        response.read()
+        body = (response.text or "").strip()
+    except Exception:
+        body = ""
+    snippet = body[:800]
+    raise httpx.HTTPStatusError(
+        f"{response.status_code} from {response.request.url}: {snippet}",
+        request=response.request,
+        response=response,
+    )
+
+
 @register_provider
 class AnthropicProvider(Provider):
     name = "anthropic"
@@ -83,7 +103,7 @@ class AnthropicProvider(Provider):
             payload["tools"] = self._convert_tools(tools)
 
         with self._client.stream("POST", "/messages", json=payload) as r:
-            r.raise_for_status()
+            _raise_with_body(r)
             yield from self._parse_sse(r)
 
     def parse_tool_calls(
