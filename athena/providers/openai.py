@@ -27,6 +27,25 @@ from .base import Provider, StreamChunk
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
+def _raise_with_body(response: httpx.Response) -> None:
+    """Read the streaming response body before raising so the error
+    surfaces the API's own complaint (model not found, key invalid,
+    quota exhausted, etc.) instead of just the URL and status code.
+    """
+    if response.status_code < 400:
+        return
+    try:
+        response.read()
+        body = (response.text or "").strip()
+    except Exception:
+        body = ""
+    raise httpx.HTTPStatusError(
+        f"{response.status_code} from {response.request.url}: {body[:800]}",
+        request=response.request,
+        response=response,
+    )
+
+
 class OpenAICompatibleProvider(Provider):
     """Shared base for OpenAI + every OpenAI-compatible service. Subclasses
     set ``name`` and may override ``base_url`` / extra request headers.
@@ -84,7 +103,7 @@ class OpenAICompatibleProvider(Provider):
         with self._client.stream(
             "POST", "/chat/completions", json=payload
         ) as r:
-            r.raise_for_status()
+            _raise_with_body(r)
             yield from self._parse_sse(r)
 
     def parse_tool_calls(

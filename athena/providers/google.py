@@ -29,6 +29,24 @@ from .base import Provider, StreamChunk
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 
+def _raise_with_body(response: httpx.Response) -> None:
+    """Read the streaming body before raising so the error includes
+    the API's own complaint (invalid model, bad key, region disabled,
+    etc.) instead of just the URL."""
+    if response.status_code < 400:
+        return
+    try:
+        response.read()
+        body = (response.text or "").strip()
+    except Exception:
+        body = ""
+    raise httpx.HTTPStatusError(
+        f"{response.status_code} from {response.request.url}: {body[:800]}",
+        request=response.request,
+        response=response,
+    )
+
+
 @register_provider
 class GoogleProvider(Provider):
     name = "google"
@@ -86,7 +104,7 @@ class GoogleProvider(Provider):
         with self._client.stream(
             "POST", path, params={"alt": "sse"}, json=payload
         ) as r:
-            r.raise_for_status()
+            _raise_with_body(r)
             yield from self._parse_sse(r)
 
     def parse_tool_calls(
