@@ -1,8 +1,8 @@
-# `sessions_v1/` — legacy ocode v1 session JSONLs
+# `sessions_v1/` — legacy athena v1 session JSONLs
 
-Session transcripts in the JSONL format used by ocode v1, used by Phase 2
+Session transcripts in the JSONL format used by athena v1, used by Phase 2
 (session store) and Phase 1 (migration) tests. Phase 2's session-store
-tests verify that ocode v2's reader handles the legacy shape; the
+tests verify that athena v2's reader handles the legacy shape; the
 migration tests verify the importer can re-key v1 sessions into v2's
 SQLite index without loss.
 
@@ -10,7 +10,7 @@ SQLite index without loss.
 
 One session per file. Each line is a JSON object — `{"role": "user",
 "content": "..."}`, `{"role": "assistant", "content": "...", "tool_calls":
-[...]}`, etc. — matching the message shape ocode v1 wrote to disk.
+[...]}`, etc. — matching the message shape athena v1 wrote to disk.
 
 ## Layout
 
@@ -39,7 +39,7 @@ sessions_v1/
 
 Samples may come from:
 
-- The user's own `~/.ocode/sessions/` (preferred; anonymize first)
+- The user's own `~/.athena/sessions/` (preferred; anonymize first)
 - Hand-crafted JSONL exercising a specific format edge case
 
 **Anonymization rules**:

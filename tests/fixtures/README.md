@@ -1,7 +1,7 @@
 # Test fixture corpora
 
 This directory holds real-world and synthetic test data referenced by
-ocode's test suite. Every subdirectory is a *corpus*: a named collection
+athena's test suite. Every subdirectory is a *corpus*: a named collection
 of samples with a consistent format, used by one or more test modules.
 
 Each corpus subdirectory has its own `README.md` documenting its purpose,
@@ -30,7 +30,7 @@ table above in the same commit.
 - **No real credentials, tokens, or personally-identifying information**
   anywhere under this tree, ever. If a sample comes from a real source,
   anonymize per that corpus's rules before committing.
-- **Samples are inputs, not source code.** They live here, not in `ocode/`.
+- **Samples are inputs, not source code.** They live here, not in `athena/`.
 - **Each sample is a contract.** Changing a sample changes the assertion
   it was checking; do it deliberately and document the reason in the
   commit message.
