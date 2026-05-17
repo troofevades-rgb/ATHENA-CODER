@@ -119,7 +119,7 @@ class OpenAICompatibleProvider(Provider):
         by every OpenAI-compatible subclass (OpenAI, openai_compat,
         OpenRouter, Nous); their endpoints all return the same shape."""
         r = self._client.get("/models")
-        r.raise_for_status()
+        _raise_with_body(r)
         data = r.json() or {}
         items = data.get("data") or []
         return [
