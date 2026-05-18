@@ -39,3 +39,6 @@ Thumbs.db
 *.safetensors
 *.bin
 *.ckpt
+
+# Phase 16 bench results — transient timestamped files
+tests/fixtures/benchmarks/results/*.json
