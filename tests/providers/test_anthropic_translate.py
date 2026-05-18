@@ -108,9 +108,54 @@ def test_json_string_arguments_are_parsed() -> None:
     assert tool_use["input"] == {"file_path": "x.py"}
 
 
-def test_assistant_with_no_content_or_tool_calls_emits_empty_text() -> None:
-    """Anthropic rejects assistant turns with empty content arrays."""
+def test_assistant_with_no_content_or_tool_calls_is_dropped() -> None:
+    """Anthropic rejects assistant turns with empty content arrays AND
+    rejects text blocks with empty strings — the safest move is to
+    drop the turn so nothing about the message log enrages the API."""
     out = AnthropicProvider._translate_messages([
+        {"role": "user", "content": "hi"},
         {"role": "assistant", "content": ""},
     ])
-    assert out[0]["content"] == [{"type": "text", "text": ""}]
+    # Only the user turn survives.
+    assert len(out) == 1
+    assert out[0]["role"] == "user"
+
+
+def test_assistant_pre_built_blocks_strip_empty_text() -> None:
+    """Upstream code that already emitted assistant content as block
+    list may include placeholder empty-text blocks (mid-stream
+    interrupts, plugin elision). Filter those out instead of
+    forwarding them straight into the API where they 400."""
+    out = AnthropicProvider._translate_messages([
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": ""},
+                {"type": "text", "text": "  "},
+                {"type": "text", "text": "real content"},
+            ],
+        },
+    ])
+    blocks = out[0]["content"]
+    assert blocks == [{"type": "text", "text": "real content"}]
+
+
+def test_assistant_only_tool_use_no_text_passes_through() -> None:
+    """Normal case: the model emits a tool call with no preamble. The
+    assistant turn carries only a tool_use block; Anthropic accepts
+    this, the translator must not invent a placeholder text block
+    that would cause a 400."""
+    out = AnthropicProvider._translate_messages([
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "c1",
+                "function": {"name": "Read", "arguments": {"file_path": "x.py"}},
+            }],
+        },
+    ])
+    blocks = out[0]["content"]
+    # Exactly one block, exactly the tool_use — no empty text smuggled in.
+    assert len(blocks) == 1
+    assert blocks[0]["type"] == "tool_use"

@@ -233,7 +233,18 @@ class AnthropicProvider(Provider):
                 if isinstance(content, str) and content:
                     blocks.append({"type": "text", "text": content})
                 elif isinstance(content, list):
-                    blocks.extend(content)
+                    # Drop empty/placeholder text blocks here too — the
+                    # constraint "text blocks must be non-empty" applies
+                    # whether the empty text arrived from us or from a
+                    # plugin that produced ``{"type": "text", "text": ""}``.
+                    for b in content:
+                        if (
+                            isinstance(b, dict)
+                            and b.get("type") == "text"
+                            and not (b.get("text") or "").strip()
+                        ):
+                            continue
+                        blocks.append(b)
                 for tc in msg.get("tool_calls") or []:
                     fn = tc.get("function") or {}
                     args = fn.get("arguments", {})
@@ -252,9 +263,15 @@ class AnthropicProvider(Provider):
                         "name": fn.get("name", ""),
                         "input": args if isinstance(args, dict) else {},
                     })
-                # Anthropic rejects assistant turns with empty content.
+                # If the turn would have zero blocks (no text, no tool
+                # calls — happens on mid-stream interrupt or aggressive
+                # plugin filtering), drop it entirely. Anthropic rejects
+                # both empty content arrays and empty text blocks, and
+                # there's nothing useful in a content-less assistant turn
+                # for the model to see anyway.
                 if not blocks:
-                    blocks.append({"type": "text", "text": ""})
+                    i += 1
+                    continue
                 out.append({"role": "assistant", "content": blocks})
                 i += 1
                 continue
