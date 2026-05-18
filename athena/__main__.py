@@ -213,6 +213,7 @@ _SUBCOMMANDS = {
     "mcp": "athena.cli.mcp",
     "acp": "athena.cli.acp",
     "profile": "athena.cli.profile",
+    "webhook": "athena.cli.webhook",
 }
 
 

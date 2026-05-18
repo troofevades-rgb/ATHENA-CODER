@@ -78,6 +78,16 @@ class CuratorConfig:
 
 
 @dataclass
+class WebhookServerConfig:
+    """Webhook listener settings (Phase 15). Lives inside
+    GatewayConfig because the listener shares the gateway daemon's
+    process — start gateway, get webhooks for free (when enabled)."""
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 4747
+
+
+@dataclass
 class GatewayConfig:
     """Gateway daemon settings (Phase 10).
 
@@ -98,6 +108,7 @@ class GatewayConfig:
     max_warm_agents: int = 50
     continuity: bool = False
     platforms: dict[str, Any] = field(default_factory=dict)
+    webhooks: WebhookServerConfig = field(default_factory=WebhookServerConfig)
 
 
 @dataclass

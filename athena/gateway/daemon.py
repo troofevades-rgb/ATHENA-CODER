@@ -103,6 +103,10 @@ class GatewayDaemon:
         self.adapters: list["GatewayAdapter"] = []
         self._adapter_tasks: list[asyncio.Task] = []
         self._started = False
+        # Webhook listener (Phase 15) — constructed lazily in start()
+        # so daemons running with [gateway.webhooks].enabled=false
+        # don't pay the import cost.
+        self._webhook_server: Any = None
 
     # ---- adapter lifecycle ----
 
@@ -142,6 +146,21 @@ class GatewayDaemon:
             )
             self._adapter_tasks.append(task)
 
+        # Webhook listener — only spin it up when the user
+        # explicitly enables it. Listening on a port without being
+        # asked would surprise people.
+        gw_cfg = self.cfg.gateway
+        wh = getattr(gw_cfg, "webhooks", None)
+        if wh is not None and getattr(wh, "enabled", False):
+            try:
+                self._webhook_server = await self._start_webhook_server(
+                    wh.host, wh.port,
+                )
+            except Exception:
+                logger.exception(
+                    "webhook server failed to start; continuing without it",
+                )
+
     async def stop(self) -> None:
         """Stop every adapter, then drain the agent pool.
 
@@ -169,6 +188,17 @@ class GatewayDaemon:
                 task.cancel()
         self._adapter_tasks.clear()
 
+        # Stop the webhook listener (if running) before tearing down
+        # the pool — webhook dispatch sometimes routes through gateway
+        # adapters, and the agent it spawned might still be writing
+        # to one.
+        if self._webhook_server is not None:
+            try:
+                await self._webhook_server.stop()
+            except Exception:
+                logger.exception("webhook server stop() raised")
+            self._webhook_server = None
+
         # Deny every pending approval so any worker thread blocked on
         # request_sync unwinds cleanly before pool.evict_all closes
         # the agents holding those threads.
@@ -176,6 +206,34 @@ class GatewayDaemon:
         await self.pool.evict_all()
         self.router.close()
         registry.unregister(self)
+
+    # ---- webhook server bootstrap ----
+
+    async def _start_webhook_server(self, host: str, port: int):
+        """Construct + start a WebhookServer wired to the same
+        profile's store and a dispatch callback that closes over
+        this daemon. Called from start() when
+        ``cfg.gateway.webhooks.enabled`` is True."""
+        from ..webhooks.delivery import dispatch_webhook
+        from ..webhooks.server import WebhookServer
+        from ..webhooks.subscription import WebhookStore
+
+        store = WebhookStore(self.profile_dir / "webhooks.db")
+
+        async def _dispatch(sub, payload, headers):
+            await dispatch_webhook(
+                daemon=self, sub=sub, payload=payload, headers=headers,
+            )
+
+        server = WebhookServer(
+            daemon=self,
+            store=store,
+            host=host,
+            port=port,
+            dispatch=_dispatch,
+        )
+        await server.start()
+        return server
 
     # ---- outbound shortcuts ----
 
