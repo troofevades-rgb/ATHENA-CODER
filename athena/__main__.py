@@ -240,9 +240,21 @@ def main() -> int:
     ap.add_argument("-C", "--cwd", help="Workspace directory (default: current dir)")
     ap.add_argument("--auto-approve", action="store_true", help="Skip confirmation prompts for tools that opt into them (Bash, etc.)")
     ap.add_argument("--lean-prompt", action="store_true", help="Use a trimmed system prompt (smaller models, low context)")
+    ap.add_argument(
+        "--profile",
+        help="Active profile name (overrides ATHENA_PROFILE / active_profile / config).",
+    )
     args = ap.parse_args()
 
     cfg = load_config()
+    # Resolve the active profile: CLI > env > active_profile file >
+    # config > "default". Apply to cfg so every subsystem that reads
+    # cfg.profile (SessionStore root, gateway router, curator state,
+    # cron db, gateway routes) lands on the same on-disk root.
+    from .profiles.resolution import resolve_active_profile
+    cfg.profile = resolve_active_profile(
+        cli_arg=args.profile, config_default=cfg.profile,
+    )
     if args.auto_approve:
         cfg.auto_approve_tools = True
     if args.lean_prompt:

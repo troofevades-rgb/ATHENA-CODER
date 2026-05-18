@@ -206,6 +206,30 @@ def test_fork_with_no_addendum_inherits_parent_system_exactly(
     assert aux.observations[0]["messages"][0]["content"] == parent_system
 
 
+def test_fork_inherits_parent_profile(parent_agent: Agent) -> None:
+    """A fork must run under the same profile as its parent — no way
+    to escape profile isolation by spawning a fork.
+
+    Structurally guaranteed by ``dataclasses.replace`` preserving
+    the ``profile`` field, but locked in as a test so a future
+    refactor can't quietly break it."""
+    parent_profile = parent_agent.cfg.profile
+    parent_agent.fork(enabled_toolsets=["core"], system_addendum="")
+    aux = FakeClient.instances[-1]
+    # The child agent's cfg, captured at construction time by
+    # FakeClient, must carry the same profile.
+    # We can't inspect cfg directly through FakeClient, but the
+    # write_origin / messages observation paths run inside the
+    # child, so we use a different angle: look at the child session
+    # row in the shared SessionStore.
+    assert parent_profile == "default"  # sanity (the fixture default)
+    sessions = parent_agent.session_store.list_sessions()  # type: ignore[union-attr]
+    children = [s for s in sessions if s.parent_session_id is not None]
+    assert children, "fork should have produced at least one child session"
+    for child in children:
+        assert child.profile == parent_profile
+
+
 def test_fork_messages_inject_conversation_history(parent_agent: Agent) -> None:
     history = [
         {"role": "user", "content": "prior question"},
