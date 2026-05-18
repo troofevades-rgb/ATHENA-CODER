@@ -36,6 +36,10 @@ gateway = [
     "aioimaplib>=2.0",
     "aiosmtplib>=3.0",
     "beautifulsoup4>=4.12",
+    # Phase 15 webhooks — aiohttp is also pulled by slack-sdk's
+    # Socket Mode but list it explicitly so a future slack-sdk dep
+    # change can't quietly remove it.
+    "aiohttp>=3.9",
 ]
 # Heavy GPU-only deps for the closed training loop. Install with
 # ``pip install -e ".[train]"`` only on a workstation with CUDA.
