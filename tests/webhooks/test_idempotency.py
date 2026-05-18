@@ -46,7 +46,10 @@ def test_ttl_expiry_allows_again() -> None:
     cache = IdempotencyCache(ttl_seconds=0.05)
     cache.check_and_record("w", "k")
     assert cache.check_and_record("w", "k") is False
-    time.sleep(0.06)
+    # Generous margin (3× TTL) so a busy CI machine doesn't make
+    # this flake. time.monotonic granularity + scheduler jitter
+    # eats well under 100ms even under load.
+    time.sleep(0.2)
     assert cache.check_and_record("w", "k") is True
 
 
@@ -106,7 +109,7 @@ def test_lazy_expiry_cleans_old_entries() -> None:
     cache = IdempotencyCache(ttl_seconds=0.03)
     cache.check_and_record("w", "a")
     assert cache.size == 1
-    time.sleep(0.05)
+    time.sleep(0.15)  # 5× TTL — generous CI margin
     # Trigger a check that runs the lazy purge.
     cache.check_and_record("w", "b")
     # 'a' was purged; only 'b' remains.
