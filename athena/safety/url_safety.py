@@ -152,7 +152,9 @@ def _resolve_all(host: str) -> Sequence[str]:
         infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
     except socket.gaierror as exc:
         raise URLSecurityDenied(f"DNS resolution failed for {host!r}: {exc}") from exc
-    return tuple({info[4][0] for info in infos})
+    # info[4] is the sockaddr; element 0 is the address string for both AF_INET
+    # and AF_INET6. Coerce to str so mypy doesn't see str|int.
+    return tuple({str(info[4][0]) for info in infos})
 
 
 def audit_append(*, kind: str, payload: dict[str, Any]) -> None:
