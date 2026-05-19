@@ -193,8 +193,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Legacy `ocode` console-script alias from `pyproject.toml` `[project.scripts]`. Update any shell aliases or scripts that called `ocode` to call `athena` instead. (T1-02)
 
 ### Security
-- _(planned; lands as T1-06 ships)_ Credential file writes use `os.open(O_EXCL, 0o600)` atomically, closing the TOCTOU window between file creation and chmod (T1-06)
-- _(planned; lands as T1-06 ships)_ TOCTOU windows closed across `credential_pool.py`, `mcp/oauth.py`, and any auth/token write paths (T1-06)
+- Credential file writes use `os.open(O_EXCL, 0o600)` atomically via the new `athena.safety.secure_files` module (T1-06)
+- TOCTOU windows closed across `credential_pool.py`, `mcp/oauth.py`, and `migration/config_translator.py` (T1-06)
+- `~/.athena/` subdirectories holding secret material created at `0o700` via `ensure_secure_dir`; existing wider-mode directories emit a `WARNING` rather than being silently re-chmodded (T1-06)
 - _(planned; lands as T1-07 ships)_ `file_ops.py` reads and writes validate workspace boundary before opening the file (T1-07)
 - _(planned; lands as T1-08 ships)_ `web.py` blocks SSRF-prone destination IPs by default (RFC1918, link-local, loopback, cloud-metadata) (T1-08)
 
