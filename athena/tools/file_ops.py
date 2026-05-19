@@ -124,6 +124,7 @@ def Read(file_path: str, offset: int | None = None, limit: int | None = None, **
         },
         "required": ["file_path", "content"],
     },
+    requires_confirmation=True,
 )
 def Write(file_path: str = "", content: str = "", **legacy) -> str:
     file_path = file_path or legacy.get("path", "")
@@ -165,6 +166,7 @@ def Write(file_path: str = "", content: str = "", **legacy) -> str:
         },
         "required": ["file_path", "old_string", "new_string"],
     },
+    requires_confirmation=True,
 )
 def Edit(
     file_path: str = "",
