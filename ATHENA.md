@@ -75,7 +75,20 @@
   - cron.py              `athena cron {add,list,remove,enable,disable,run-now,logs,daemon}` (Phase 6)
   - model.py             `athena model {list,switch,info}` (Phase 7)
   - train.py             `athena train {review,build-dataset,run,status}` (Phase 7)
-- athena/ollama_client.py thin /api/chat wrapper (provider abstraction lands in Phase 8)
+- athena/providers/       provider abstraction (Phase 8) — `Provider` ABC,
+  `StreamChunk`, name-keyed registry, runtime resolver with prefix routing
+  (`anthropic/`, `openai/`, `google/`, `openrouter/`, `nous/`) and 429-aware
+  fallback chains. First-class providers: `OllamaProvider`,
+  `AnthropicProvider`, `OpenAIProvider`, `GoogleProvider`, `OpenAICompat`,
+  `OpenRouterProvider`, `NousProvider`.
+  - credential_pool.py   thread-safe per-provider key rotation; cooldown
+                         on 429; atomic JSON persistence at
+                         `~/.athena/credentials.json`
+  - parsers/             per-(provider, model_glob) tool-call parser registry
+                         (Phase 9): anthropic_xml, openai_function,
+                         openai_tools, ollama_native, qwen_xml_leakage,
+                         harmony, code_fenced_json, json_block, fallback
+- athena/ollama_client.py  back-compat shim re-exporting OllamaProvider
 - athena/plugins/         agentskills.io-style plugin format (Phase 5)
   - base.py              `Plugin` ABC with lifecycle hooks (install / session
                          start+end / pre+post tool call / user+assistant message)
@@ -136,7 +149,55 @@
   - recall_tools.py      search_sessions (toolset=recall)
   - delta_lint.py        post-write syntax check for .py/.pyi/.json/.yaml/.yml/.toml
   - agent_tool.py        sub-agent dispatch (thin wrapper around `Agent.fork()`)
-- athena/mcp/             MCP stdio integration
+- athena/mcp/             MCP integration. Both **stdio** and
+                          **HTTP/SSE** transports supported (Phase 12).
+                          HTTP/SSE with OAuth 2.1 PKCE; tokens persist at
+                          `~/.athena/mcp_tokens/<server_id>.json` (mode 0600,
+                          atomic writes via tempfile + os.replace).
+                          Transport selected per-server via the
+                          `transport_resolver` based on `mcp.json` entry's
+                          `transport` field; legacy stdio entries unaffected.
+- athena/safety/          mechanical safety subsystem (Phase 17)
+  - approval_callback.py per-thread approval callback ContextVar; forks
+                         install `AUTO_DENY`
+  - approval_guard.py    ContextVar-scoped approval grants;
+                         `ApprovalDeniedInBackground` raised when a fork
+                         tries to prompt
+  - snapshots.py         content-addressed tarball snapshots under
+                         `~/.athena/snapshots/YYYY/MM/DD/`
+  - audit.py             append-only JSONL mutation log at
+                         `~/.athena/audit/mutations-YYYY-MM.jsonl`
+  - mutation.py          `snapshot_and_record(paths, *, tool_name)`
+                         combined context manager used at every skill/
+                         memory mutation site
+  - context.py           per-profile singletons for snapshot store +
+                         audit log
+  - shell_policy.py      word-boundary allowlist + always-on denylist
+                         applied to every Bash command before execution
+- athena/profiles/        multi-profile isolation under
+                          `~/.athena/profiles/<name>/` (Phase 14). Each
+                          profile owns its own skills, memory, sessions,
+                          cron schedule, gateway routes, MCP servers,
+                          and goal. Strict name validation; default is
+                          delete-protected.
+- athena/gateway/         messaging-platform daemon (Phase 10-11). Owns the
+                          session router, agent pool, approval router, and
+                          continuity manager. Adapters under
+                          `athena/gateway/platforms/` for Telegram, Slack,
+                          Discord, Signal, iMessage, Matrix, Email — each
+                          renders approvals natively (inline buttons,
+                          reactions, or text-reply tokens).
+- athena/acp/             Agent Client Protocol server (Phase 13) exposing
+                          athena to Zed and other ACP IDEs over JSON-RPC 2.0
+                          stdio.
+- athena/webhooks/        HTTP webhook listener inside the gateway daemon
+                          (Phase 15). HMAC-SHA256 / Bearer / none auth,
+                          idempotency cache, per-webhook sliding-window
+                          rate limiting, skill / prompt-template bindings.
+- athena/prompts/         system-prompt builder. Composes the Modelfile
+                          SYSTEM, project ATHENA.md, skills catalog, goal
+                          invariant, and progressive disclosure into the
+                          single string seeded as messages[0].
 
 ## Conventions
 - New built-in tools register via `@tool(name=…, toolset=…, …)` in `athena/tools/`
@@ -166,21 +227,70 @@
 ## CLI
 - `athena` — interactive REPL (default)
 - `athena -p "<prompt>"` — one-shot prompt
+- `athena --version` — print `athena-coder <version>` and exit
+- `athena --profile <name>` — pick profile (also `ATHENA_PROFILE` env)
 - `athena import-from-hermes --source PATH --dest PATH [--dry-run]` —
   migrate a Hermes home into athena v2
 - `athena sessions {list,browse,search,purge}` — inspect prior sessions
 - `athena reindex [--profile NAME]` — rebuild the session FTS5 index from JSONL
 - `athena curator run [--dry-run] [--force]` — run the umbrella consolidator now
 - `athena curator {status,pause,resume,inspect-last}` — manage the curator
-- `athena plugins {list,enable,disable,info}` — Phase 5 plugin management
-- `athena cron {add,list,remove,enable,disable,run-now,logs,daemon}` — Phase 6
+- `athena plugins {list,enable,disable,info}` — plugin management
+- `athena cron {add,list,remove,enable,disable,run-now,logs,daemon}` —
   scheduled jobs (agent or watchdog mode)
-- `athena model {list,switch,info}` — Phase 7 Ollama model management
-- `athena train {review,build-dataset,run,status}` — Phase 7 closed training loop
+- `athena model {list,switch,info}` — Ollama model management
+- `athena train {review,build-dataset,run,status}` — closed training loop
+- `athena profile {list,show,create,switch,delete,rename}` — manage
+  per-profile config / skills / memory / sessions
+- `athena providers {list,test,add-key,remove-key,models}` — hosted
+  provider credentials + live model catalog query
+- `athena mcp {list,auth,token-status,revoke,test}` — manage MCP servers
+  (stdio + HTTP/SSE; OAuth flow runs locally)
+- `athena gateway {run,routes,link,unlink,canonical-users}` — messaging-
+  platform daemon (Telegram, Slack, Discord, Signal, iMessage, Matrix, Email)
+- `athena acp {serve,install-zed}` — Agent Client Protocol server for IDEs
+- `athena webhook {add,list,info,remove,enable,disable,test}` — webhook
+  subscriptions hosted inside the gateway daemon
+- `athena status [--profile NAME] [--json]` — read-only counters from
+  `<profile_dir>/.status.json` (atomic snapshot written at every turn end)
+- `athena snapshot {list,show,pin,unpin,prune}` — inspect the Phase 17
+  content-addressed snapshot store
+- `athena skill {diff,rollback} <name>` — diff a skill against its most-
+  recent snapshot; rollback restores byte-for-byte (rollback itself audited)
+- `athena memory {diff,rollback} <name>` — same for memory entries
 
-## Slash commands (Phase 6 additions)
-- `/steer <message>` — queue a redirect; delivered as a synthetic user
-  message before your next prompt. FIFO; `/queue` lists pending.
-- `/goal <msg|show|clear>` — set or clear the persistent invariant.
-  Stored at `<profile_dir>/goal.txt`; injected at the END of every
-  system-prompt rebuild.
+## Slash commands
+Dispatched in two ways (consolidation tracked under TODO in CHANGELOG):
+
+REPL state-pokes dispatched inline in `athena/__main__.py:_handle_slash`:
+- `/help` — show the slash-command help block
+- `/exit /quit /q` — leave the REPL
+- `/clear` — reset conversation (keeps system prompt)
+- `/model NAME` — switch model
+- `/models` — list available models (Ollama or hosted provider's catalog)
+- `/tools` — list registered tools (built-in + MCP)
+- `/mcp [logs NAME]` — list connected MCP servers; `logs <name>` dumps the
+  named server's recent stderr
+- `/cost` — token usage + elapsed time for this session
+- `/status [live]` — current counters; `live` opens the Rich.Live dashboard
+- `/cwd [path]` — show or change workspace
+- `/save [file]` — save transcript JSON
+- `/dump` — print the assembled system prompt (debug)
+- `/hooks` — list configured settings.json hooks
+
+Subsystem commands with modules under `athena/commands/`:
+- `/init` — `athena init`: scaffold ATHENA.md from a workspace survey
+- `/loop INTERVAL CMD` — re-run a prompt or slash command on a timer
+- `/loop-stop` — stop a running `/loop`
+- `/compact` — summarize history and replace it with the summary
+- `/resume [file]` — load a saved session JSONL into the current REPL
+- `/memory {list,show,delete,dir}` — inspect or edit persistent memory
+- `/plan [prompt]` — enter plan mode (read-only investigation); `/plan-exit`
+  to leave without executing
+- `/review [ref]` — review pending changes (or a git ref); `/security-review`
+  for security-focused review
+- `/steer MSG | /steer clear | /queue` — queue cross-thread redirects;
+  delivered as synthetic user messages before your next prompt. FIFO.
+- `/goal MSG | /goal show | /goal clear` — persistent Ralph-loop invariant
+  at `<profile_dir>/goal.txt`; injected at the END of every system-prompt
+  rebuild.
