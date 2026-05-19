@@ -69,6 +69,15 @@ def render_status(snapshot: dict[str, Any]) -> str:
     lines.append(f"  prompt:     {snapshot.get('prompt_tokens', 0):>8}")
     lines.append(f"  completion: {snapshot.get('completion_tokens', 0):>8}")
     lines.append(f"  total:      {snapshot.get('total_tokens', 0):>8}")
+    cache_read = snapshot.get("cache_read_tokens", 0)
+    cache_creation = snapshot.get("cache_creation_tokens", 0)
+    if cache_read or cache_creation:
+        lines.append(f"  cache read: {cache_read:>8}")
+        lines.append(f"  cache new:  {cache_creation:>8}")
+    cache_strategy = snapshot.get("cache_strategy")
+    if cache_strategy:
+        ttl = snapshot.get("prompt_cache_ttl", "5m")
+        lines.append(f"  strategy:   {cache_strategy} (ttl {ttl})")
     lines.append("")
 
     lines.append(f"turns:        {snapshot.get('turns', 0):>4}")
