@@ -10,12 +10,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - (Future work lands here.)
 
 ### TODO before tagging v0.2.0
-- _Finish T1-04 agent core test suite._ Sub-prompts .1–.3 landed in
-  `edd496f` (plan doc, FakeProvider scaffold, 3 Agent-init tests).
-  Sub-prompts .4–.8 (`run_turn`, `run_until_done`, fork, auxiliary
-  client, coverage finalize) are pending; per the Tier 1 ROADMAP
-  they land **after** T1-06/07/08 so the tests assert against
-  post-security agent behaviour rather than re-baselining later.
 - _Consolidate slash commands into `athena/commands/`._ T1-05 surfaced
   that `/help`, `/exit`, `/model`, `/models`, `/tools`, `/mcp`,
   `/clear`, `/cost`, `/status`, `/save`, `/dump`, `/hooks`, `/cwd`
@@ -36,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `athena --version` flag reading `athena.__version__` (single source of truth via `scripts/verify_version.py` CI gate) (T1-02)
 - `pytest-cov>=4.1` + `pytest-timeout>=2.3` in `[project.optional-dependencies].dev`; pytest configured with `timeout=60` so hung tests fail loudly instead of wedging CI runners (T1-01)
 - `CHANGELOG.md` reorganized to [Keep-a-Changelog](https://keepachangelog.com/en/1.1.0/) format with `## [Unreleased]` + `## [0.2.0]` versioned sections; `RELEASE_v0.2.0.md` at repo root summarizes the release for the GitHub Releases UI; `docs/internal/release-process.md` is the operator checklist (T1-03)
-- _(planned; lands as T1-04 ships)_ Agent core unit test suite under `tests/agent/` covering `core.run_until_done`, `fork.Agent.fork()`, `auxiliary_client` (T1-04)
+- Agent core unit test suite under `tests/agent/` covering `core.run_turn`, `core.run_until_done`, `fork.Agent.fork()`, and `auxiliary_client` — 22 tests bringing `athena.agent` coverage to 62% (T1-04)
 - _(planned; lands as T1-07 ships)_ Path security module sandboxing file operations to the workspace; outside-workspace writes require explicit approval (T1-07)
 - _(planned; lands as T1-08 ships)_ SSRF defense on the web tool: blocks RFC1918, link-local, loopback, and cloud-metadata IPs by default (T1-08)
 - **PyPI publishing via trusted publishing** (T1-02) — `.github/workflows/publish.yml` fires on every `v*` git tag push. Builds sdist + wheel once, then routes the artifacts to TestPyPI (for `v*-rc*` / `v*-beta*` / `v*-alpha*` tags via PEP 440 pre-release detection) or real PyPI (for everything else). Uses OIDC trusted publishing — no `PYPI_API_TOKEN` secret in repo settings. Both publish jobs target named GitHub environments (`testpypi` / `pypi`) so a maintainer can optionally pin a manual-approval gate per release. `workflow_dispatch` inputs let you re-run a failed publish without burning a fresh tag.
