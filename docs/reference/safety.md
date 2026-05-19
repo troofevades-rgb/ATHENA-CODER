@@ -227,6 +227,50 @@ bash_allowlist = ["git", "ls", "cat"]
 bash_extra_denylist = []
 ```
 
+## Secure file writes (T1-06)
+
+Files holding secret material — provider credentials, OAuth tokens,
+imported API keys — go through `athena.safety.secure_files`. The
+contract closes the TOCTOU window where a credential file briefly
+exists at the system default umask (often `0o644`) before being
+`chmod`-ed to `0o600`.
+
+| Operation | Function | Mode |
+|---|---|---|
+| Write text | `secure_write_text(path, text)` | `0o600` |
+| Write JSON | `secure_write_json(path, obj)` | `0o600` |
+| Read text | `secure_read_text(path)` | warns on `> 0o600` |
+| Read JSON | `secure_read_json(path)` | warns on `> 0o600` |
+| Create dir | `ensure_secure_dir(path)` | `0o700` |
+
+Under the hood the write path is:
+
+1. `os.open(<tmp>, O_CREAT|O_WRONLY|O_EXCL, 0o600)` — no window at
+   wider mode, no symlink-clobber race.
+2. `os.fdopen` → write → `flush` → `fsync`.
+3. `fsync` the parent directory (POSIX only — Windows has no
+   `O_DIRECTORY`).
+4. `os.replace(<tmp>, <dest>)` — atomic on POSIX and Windows 10+.
+   On Windows transient `PermissionError` from concurrent peers is
+   retried with backoff.
+5. `fsync` the parent directory again.
+
+The 50-thread regression test in `tests/safety/test_secure_files.py`
+exercises the concurrent-fork path: 50 threads writing the same
+destination must converge to one consistent file at `0o600`.
+
+`ensure_secure_dir` deliberately does not re-`chmod` existing
+directories at wider modes. A `WARNING` is logged so the operator
+can audit and `chmod` themselves rather than the agent silently
+mutating filesystem state.
+
+Surfaces migrated to `secure_files`:
+
+- `athena/providers/credential_pool.py` — `credentials.json`
+- `athena/mcp/oauth.py` — `~/.athena/mcp_tokens/<server>.json`
+- `athena/migration/config_translator.py` — Hermes-import credential
+  carry-over
+
 ## Operational playbook
 
 **An agent edit broke a skill.**
