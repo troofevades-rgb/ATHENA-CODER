@@ -217,6 +217,13 @@ class Stats:
     fork_count: int = 0
     review_fired_count: int = 0
     curator_run_count: int = 0
+    # T2-01: Anthropic prompt-cache counters, populated from the
+    # provider's usage chunk. ``cache_read`` is the prefix the API
+    # served from cache (cheap); ``cache_creation`` is the new prefix
+    # being cached this turn (slightly more expensive than normal
+    # input).
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
 
     def record_tool_call(self, tool_name: str) -> None:
         """Increment both the top-level counter (legacy ``/cost``)
@@ -231,6 +238,8 @@ class Stats:
         model: str,
         provider: str,
         profile: str,
+        cache_strategy: str | None = None,
+        prompt_cache_ttl: str | None = None,
     ) -> dict:
         return {
             "session_id": session_id,
@@ -248,6 +257,10 @@ class Stats:
             "fork_count": self.fork_count,
             "review_fired_count": self.review_fired_count,
             "curator_run_count": self.curator_run_count,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_creation_tokens": self.cache_creation_tokens,
+            "cache_strategy": cache_strategy,
+            "prompt_cache_ttl": prompt_cache_ttl,
         }
 
 
@@ -635,6 +648,9 @@ class Agent:
                 self.stats.eval_tokens += (
                     raw_done.get("eval_count") or raw_done.get("completion_tokens") or 0
                 )
+                # Anthropic prompt-cache counters (T2-01).
+                self.stats.cache_read_tokens += raw_done.get("cache_read_input_tokens") or 0
+                self.stats.cache_creation_tokens += raw_done.get("cache_creation_input_tokens") or 0
 
             # Record the assistant message (with tool_calls if any) into history
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": assistant_text}
@@ -756,6 +772,8 @@ class Agent:
                 model=self.model,
                 provider=getattr(self.provider, "name", "?"),
                 profile=profile,
+                cache_strategy=getattr(self.cfg, "cache_strategy", None),
+                prompt_cache_ttl=getattr(self.cfg, "prompt_cache_ttl", None),
             )
         except Exception:
             return
