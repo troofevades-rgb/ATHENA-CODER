@@ -75,10 +75,15 @@ class DiscordAdapter(GatewayAdapter):
         self._client = discord.Client(intents=intents)
         self._tree = app_commands.CommandTree(self._client)
 
-        # Register handlers via add_listener so they're easy to call
-        # directly from tests.
-        self._client.event(self._on_ready)
-        self._client.event(self._on_message)
+        # discord.py routes events by the handler function's __name__:
+        # only ``on_ready`` / ``on_message`` (no underscore prefix) are
+        # wired to the corresponding gateway events. Using add_listener
+        # with an explicit ``name=`` makes the binding independent of
+        # method naming, so the adapter's private-method convention
+        # (``_on_ready`` / ``_on_message``) stays intact while the
+        # listener actually fires.
+        self._client.add_listener(self._on_ready, name="on_ready")
+        self._client.add_listener(self._on_message, name="on_message")
 
         @self._tree.command(
             name="athena",
