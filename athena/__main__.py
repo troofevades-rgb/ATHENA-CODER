@@ -152,6 +152,8 @@ def _slash_status(agent: Agent, arg: str) -> None:
         model=agent.model,
         provider=getattr(agent.provider, "name", "?"),
         profile=(agent.cfg.profile or "default"),
+        cache_strategy=getattr(agent.cfg, "cache_strategy", None),
+        prompt_cache_ttl=getattr(agent.cfg, "prompt_cache_ttl", None),
     )
     ui.console.print(render_status(snapshot))
 
