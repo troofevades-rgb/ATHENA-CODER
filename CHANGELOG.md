@@ -16,6 +16,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   client, coverage finalize) are pending; per the Tier 1 ROADMAP
   they land **after** T1-06/07/08 so the tests assert against
   post-security agent behaviour rather than re-baselining later.
+- _Consolidate slash commands into `athena/commands/`._ T1-05 surfaced
+  that `/help`, `/exit`, `/model`, `/models`, `/tools`, `/mcp`,
+  `/clear`, `/cost`, `/status`, `/save`, `/dump`, `/hooks`, `/cwd`
+  are dispatched inline in `athena/__main__.py:_handle_slash`, while
+  `/compact`, `/goal`, `/init`, `/loop`, `/memory`, `/plan`,
+  `/resume`, `/review`, `/steer` have proper handler modules under
+  `athena/commands/`. The split is accidental ("added it quick,
+  never moved it"), not principled. Refactor each inline command
+  into its own `athena/commands/<name>_cmd.py` so the dispatcher
+  becomes a uniform table and new contributors find every command
+  in one place. Out of T1-05's scope (no-code-edits docs phase);
+  pencil for a Tier-1 follow-up after T1-08 or for Tier 2.
 
 ## [0.2.0] - 2026-05-19
 
