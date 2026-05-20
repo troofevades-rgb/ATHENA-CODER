@@ -51,6 +51,8 @@ def with_retry(
     max_backoff_s: float = 30.0,
     on_rotate_credential: Callable[[], bool] | None = None,
     on_compress_context: Callable[[], bool] | None = None,
+    on_retry: Callable[[Classification], None] | None = None,
+    on_abort: Callable[[Classification], None] | None = None,
     provider_label: str = "<unknown>",
 ) -> T:
     """Run ``operation()`` with classifier-driven retries.
@@ -103,6 +105,8 @@ def with_retry(
                     classification.error_class.value,
                     classification.reason,
                 )
+                if on_abort is not None:
+                    on_abort(classification)
                 raise RetryBudgetExceeded(attempt, classification) from exc
 
             action = classification.action
@@ -114,13 +118,21 @@ def with_retry(
                     classification.reason,
                     classification.error_class.value,
                 )
+                if on_abort is not None:
+                    on_abort(classification)
                 raise
 
             if action is ErrorAction.FALLBACK_PROVIDER:
                 # Reserved; treat as abort until cross-provider
                 # fallback machinery exists (Tier 3/4).
                 logger.error("[%s] fallback_provider not implemented; aborting", provider_label)
+                if on_abort is not None:
+                    on_abort(classification)
                 raise
+
+            # Anything past here is a retry of some kind; fire the counter hook.
+            if on_retry is not None:
+                on_retry(classification)
 
             if action is ErrorAction.ROTATE_CREDENTIAL:
                 if on_rotate_credential is None or not on_rotate_credential():

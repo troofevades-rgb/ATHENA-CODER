@@ -50,6 +50,9 @@ class OllamaProvider(Provider):
         # from the same retry policy.
         self._retry_max: int = 5
         self._retry_backoff_s: float = 30.0
+        # T2-03.9: per-session retry / abort counters for /status.
+        self._retry_count: int = 0
+        self._abort_count: int = 0
 
     # ---- Core stream API ----
 
@@ -107,6 +110,8 @@ class OllamaProvider(Provider):
                 _open_response,
                 max_retries=self._retry_max,
                 max_backoff_s=self._retry_backoff_s,
+                on_retry=lambda _c: self._inc_retry(),
+                on_abort=lambda _c: self._inc_abort(),
                 provider_label=self.name,
             )
             for line in r.iter_lines():
@@ -143,6 +148,16 @@ class OllamaProvider(Provider):
                     yield StreamChunk("end", {"reason": obj.get("done_reason", "stop")})
         finally:
             outer_stack.close()
+
+    def _inc_retry(self) -> None:
+        self._retry_count += 1
+
+    def _inc_abort(self) -> None:
+        self._abort_count += 1
+
+    def get_retry_counts(self) -> dict[str, int]:
+        """Per-session retry / abort counters (T2-03.9)."""
+        return {"retries": self._retry_count, "aborts": self._abort_count}
 
     def parse_tool_calls(
         self, content: str, raw_response: dict[str, Any]
