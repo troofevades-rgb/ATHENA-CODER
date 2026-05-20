@@ -311,6 +311,27 @@ class Config:
     lsp_enabled: bool = False
     lsp_server_command: dict[str, list[str]] = field(default_factory=dict)
     lsp_timeout_s: float = 30.0
+    # T5-04: verified-execution loop. After each file write, the
+    # loop diagnoses the file via LSP, optionally runs a sandboxed
+    # verify_command (e.g. "pytest -q", "ruff check"), and on
+    # failure either offers a `/rollback-to <id>` to the user
+    # (verify_auto_rollback=False) or reverts automatically
+    # (=True).  ``verify_on_write`` selects how much the loop does:
+    #
+    #   "off"          do nothing (legacy behaviour)
+    #   "diagnose"     LSP only — fast, no subprocess
+    #   "diagnose+run" LSP plus verify_command (uses sandbox if
+    #                  sandbox_enabled is True)
+    #
+    # ``verify_auto_retry`` (off by default) lets the loop ask the
+    # active provider for a one-shot revised write before falling
+    # back to the rollback offer — capped at ``verify_max_retries``.
+    verify_on_write: str = "diagnose"  # "off" | "diagnose" | "diagnose+run"
+    verify_command: str | None = None
+    verify_auto_rollback: bool = False
+    verify_auto_retry: bool = False
+    verify_max_retries: int = 2
+    verify_run_timeout_s: float = 120.0
 
 
 def load_config() -> Config:
