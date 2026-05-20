@@ -167,6 +167,22 @@ def Write(file_path: str = "", content: str = "", **legacy) -> str:
                 "description": "Replacement text. Empty string deletes.",
             },
             "replace_all": {"type": "boolean", "description": "Default false."},
+            "fuzzy": {
+                "type": "boolean",
+                "description": (
+                    "If true, fall back to fuzzy substring matching when "
+                    "old_string doesn't match verbatim. Requires EXACTLY ONE "
+                    "near-match above the threshold; multiple matches error "
+                    "out and ask the agent to include more disambiguating "
+                    "context. Default false."
+                ),
+            },
+            "fuzzy_threshold": {
+                "type": "number",
+                "description": (
+                    "Similarity threshold in [0,1] for the fuzzy fallback (default 0.95)."
+                ),
+            },
         },
         "required": ["file_path", "old_string", "new_string"],
     },
@@ -177,6 +193,8 @@ def Edit(
     old_string: str = "",
     new_string: str = "",
     replace_all: bool = False,
+    fuzzy: bool = False,
+    fuzzy_threshold: float = 0.95,
     **legacy,
 ) -> str:
     # Back-compat: old call sites used path/old_str/new_str
@@ -190,7 +208,45 @@ def Edit(
     text = p.read_text(encoding="utf-8")
     count = text.count(old_string)
     if count == 0:
-        return f"ERROR: old_string not found in {p}. Re-read the file and copy text exactly."
+        # T2-07: optional fuzzy fallback. Returns ERROR rather than
+        # speculating when 0 or >1 near-matches are above threshold;
+        # callers are expected to retry with more context.
+        if not fuzzy:
+            return (
+                f"ERROR: old_string not found in {p}. Re-read the file and "
+                "copy text exactly, or pass fuzzy=true to enable approximate "
+                "matching."
+            )
+        from .fuzzy_match import find_fuzzy_matches
+
+        matches = find_fuzzy_matches(text, old_string, threshold=fuzzy_threshold)
+        if not matches:
+            return (
+                f"ERROR: no fuzzy match for old_string in {p} above "
+                f"threshold={fuzzy_threshold}. Provide more accurate context."
+            )
+        if len(matches) > 1:
+            return (
+                f"ERROR: {len(matches)} fuzzy matches above threshold="
+                f"{fuzzy_threshold} in {p}. Include more surrounding "
+                "context in old_string to disambiguate."
+            )
+        match = matches[0]
+        new_text = text[: match.start] + new_string + text[match.end :]
+        replacements = 1
+        p.write_text(new_text, encoding="utf-8")
+        lint_err = lint_after_write(p, new_text)
+        suffix = f" (fuzzy: score={match.score:.3f}, matched {match.end - match.start} chars)"
+        if lint_err:
+            return (
+                f"edited {p}: replaced 1 occurrence{suffix} "
+                f"but failed validation: {lint_err}. "
+                "Fix the syntax and re-call Edit."
+            )
+        return (
+            f"edited {p}: replaced 1 occurrence{suffix} "
+            f"({len(old_string)} -> {len(new_string)} chars)"
+        )
     if count > 1 and not replace_all:
         return (
             f"ERROR: old_string matches {count} times in {p}. "
