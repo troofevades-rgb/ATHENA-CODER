@@ -302,6 +302,15 @@ class Config:
     sandbox_allow_network: bool = False
     sandbox_writable_paths: list[str] = field(default_factory=list)
     sandbox_fallback: str = "warn"  # "warn" | "error"
+    # T5-03R: LSP diagnostics. When True, the `diagnose` tool (and
+    # the T5-04 verified-execution gate) launches a configured
+    # language server (default: pyright-langserver for Python) and
+    # collects publishDiagnostics. lsp_server_command is a dict
+    # `{language: ["argv", ...]}` overriding the built-in default
+    # per language. lsp_timeout_s caps the per-call wait.
+    lsp_enabled: bool = False
+    lsp_server_command: dict[str, list[str]] = field(default_factory=dict)
+    lsp_timeout_s: float = 30.0
 
 
 def load_config() -> Config:
