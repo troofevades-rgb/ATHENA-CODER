@@ -789,6 +789,23 @@ class Agent:
             token = _current_agent.set(self)
             set_active_checkpoint_manager(self.checkpoint_manager)
             _set_metrics_store(self.skill_metrics_store)
+            # T6-01: bind the per-session vector store on the
+            # ContextVar so _persist_message's record_turn finds
+            # it without explicit threading. Lazy-built once and
+            # reused across run_turn calls in the same session.
+            from ..recall import (
+                build_vector_store as _build_vs,
+                set_active_vector_store,
+            )
+
+            if not hasattr(self, "_vector_store"):
+                try:
+                    self._vector_store = _build_vs(
+                        cfg=self.cfg, profile_dir=self._profile_dir()
+                    )
+                except Exception:  # noqa: BLE001
+                    self._vector_store = None
+            set_active_vector_store(self._vector_store)
             try:
                 current_input = user_input
                 tokens_at_loop_start = (
@@ -803,6 +820,7 @@ class Agent:
                         return
                     current_input = next_input
             finally:
+                set_active_vector_store(None)
                 _set_metrics_store(None)
                 set_active_checkpoint_manager(None)
                 _current_agent.reset(token)
@@ -1430,6 +1448,33 @@ class Agent:
             self.session_store.append_turn(self.session_id, clean)
         except Exception as e:  # pragma: no cover — defensive
             ui.info(f"session append failed (continuing): {e}")
+            return
+
+        # T6-01: incremental embedding for semantic recall. Best
+        # effort — a recall-side failure must never block a
+        # session write. The active vector store comes from the
+        # recall ContextVar bound in run_turn (similar to T3-03's
+        # checkpoint manager pattern).
+        try:
+            from ..recall import record_turn
+
+            # turn_index = current length minus the just-appended
+            # message (so this turn's persisted offset matches the
+            # JSONL line count after append).
+            turn_index = max(0, len(self.messages) - 1)
+            record_turn(
+                session_id=self.session_id,
+                turn_index=turn_index,
+                role=str(clean.get("role", "")),
+                content=clean.get("content", ""),
+                workspace=str(self.workspace),
+            )
+        except Exception:  # noqa: BLE001
+            import logging as _logging
+
+            _logging.getLogger(__name__).debug(
+                "record_turn failed", exc_info=True
+            )
 
     def _maybe_compress_context(self) -> None:
         """T2-04: compress ``self.messages`` if total tokens exceed
