@@ -31,6 +31,25 @@ def test_capabilities_conservative_new_fields() -> None:
     assert c.max_context_tokens is None
     assert c.max_image_edge_px is None
     assert c.native_format == "openai"
+    # T6-02: social_search defaults False — conservative-default
+    # contract so nothing routes by accident.
+    assert c.social_search is False
+
+
+def test_social_search_defaults_false() -> None:
+    """The new social_search capability is opt-in. A provider that
+    doesn't declare it must not be routed social-search sub-tasks."""
+    c = Capabilities()
+    assert c.social_search is False
+    assert c.supports("social_search") is False
+
+
+def test_social_search_supported_when_declared() -> None:
+    """A provider that declares social_search=True is what the
+    broker's best_for({"social_search"}) lookup will find."""
+    c = Capabilities(social_search=True)
+    assert c.social_search is True
+    assert c.supports("social_search") is True
 
 
 def test_capabilities_is_frozen() -> None:
