@@ -64,6 +64,11 @@ class Capabilities:
     - ``is_local`` — broker preference signal
     - ``native_format`` — the request/response shape on the wire
       (``"openai"``, ``"anthropic"``, ``"ollama"``, ``"google"``)
+    - ``social_search`` — provider can search a social network
+      (X / similar) for real-time public posts (T6-02). The
+      broker routes a ``search_x`` sub-task to a provider
+      declaring this capability even when a different model is
+      primary. Defaults False so nothing routes by accident.
     """
 
     tool_calls: bool = True
@@ -78,6 +83,7 @@ class Capabilities:
     max_context_tokens: int | None = None
     is_local: bool = False
     native_format: str = "openai"
+    social_search: bool = False
 
     def supports(self, capability: str) -> bool:
         """``True`` when the named field is truthy. Lets callers
