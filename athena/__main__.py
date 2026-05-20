@@ -122,6 +122,7 @@ _SUBCOMMANDS = {
     "audit": "athena.cli.audit",
     "verify": "athena.cli.verify",
     "cache": "athena.cli.cache",
+    "recall": "athena.cli.recall",
 }
 
 

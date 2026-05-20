@@ -13,5 +13,30 @@ recall never breaks because of a missing optional component.
 
 from .embeddings import Embedder, resolve_embedder
 from .hybrid import rrf_fuse
+from .manager import (
+    build_vector_store,
+    get_active_vector_store,
+    memory_doc_id,
+    parse_session_doc_id,
+    record_memory_entry,
+    record_turn,
+    session_doc_id,
+    set_active_vector_store,
+)
+from .vector_store import VectorEntry, VectorStore
 
-__all__ = ["Embedder", "resolve_embedder", "rrf_fuse"]
+__all__ = [
+    "Embedder",
+    "VectorEntry",
+    "VectorStore",
+    "build_vector_store",
+    "get_active_vector_store",
+    "memory_doc_id",
+    "parse_session_doc_id",
+    "record_memory_entry",
+    "record_turn",
+    "resolve_embedder",
+    "rrf_fuse",
+    "session_doc_id",
+    "set_active_vector_store",
+]
