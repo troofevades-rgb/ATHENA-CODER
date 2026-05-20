@@ -105,6 +105,16 @@ def render_status(snapshot: dict[str, Any]) -> str:
         lines.append("rate limits:")
         for cred_id, formatted in rate_limits.items():
             lines.append(f"  {cred_id}: {formatted}")
+
+    # T2-03.9: retry / abort counters per provider for this session.
+    retry_counts = snapshot.get("retry_counts") or {}
+    if retry_counts:
+        lines.append("")
+        lines.append("retries this session:")
+        for prov, counts in retry_counts.items():
+            retries = counts.get("retries", 0)
+            aborts = counts.get("aborts", 0)
+            lines.append(f"  {prov}: {retries} retries, {aborts} aborts")
     return "\n".join(lines)
 
 
