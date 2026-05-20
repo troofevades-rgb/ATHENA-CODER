@@ -161,6 +161,10 @@ def _slash_status(agent: Agent, arg: str) -> None:
         snapshot["rate_limits"] = {
             cred_id: tracker.format() for cred_id, tracker in rl_getter().items()
         }
+    # T2-03.9: per-session retry / abort counters.
+    rc_getter = getattr(agent.provider, "get_retry_counts", None)
+    if callable(rc_getter):
+        snapshot["retry_counts"] = {snapshot["provider"]: rc_getter()}
     ui.console.print(render_status(snapshot))
 
 
