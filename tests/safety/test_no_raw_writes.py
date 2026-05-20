@@ -69,6 +69,7 @@ ALLOWLIST: frozenset[str] = frozenset(
         "athena/transform/dataset.py",  # training dataset exports
         "athena/transform/deploy.py",  # deployment artefacts
         "athena/transform/review.py",  # review artefacts
+        "athena/transform/batch_driver.py",  # T3-05R labels sidecar rewrite (same path as review.py)
         "athena/webhooks/delivery.py",  # webhook delivery journal
         # Rollback CLI is itself audited; the restore() call lives in
         # snapshots.py which is allowlisted as the substrate.
