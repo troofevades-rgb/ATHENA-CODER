@@ -159,3 +159,69 @@ def test_can_reflects_at_least_one_declaration(patched_registry):
     assert mr.can("vision") is False
     patched_registry["v"] = _make_provider("v", Capabilities(vision=True))
     assert mr.can("vision") is True
+
+
+# ---------------------------------------------------------------------------
+# available_backend_for — credential-aware (T5-05.2)
+# ---------------------------------------------------------------------------
+
+
+class _FakePool:
+    """Minimal CredentialPool stub matching the runtime_resolver
+    contract: .get(name) returns a credential record or None."""
+
+    def __init__(self, *, available: set[str]):
+        self._available = set(available)
+
+    def get(self, name: str):
+        return object() if name in self._available else None
+
+
+def _local_keyless(name: str, *, vision: bool = True) -> type[Provider]:
+    """Provider that doesn't require an API key (mirrors ollama
+    / openai_compat)."""
+    cls = _make_provider(name, Capabilities(vision=vision, is_local=True))
+    cls.requires_api_key = False  # type: ignore[attr-defined]
+    return cls
+
+
+def _hosted(name: str, *, vision: bool = True) -> type[Provider]:
+    """Hosted provider (requires_api_key = True default)."""
+    return _make_provider(name, Capabilities(vision=vision, is_local=False))
+
+
+def test_available_backend_for_returns_none_when_no_creds(patched_registry):
+    """Hosted provider declares vision but pool has nothing →
+    available_backend_for returns None."""
+    patched_registry["hosted"] = _hosted("hosted", vision=True)
+
+    mr = MediaRegistry(cfg=SimpleNamespace(media_backend_prefer="local"))
+    pool = _FakePool(available=set())
+    assert mr.available_backend_for("vision", pool=pool) is None
+
+
+def test_available_backend_for_prefers_local_keyless(patched_registry):
+    """Local keyless provider always available; hosted is too once
+    credentialed. Local wins under default preference."""
+    patched_registry["local_no_key"] = _local_keyless("local_no_key")
+    patched_registry["hosted_with_key"] = _hosted("hosted_with_key")
+
+    mr = MediaRegistry(cfg=SimpleNamespace(media_backend_prefer="local"))
+    pool = _FakePool(available={"hosted_with_key"})
+    chosen = mr.available_backend_for("vision", pool=pool)
+    assert chosen is not None
+    assert chosen.name == "local_no_key"
+
+
+def test_available_backend_for_falls_back_when_no_local(patched_registry):
+    """No local provider declares vision → first available hosted
+    wins (alphabetical via available_providers_with_capability)."""
+    patched_registry["zebra"] = _hosted("zebra")
+    patched_registry["alpha"] = _hosted("alpha")
+
+    mr = MediaRegistry(cfg=SimpleNamespace(media_backend_prefer="local"))
+    pool = _FakePool(available={"alpha", "zebra"})
+    chosen = mr.available_backend_for("vision", pool=pool)
+    assert chosen is not None
+    assert chosen.name == "alpha"
+
