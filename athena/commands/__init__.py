@@ -39,6 +39,7 @@ def all_commands() -> dict[str, CommandFn]:
 
 # Import command modules so they register
 from . import (
+    checkpoint_cmds,  # noqa: F401 — T3-03 /checkpoint, /rollback-to, /checkpoints
     clear_cmd,  # noqa: F401
     compact,  # noqa: F401
     cost_cmd,  # noqa: F401
