@@ -81,23 +81,62 @@ class VerifiedExecution:
     # Public API
     # ------------------------------------------------------------------
 
-    def verify_write(self, path: str | Path) -> VerificationOutcome:
+    def verify_write(
+        self,
+        path: str | Path,
+        *,
+        retry_fn: Callable[[VerificationOutcome], None] | None = None,
+    ) -> VerificationOutcome:
         """Run the full capture → diagnose → (run) → resolve cycle
         on a single just-written file path.
+
+        ``retry_fn`` lets the caller plug in a "fix it and try
+        again" hook. When ``verify_auto_retry`` is set and the
+        cycle fails, the loop calls ``retry_fn(outcome)`` (which
+        is expected to perform a corrected write at the same
+        path), then re-verifies. The number of retries is capped
+        at ``verify_max_retries`` and the per-attempt counter is
+        carried on the resulting outcome.
 
         Never raises: any internal error in a verification leg
         becomes a logged debug + a ``skipped`` outcome so the
         post-write hook never blocks the agent on its own bugs.
         """
-        path_str = str(path)
         cfg = self._cfg if self._cfg is not None else self._load_cfg()
+
+        # Single-shot path: just one cycle, no retry.
+        outcome = self._verify_once(path, cfg=cfg)
+        self._latest = outcome
+
+        if outcome.passed:
+            return outcome
+        if not getattr(cfg, "verify_auto_retry", False):
+            return outcome
+        if retry_fn is None:
+            return outcome
+
+        max_retries = int(getattr(cfg, "verify_max_retries", 2))
+        for attempt in range(1, max_retries + 1):
+            try:
+                retry_fn(outcome)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("verify_write: retry_fn raised, giving up: %s", e)
+                return outcome
+            outcome = self._verify_once(path, cfg=cfg)
+            outcome.retries = attempt
+            self._latest = outcome
+            if outcome.passed:
+                return outcome
+        return outcome
+
+    def _verify_once(self, path: str | Path, *, cfg: Any) -> VerificationOutcome:
+        """One capture → diagnose → run cycle without retry."""
+        path_str = str(path)
         mode = getattr(cfg, "verify_on_write", "diagnose")
 
         # Early out: verification disabled.
         if mode == "off":
-            outcome = VerificationOutcome(path=path_str, outcome="skipped")
-            self._latest = outcome
-            return outcome
+            return VerificationOutcome(path=path_str, outcome="skipped")
 
         # 1. Pre-write checkpoint (best effort).
         checkpoint_id = self._capture_checkpoint(path_str)
@@ -112,7 +151,7 @@ class VerifiedExecution:
 
         introduced = self._extract_errors(new_diagnostics)
         if introduced:
-            outcome = self._finalize_failure(
+            return self._finalize_failure(
                 VerificationOutcome(
                     path=path_str,
                     outcome="failed_diagnostics",
@@ -121,24 +160,19 @@ class VerifiedExecution:
                 ),
                 cfg=cfg,
             )
-            self._latest = outcome
-            return outcome
 
         # 3. Run leg (only when configured).
         if mode == "diagnose+run" and getattr(cfg, "verify_command", None):
             run_outcome = self._run_command(path_str, cfg, checkpoint_id)
             if run_outcome is not None:
-                self._latest = run_outcome
                 return run_outcome
 
         # 4. Passed.
-        outcome = VerificationOutcome(
+        return VerificationOutcome(
             path=path_str,
             outcome="passed",
             checkpoint_id=checkpoint_id,
         )
-        self._latest = outcome
-        return outcome
 
     @property
     def latest_outcome(self) -> VerificationOutcome | None:
