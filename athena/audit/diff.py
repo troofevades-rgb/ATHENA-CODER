@@ -16,11 +16,12 @@ This module walks both, classifies entries by tool_name prefix
 (``skill_*`` → skill event, ``memory_*`` → memory event), filters
 the time window, and renders human-readable or JSON output.
 
-Content diff: ``MutationAuditLog`` records SHA digests but not the
-file content itself (the content is recoverable from the linked
-``snapshot_id`` if needed). The diff prints ``sha_before`` /
-``sha_after`` and ``byte_delta``; full text-diff is reserved for a
-follow-up that extracts the snapshot tarball on demand.
+Content diff: ``MutationAuditLog`` records SHA digests but not
+the file content itself. Default output prints ``sha_before`` /
+``sha_after`` + ``byte_delta``; pass ``with_content=True`` (CLI:
+``--content``) to extract the bytes from the linked snapshot
+tarball and inline a real unified diff per event (T3-04.1; see
+:mod:`athena.audit.content`).
 """
 
 from __future__ import annotations
@@ -69,6 +70,11 @@ class SkillEvent:
     byte_delta: int
     path: str
     snapshot_id: str | None
+    # Populated only when the caller passes ``with_content=True``;
+    # otherwise ``None`` (hash-only diff). Empty string means
+    # ``--content`` was requested but the content couldn't be
+    # recovered (snapshot missing / binary / decode failure).
+    content_diff: str | None = None
 
     @property
     def category(self) -> str:
@@ -91,6 +97,7 @@ class MemoryEvent:
     byte_delta: int
     path: str
     snapshot_id: str | None
+    content_diff: str | None = None
 
     @property
     def category(self) -> str:
@@ -120,9 +127,17 @@ def collect_skill_events(
     since: _dt.datetime,
     until: _dt.datetime,
     actor: str | None = None,
+    with_content: bool = False,
+    snapshot_root: Path | None = None,
+    relative_to: Path | None = None,
 ) -> list[SkillEvent]:
     """Walk ``<audit_dir>/mutations-*.jsonl`` and return skill events
-    in the window, oldest-first."""
+    in the window, oldest-first.
+
+    With ``with_content=True``, each event also carries a
+    ``content_diff`` unified diff extracted from the SnapshotStore
+    tarballs the audit rows point at (T3-04.1).
+    """
     out: list[SkillEvent] = []
     for entry in _iter_mutation_records(audit_dir, since=since, until=until):
         tool = str(entry.get("tool_name") or "")
@@ -145,6 +160,8 @@ def collect_skill_events(
             )
         )
     out.sort(key=lambda e: e.timestamp)
+    if with_content:
+        _attach_content_diffs(out, snapshot_root=snapshot_root, relative_to=relative_to)
     return out
 
 
@@ -154,6 +171,9 @@ def collect_memory_events(
     since: _dt.datetime,
     until: _dt.datetime,
     actor: str | None = None,
+    with_content: bool = False,
+    snapshot_root: Path | None = None,
+    relative_to: Path | None = None,
 ) -> list[MemoryEvent]:
     out: list[MemoryEvent] = []
     for entry in _iter_mutation_records(audit_dir, since=since, until=until):
@@ -177,6 +197,8 @@ def collect_memory_events(
             )
         )
     out.sort(key=lambda e: e.timestamp)
+    if with_content:
+        _attach_content_diffs(out, snapshot_root=snapshot_root, relative_to=relative_to)
     return out
 
 
@@ -287,7 +309,7 @@ def _render_skill_event(e: SkillEvent) -> list[str]:
         )
     if e.snapshot_id:
         out.append(f"     snapshot: {e.snapshot_id}")
-    out.append("     diff: [content not in audit log — recover from snapshot]")
+    out.extend(_render_diff_section(e.content_diff))
     return out
 
 
@@ -308,8 +330,23 @@ def _render_memory_event(e: MemoryEvent) -> list[str]:
         )
     if e.snapshot_id:
         out.append(f"     snapshot: {e.snapshot_id}")
-    out.append("     diff: [content not in audit log — recover from snapshot]")
+    out.extend(_render_diff_section(e.content_diff))
     return out
+
+
+def _render_diff_section(content_diff: str | None) -> list[str]:
+    """Render the per-event diff block.
+
+    ``None`` → hash-only (no ``--content``); print a hint. Empty
+    string → ``--content`` was requested but the content couldn't
+    be recovered (snapshot missing / binary / decode failure).
+    Non-empty string → emit the unified diff indented under the
+    event."""
+    if content_diff is None:
+        return ["     diff: [content not in audit log — recover from snapshot]"]
+    if content_diff == "":
+        return ["     diff: [content unavailable in snapshot tarball]"]
+    return ["     diff:"] + [f"         {line}" for line in content_diff.splitlines()]
 
 
 def _summarise_skill(events: list[SkillEvent]) -> dict[str, int]:
@@ -432,6 +469,48 @@ def _render_json(
         "summary": summary,
     }
     return json.dumps(payload, indent=2, sort_keys=False, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Content diff (opt-in; pulls bytes out of snapshot tarballs)
+# ---------------------------------------------------------------------------
+
+
+def _attach_content_diffs(
+    events: list[Any],
+    *,
+    snapshot_root: Path | None,
+    relative_to: Path | None,
+) -> None:
+    """Mutate ``events`` in place: for each one, populate
+    ``content_diff`` from its snapshot + the next event's snapshot
+    for the same path.
+
+    Imports :mod:`athena.audit.content` lazily so the hash-only
+    path doesn't pull tarfile into the import graph when nobody
+    asked for it.
+    """
+    from .content import unified_diff_for_event
+
+    # Map path → list[event index] in order so we can find the
+    # next event for the same path.
+    by_path: dict[str, list[int]] = {}
+    for i, ev in enumerate(events):
+        by_path.setdefault(ev.path, []).append(i)
+
+    for path, indices in by_path.items():
+        for slot, idx in enumerate(indices):
+            ev = events[idx]
+            next_snapshot_id: str | None = None
+            if slot + 1 < len(indices):
+                next_snapshot_id = events[indices[slot + 1]].snapshot_id
+            ev.content_diff = unified_diff_for_event(
+                snapshot_id=ev.snapshot_id,
+                next_snapshot_id=next_snapshot_id,
+                target_path=path,
+                snapshot_root=snapshot_root,
+                relative_to=relative_to,
+            )
 
 
 # ---------------------------------------------------------------------------
