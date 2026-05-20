@@ -102,3 +102,51 @@ class MediaRegistry:
             cls.static_capabilities().supports(capability)
             for cls in _REGISTRY.values()
         )
+
+    def available_backend_for(
+        self,
+        capability: str,
+        *,
+        pool: Any,
+    ) -> type[Provider] | None:
+        """Like :meth:`backend_for` but additionally credential-aware
+        (T5-05.2).
+
+        Routes through
+        :func:`athena.providers.runtime_resolver.available_providers_with_capability`,
+        which combines the class-level capability declaration with
+        the credential pool's live-credential check. Returns None
+        either when no provider declares the capability OR when
+        every declaring provider is unusable right now (empty
+        bucket / 429 cooldown).
+
+        ``pool`` is required — callers supply their active
+        :class:`CredentialPool`. The differentiated MCP surface
+        is the primary caller (T5-05.3); it has a pool in hand.
+        """
+        from ..providers.runtime_resolver import (
+            available_providers_with_capability,
+        )
+
+        names = available_providers_with_capability(
+            capability, cfg=self.cfg, pool=pool
+        )
+        if not names:
+            logger.info(
+                "media:%s → no AVAILABLE backend (declared but no creds / all cooled-down)",
+                capability,
+            )
+            return None
+
+        if getattr(self.cfg, "media_backend_prefer", "local") == "local":
+            for name in names:
+                cls = _REGISTRY.get(name)
+                if cls is not None and cls.static_capabilities().is_local:
+                    logger.info(
+                        "media:%s → %s (local + available)", capability, name
+                    )
+                    return cls
+
+        chosen = names[0]
+        logger.info("media:%s → %s (available)", capability, chosen)
+        return _REGISTRY.get(chosen)
