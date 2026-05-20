@@ -114,16 +114,44 @@ to arbitrary paths, patch_apply, etc.).
 
 ## Content diff
 
-`MutationAuditLog` stores SHA digests + byte deltas, **not** full
-file content. The diff prints `sha_before -> sha_after (+N bytes)`
-and notes `[content not in audit log — recover from snapshot]`.
-Full text diff is reserved for a follow-up that extracts the
-snapshot tarball on demand.
+`MutationAuditLog` stores SHA digests + byte deltas in each row,
+**not** the file content itself. The default output prints
+`sha_before -> sha_after (+N bytes)` and the placeholder
+`[content not in audit log — recover from snapshot]`.
 
-This is by design: the audit log itself isn't an integrity-or-
-nothing surface — it's a forensic record of *what changed*. The
-content lives in the `SnapshotStore` tarball that
-`snapshot_and_record` always creates alongside the audit entry.
+Pass **`--content`** to extract the file body from the snapshot
+tarballs the audit rows point at and inline a real unified diff:
+
+```bash
+athena audit skill 24h now --content
+```
+
+How it works:
+
+- `before` content comes from the file's bytes inside the audit
+  row's own `snapshot_id` tarball (captured BEFORE the mutation).
+- `after` content comes from the NEXT mutation-for-same-path's
+  `snapshot_id` tarball (which captured the file state right
+  before the next mutation — that IS the state after this one).
+  When no later mutation exists for the path, falls back to the
+  live on-disk file.
+
+The diff is truncated at 200 lines per event by default so one
+huge mutation doesn't drown the surrounding output.
+
+Behaviour matrix:
+
+| `--content` | Recovery succeeds | Output |
+|-------------|-------------------|--------|
+| off (default) | — | `diff: [content not in audit log — recover from snapshot]` |
+| on | yes | inline unified diff (truncated at 200 lines) |
+| on | no (tarball missing / file not in snapshot / binary content) | `diff: [content unavailable in snapshot tarball]` |
+
+This is "use what the audit log points at" rather than
+"reconstruct content the audit log doesn't have" — the snapshot
+is part of athena's mutation-record system; `snapshot_and_record`
+writes the audit row + tarball atomically. The default-off flag
+makes the deeper recovery an explicit choice.
 
 ## Cross-reference with rollback events
 
@@ -144,7 +172,6 @@ Filtering by skill name or memory topic is a future enhancement
 
 ## Limitations
 
-- Hash-only diff (see "Content diff" above).
 - Audit log scanning is linear; with very large logs (>100 MB)
   consider an external index. Audit-log rotation by month
   (`mutations-YYYY-MM.jsonl`) keeps single-file size bounded in

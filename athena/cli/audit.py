@@ -79,6 +79,16 @@ def _parse(argv: list[str]) -> argparse.Namespace:
             action="store_true",
             help="Omit rollback / checkpoint markers from the output.",
         )
+        p.add_argument(
+            "--content",
+            action="store_true",
+            help=(
+                "Extract before/after file content from the snapshot "
+                "tarballs the audit rows point at and emit a unified "
+                "diff per event. Opt-in (slower on long histories) "
+                "but produces a real text diff."
+            ),
+        )
 
     return ap.parse_args(argv)
 
@@ -139,6 +149,7 @@ def main(argv: list[str]) -> int:
             since=since,
             until=until,
             actor=args.actor,
+            with_content=args.content,
         )
         if args.json_out:
             sys.stdout.write(
@@ -156,6 +167,7 @@ def main(argv: list[str]) -> int:
             since=since,
             until=until,
             actor=args.actor,
+            with_content=args.content,
         )
         if args.json_out:
             sys.stdout.write(
