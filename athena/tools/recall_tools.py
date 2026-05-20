@@ -52,17 +52,19 @@ def _format_hits(query: str, hits: list[Any]) -> str:
     name="search_sessions",
     toolset="recall",
     description=(
-        "Search prior session messages by keyword (FTS5-backed). Returns the "
-        "matching turns with surrounding context (1 turn before, 1 after) so "
-        "the result has enough shape for you to act on it. Filters to the "
-        'active workspace by default — pass workspace="" to search globally.'
+        "Search prior session messages. Three modes: keyword (FTS5), "
+        "semantic (embedding cosine), hybrid (RRF fusion of both — "
+        "default, best on paraphrased queries). Returns the matching "
+        "turns with surrounding context (1 turn before, 1 after). "
+        'Filters to the active workspace by default — pass workspace="" '
+        "to search globally."
     ),
     parameters={
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "FTS5 query string. Use quotes for phrases.",
+                "description": "Query text. For keyword mode, FTS5 syntax (quotes for phrases) applies.",
             },
             "k": {"type": "integer", "description": "Max number of matches (default 5)."},
             "workspace": {
@@ -73,11 +75,25 @@ def _format_hits(query: str, hits: list[Any]) -> str:
                     "searches all workspaces."
                 ),
             },
+            "mode": {
+                "type": "string",
+                "enum": ["keyword", "semantic", "hybrid"],
+                "description": (
+                    "Recall ranker. Defaults to cfg.recall_default_mode "
+                    "(usually 'hybrid'). Semantic / hybrid degrade to "
+                    "keyword when no embeddings backend is configured."
+                ),
+            },
         },
         "required": ["query"],
     },
 )
-def search_sessions(query: str, k: int = 5, workspace: str | None = None) -> str:
+def search_sessions(
+    query: str,
+    k: int = 5,
+    workspace: str | None = None,
+    mode: str | None = None,
+) -> str:
     store, active_ws = _store_and_workspace()
     if store is None:
         return "ERROR: search_sessions can only be called from an active agent."
@@ -86,8 +102,134 @@ def search_sessions(query: str, k: int = 5, workspace: str | None = None) -> str
     elif workspace == "":
         workspace = None  # explicit opt-in to global search
 
+    resolved_mode = _resolve_mode(mode)
+
     try:
-        hits = store.search(query, k=int(k), workspace=workspace)
+        hits = _ranked_hits(
+            store=store, query=query, k=int(k), workspace=workspace, mode=resolved_mode
+        )
     except Exception as e:
         return f"ERROR: session search failed: {e}"
     return _format_hits(query, hits)
+
+
+# ---------------------------------------------------------------------------
+# Mode dispatch (T6-01.3)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_mode(mode: str | None) -> str:
+    """Pick the effective recall mode. Explicit argument wins;
+    else cfg.recall_default_mode; else "hybrid"."""
+    if mode in ("keyword", "semantic", "hybrid"):
+        return mode
+    try:
+        from ..config import load_config
+
+        return getattr(load_config(), "recall_default_mode", "hybrid") or "hybrid"
+    except Exception:
+        return "hybrid"
+
+
+def _ranked_hits(
+    *,
+    store: Any,
+    query: str,
+    k: int,
+    workspace: str | None,
+    mode: str,
+) -> list[Any]:
+    """Resolve hits per ``mode``. Semantic + hybrid fall back to
+    keyword when no vector store is available (no embeddings
+    backend), so the caller never breaks because of a missing
+    optional component."""
+    if mode == "keyword":
+        return store.search(query, k=k, workspace=workspace)
+
+    from ..recall import get_active_vector_store, parse_session_doc_id, rrf_fuse
+
+    vector_store = get_active_vector_store()
+    if vector_store is None:
+        return store.search(query, k=k, workspace=workspace)
+
+    candidate_k = max(k * 3, k + 5)
+    vec_doc_ids = vector_store.search(query, k=candidate_k, workspace=workspace)
+
+    if mode == "semantic":
+        # Pure semantic: no FTS5 fetch. Hydrate top-k vec ids
+        # against the SessionStore. Missing sessions are skipped.
+        return [
+            hit
+            for doc_id in vec_doc_ids[:k]
+            for hit in (_hydrate_session_hit(store, doc_id),)
+            if hit is not None
+        ]
+
+    # Hybrid: FTS5 + vector, fused. Keep the kw hits' SearchHit
+    # records as the canonical hydration source — they already
+    # have surrounding context + score + started_at from the
+    # SessionStore's normal pipeline.
+    kw_hits = store.search(query, k=candidate_k, workspace=workspace)
+    kw_by_id = {f"{h.session_id}#{h.turn_index}": h for h in kw_hits}
+    kw_doc_ids = list(kw_by_id.keys())
+    ordered_ids = rrf_fuse(kw_doc_ids, vec_doc_ids)[:k]
+
+    hits: list[Any] = []
+    for doc_id in ordered_ids:
+        if doc_id in kw_by_id:
+            hits.append(kw_by_id[doc_id])
+            continue
+        # Vector-only id (didn't surface in FTS5) — hydrate from
+        # the store using the doc_id parser.
+        hit = _hydrate_session_hit(store, doc_id)
+        if hit is not None:
+            hits.append(hit)
+    return hits
+
+
+def _hydrate_session_hit(store: Any, doc_id: str) -> Any | None:
+    """Reconstruct a SearchHit for a doc_id the FTS5 path didn't
+    surface. Falls back to ``store.load(session_id)`` + manual
+    composition — slower than the FTS5 path, but only triggered
+    for vector-only matches in semantic / hybrid mode."""
+    from ..recall import parse_session_doc_id
+
+    parsed = parse_session_doc_id(doc_id)
+    if parsed is None:
+        return None
+    session_id, turn_index = parsed
+    try:
+        messages = store.load(session_id)
+    except Exception:  # noqa: BLE001
+        return None
+    if turn_index < 0 or turn_index >= len(messages):
+        return None
+    target = messages[turn_index]
+    surrounding = [
+        {"turn_index": i, **m}
+        for i, m in enumerate(messages)
+        if turn_index - 1 <= i <= turn_index + 1
+    ]
+    # Build a SearchHit-shaped object on the spot — the same
+    # dataclass the FTS5 path produces, so _format_hits doesn't
+    # care which branch produced it.
+    from datetime import datetime as _dt
+
+    from ..sessions.store import SearchHit
+
+    content = target.get("content", "")
+    if isinstance(content, list):
+        content = " ".join(
+            c.get("text", "") for c in content if isinstance(c, dict)
+        )
+    snippet = (content or "")[:240]
+    return SearchHit(
+        session_id=session_id,
+        turn_index=turn_index,
+        role=target.get("role", "?"),
+        snippet=snippet,
+        surrounding=surrounding,
+        score=0.0,
+        started_at=_dt.fromtimestamp(0),
+        workspace=None,
+    )
