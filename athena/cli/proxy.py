@@ -1,15 +1,16 @@
-"""``athena proxy`` — local OpenAI-compatible HTTP endpoint (T3-01.8).
+"""``athena proxy serve`` — local OpenAI-compatible HTTP endpoint (T3-01R.4).
 
-Spawns a FastAPI server backed by athena's full provider stack —
-caching, retry, rate-limit tracking — so any third-party tool that
-speaks OpenAI Chat Completions can use athena as its backend
-without learning a new CLI.
+Spawns the aiohttp server from :mod:`athena.proxy.server` backed
+by athena's full provider stack (``resolve_provider`` + caching +
+retry + rate-limit tracking). Any third-party tool that speaks
+OpenAI Chat Completions can use athena as its backend without
+learning a new CLI.
 
-Default binds to 127.0.0.1 on port 11434 (Ollama's port; the proxy
-slots in cleanly when Ollama isn't running and any tool already
-configured for Ollama works against it unchanged). ``--bind-public``
-is required to expose 0.0.0.0 — defense-in-depth, since the proxy
-holds your API keys.
+Default binds to ``127.0.0.1:11434`` (Ollama's port — slots in
+cleanly when Ollama isn't running and any tool already configured
+for Ollama works against the proxy unchanged). ``--bind-public``
+is the only way to bind ``0.0.0.0`` — defense-in-depth, since the
+proxy holds your API keys.
 """
 
 from __future__ import annotations
@@ -29,45 +30,73 @@ def _parse(argv: list[str]) -> argparse.Namespace:
         description=(
             "Run a local OpenAI-compatible HTTP endpoint backed by "
             "athena. Routes incoming /v1/chat/completions requests to "
-            "the active provider, applies athena's caching / retry / "
-            "rate-limit machinery, and logs each translated pair to "
-            "~/.athena/proxy.jsonl."
+            "the active provider via resolve_provider, applies athena's "
+            "caching / retry / rate-limit machinery, and emits a "
+            "Phase-16 observability span per call."
         ),
     )
-    ap.add_argument("--host", default=None, help="Bind host (default: cfg.proxy_bind_host).")
-    ap.add_argument("--port", type=int, default=None, help="Port (default: cfg.proxy_bind_port).")
-    ap.add_argument(
+    sub = ap.add_subparsers(dest="action")
+
+    p_serve = sub.add_parser("serve", help="Run the proxy server.")
+    p_serve.add_argument(
+        "--host",
+        default=None,
+        help="Bind host (default: cfg.proxy_bind_host, usually 127.0.0.1).",
+    )
+    p_serve.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Port (default: cfg.proxy_bind_port, 11434).",
+    )
+    p_serve.add_argument(
         "--bind-public",
         action="store_true",
         help=(
             "Bind 0.0.0.0 instead of loopback. "
-            "Requires explicit opt-in; the proxy uses your API keys "
-            "to fulfil any request that reaches it."
+            "Requires explicit opt-in; the proxy uses your API keys."
         ),
     )
-    ap.add_argument(
+    p_serve.add_argument(
         "--provider",
-        help=("Default provider for unrouted requests (overrides cfg.proxy_default_provider)."),
+        help="Default provider when no header / model match resolves.",
     )
-    ap.add_argument(
+    p_serve.add_argument(
         "--log-bodies",
         action="store_true",
         help="Persist full request/response bodies under ~/.athena/proxy_bodies/.",
     )
-    ap.add_argument(
+    p_serve.add_argument(
         "--no-translate",
         action="store_true",
         help=(
             "Passthrough mode for debugging — accept the request, route "
             "to the named provider, return the upstream response "
-            "unmodified. No translation, no caching, no retry."
+            "unmodified. (Reserved; not yet implemented.)"
         ),
     )
+
+    # Bare-call convenience: ``athena proxy --port X`` still works
+    # without naming ``serve`` explicitly. Mirrors the checkpoint
+    # subcommand's convenience layer.
+    ap.add_argument("--host", default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--port", type=int, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--bind-public", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--provider", help=argparse.SUPPRESS)
+    ap.add_argument("--log-bodies", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--no-translate", action="store_true", help=argparse.SUPPRESS)
+
     return ap.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = _parse(argv)
+    action = args.action or "serve"
+
+    if action != "serve":
+        ui.error(f"unknown proxy action: {action}")
+        return 2
+
     cfg = load_config()
     if args.provider:
         cfg.proxy_default_provider = args.provider
@@ -88,21 +117,16 @@ def main(argv: list[str]) -> int:
         )
 
     try:
-        from .. import providers as _providers  # noqa: F401 — registers built-ins
-        from ..proxy.server import make_app
-    except RuntimeError as e:
-        # FastAPI not installed.
-        ui.error(str(e))
-        return 2
-
-    try:
-        import uvicorn
+        from aiohttp import web
     except ImportError:
         ui.error(
-            "athena proxy requires uvicorn. Install with:\n"
+            "athena proxy requires aiohttp. Install with:\n"
             '    pipx install --force "athena-coder[proxy]"'
         )
         return 2
+
+    from .. import providers as _providers  # noqa: F401 — registers built-ins
+    from ..proxy.server import make_app
 
     pool = global_pool()
     app = make_app(cfg=cfg, pool=pool)
@@ -112,7 +136,10 @@ def main(argv: list[str]) -> int:
     ui.info(f"default provider: {cfg.proxy_default_provider}")
     ui.info("OpenAI-compatible clients: point --openai-api-base at this host")
 
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    # web.run_app is the canonical aiohttp launcher; matches the
+    # webhook server's run pattern (which lives inside the gateway
+    # daemon's lifecycle).
+    web.run_app(app, host=host, port=port, print=lambda *_: None)
     return 0
 
 
