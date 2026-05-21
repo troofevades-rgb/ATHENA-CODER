@@ -499,6 +499,17 @@ class Config:
     task_store_path: str | None = None
     board_auto_maintain: bool = True
     task_archive_done_after_days: float = 30.0
+    # T6-07: self-update. `athena update` detects how athena was
+    # installed and uses the matching upgrade path. update_source
+    # forces a path ("pypi" / "git") or lets detection pick
+    # ("auto"). update_channel picks stable vs pre-release.
+    # update_auto_check (off by default) prints a one-line
+    # notice at startup when a newer version exists — notify
+    # only; never auto-installs.
+    update_source: str = "auto"
+    update_channel: str = "stable"
+    update_auto_check: bool = False
+    update_state_path: str | None = None  # default <CONFIG_DIR>/update_state.json
 
 
 def load_config() -> Config:
