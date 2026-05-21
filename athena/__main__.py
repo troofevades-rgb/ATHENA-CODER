@@ -127,6 +127,8 @@ _SUBCOMMANDS = {
     "computer": "athena.commands.computer",
     "board": "athena.commands.board",
     "update": "athena.commands.update",
+    # T7-02: batch_runner iterating the T7-01 headless primitive.
+    "batch": "athena.cli.batch",
 }
 
 
