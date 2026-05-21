@@ -129,6 +129,9 @@ _SUBCOMMANDS = {
     "update": "athena.commands.update",
     # T7-02: batch_runner iterating the T7-01 headless primitive.
     "batch": "athena.cli.batch",
+    # T6-03 admin: verify the cli_delegate_command config + a
+    # one-shot codex setup helper.
+    "delegate": "athena.cli.delegate",
 }
 
 
