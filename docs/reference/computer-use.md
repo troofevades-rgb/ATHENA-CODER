@@ -1,7 +1,11 @@
 # Computer use (desktop control)
 
+> **The riskiest tool surface athena ships, and the only one with no
+> isolation underneath.** Read the safety section *first*. The
+> permission model **IS** the design.
+
 Athena can observe your screen and (with explicit consent) drive
-mouse/keyboard input. Two modes:
+mouse / keyboard input. Two modes:
 
 | Mode | What it does | Risk |
 |---|---|---|
@@ -17,24 +21,41 @@ isolates code *away from* your machine; computer use points the
 agent *at* your machine on purpose.
 
 **There is no isolation here.** A click is a real click; a typed
-character lands in whatever window has focus; a `Delete` press is
-a `Delete` press. The permission model is the **only** safety
+character lands in whatever window has focus; a `Delete` press
+is a `Delete` press. The permission model is the **only** safety
 boundary.
 
 That's not a flaw — it's the deal you accept when you ask an
 agent to operate your computer. This page documents what the
 boundary actually catches and what it doesn't.
 
-## What the permission model catches
+## The permission model (T6-04R)
 
-Every proposed input action is classified into one of three
-tiers:
+Every input action routes through athena's existing approval
+infrastructure:
 
-| Tier | Examples | Default behaviour |
+  - `athena.safety.approval_guard.request_approval_sync` — the
+    ContextVar-scoped approval gate that already protects
+    file-write operations, MCP tools, and verified-execution
+    rollback. There is **no new consent machinery** for
+    computer use; it's the same prompt surface every other
+    sensitive tool uses.
+
+  - `athena.safety.approval_callback` — the prompt callback
+    bound to the current session. Defaults to interactive
+    `ui.confirm`; switched to the ACP `permission_request` when
+    you're driving athena from an IDE; switched to `AUTO_DENY`
+    inside any fork (background review / curator / migration /
+    system).
+
+The gate classifies every proposed action into one of three
+tiers and dispatches:
+
+| Tier | Examples | Cache policy |
 |---|---|---|
-| **observe** | screenshot, describe, locate | Always allowed, no prompt |
-| **input** | click on a labeled button, type into a search box, scroll | Gated by mode + allow/denylist |
-| **destructive** | click "Delete" / "Send" / "Pay" / "Confirm" / "Discard"; press Alt+F4 / Cmd+W / Delete; click an *unreadable* button (we don't know what it does); type `sudo` / `rm -rf` | **Always confirms, in every mode, every session, no exception** |
+| **observe** | screenshot, describe, locate | No approval — never prompts. |
+| **input** | click on a labeled button, type into a search box, scroll | Prompts once via the active approval callback; the grant caches under `computer_input` for the rest of the turn / scope. |
+| **destructive** | click "Delete" / "Send" / "Pay" / "Confirm" / "Discard"; press Alt+F4 / Cmd+W / Delete / F5; click an *unreadable* button (we don't know what it does); type `sudo` / `rm -rf` | Prompts via a **per-action resource_id**. The cache never hits. Every destructive action freshly confirms. |
 
 The classifier is **conservative by default** — an unknown or
 unreadable target is treated as destructive. Better to ask an
@@ -43,273 +64,237 @@ extra time than to auto-execute something we can't describe.
 What the gate decides, in order:
 
 1. **observe-tier** → allowed; no prompt.
-2. **Denylisted app** → refused; **no prompt**. The denylist
-   always wins, even over the mode and even over destructive
-   confirmation.
-3. **App not in the allowlist** → refused. The allowlist is the
-   user's explicit list of apps athena may control.
-4. **`observe_only` mode** → every input refused. No prompt.
-5. **destructive tier** → confirm callback fires. Asked every
-   time, in every mode. Cannot be batched.
-6. `per_action` mode + input tier → confirm fires once per
-   action.
-7. `per_session` mode + input tier → confirm fires once per
-   task; the decision (yes OR no) persists for the rest of
-   that task. Destructive **still** confirms each time.
+2. **Panic engaged** → refused; **no prompt**. The kill switch
+   shorts every input/destructive check until the operator
+   disengages.
+3. **Denylisted app** → refused; **no prompt**.
+4. **App not in the allowlist** → refused; **no prompt**.
+5. **`observe_only` mode (or unknown mode)** → every input
+   refused; **no prompt**.
+6. **`/goal` autonomous loop active** + `computer_deny_during_goal_loop`
+   (default `true`) → refused; **no prompt**. See "Goal-loop
+   guarantee" below.
+7. **Background context** (a fork / curator / migration / system
+   origin) → `ApprovalDeniedInBackground` raised inside
+   `request_approval_sync`; gate returns False **without
+   invoking the approval callback**. The fork's `AUTO_DENY`
+   default never even fires.
+8. **destructive tier** → approval prompt fires with a per-
+   action resource_id (SHA-256 short hash of
+   `action.describe()`). Different destructive actions get
+   distinct resource_ids — a "Delete file" grant **cannot**
+   satisfy a "Submit form" check.
+9. **input tier** → approval prompt fires with the stable
+   `computer_input` resource_id. Caches per turn so the user
+   isn't re-prompted on every keystroke within an approved
+   task.
 
-## The kill switch — always available
+## The background-deny guarantee
 
-A global halt with two trigger paths:
+**Autonomous runs cannot drive input.** A fork executing tools
+(background review, curator, migration, anything inside a
+non-FOREGROUND write_origin) hits `ApprovalDeniedInBackground`
+the moment it touches an input or destructive action. Observe
+tier still works — looking at the screen has no side effects.
 
-- **Ctrl+C** (always available once a computer-use task is
-  active) — SIGINT-driven. Engages the switch and raises
-  `KeyboardInterrupt` so athena's existing turn-cancel paths
-  fire.
-- **Hotkey** (default `ctrl+alt+k`) — best-effort. Requires
-  the optional `pynput` package; when absent, Ctrl+C remains
-  the active path.
+This composes with athena's existing fork machinery (T3-04 +
+T17.2). Every fork enters with `_approval_grants` reset by
+`scope_fresh_approvals()` and an `AUTO_DENY` callback installed
+at thread entry; even before either of those layers fires, the
+background-origin check refuses computer-use prompts at the
+gate.
 
-The loop checks the switch at the **top** of every iteration. A
-halt during a rate-limit sleep or during a vision call is
-honoured on the next iteration; a halt during a `perform` call
-lands via the SIGINT path immediately.
+The escape hatch (`auto_approve_in_background=True` per
+resource) is intentionally NOT used for computer use. **Do not
+flip it on for computer-use resource_ids.** A computer-use
+action that auto-approves inside a background fork is the
+worst possible default — silent desktop control by a fork the
+operator isn't watching.
 
-Engagement is **always logged** — the audit row carries the
-reason ("Ctrl+C" / "hotkey ctrl+alt+k") so an operator can
-correlate a halt with what athena was about to do.
+## The goal-loop guarantee
+
+The `/goal` continuation loop (T5-07) injects synthetic turns
+into the main agent context to drive autonomous work toward a
+declared objective. **That loop runs in FOREGROUND origin**
+(it re-uses the agent's session), so the background-deny check
+alone wouldn't catch it.
+
+The gate adds an extra check: when an active goal-state file
+indicates the loop is driving and `cfg.computer_deny_during_goal_loop`
+is True (default), input and destructive actions are refused
+**without** burning a prompt. The autonomous loop never gets
+to drive the desktop unless the operator deliberately disables
+this guard.
+
+To enable computer use under `/goal`: set
+`computer_deny_during_goal_loop = false`. You should not do
+this. Document the reason if you do.
+
+## The kill switch
+
+Two surfaces, complementary:
+
+  - **`computer_use_panic()`** (T6-04R): engages a process-
+    wide disable flag AND drops every cached grant via
+    `clear_grants()`. The gate refuses every input/destructive
+    check WITHOUT prompting until `computer_use_unpanic()` is
+    called. This is the strongest brake.
+
+  - **Hotkey + Ctrl+C** (T6-04.3 — still present): the
+    pynput-backed global hotkey (default `ctrl+alt+k`) and the
+    Ctrl+C SIGINT handler engage the loop-level killswitch
+    that aborts the active task. The hotkey degrades silently
+    when `pynput` isn't installed (Ctrl+C remains active).
+
+Engagement is **always logged** at WARNING. The audit row
+carries the reason so an operator can correlate a halt with
+what athena was about to do.
 
 ## Safe defaults — what you get out of the box
 
 | Knob | Default | Why |
 |---|---|---|
-| `computer_use_enabled` | `false` | Opt-in per machine. |
+| `computer_use_enabled` | `false` | Opt-in per machine. Tools refuse with `available=False` when off. |
 | `computer_permission_mode` | `"observe_only"` | No input until you explicitly switch modes. |
 | `computer_app_allowlist` | `[]` | Empty → no app may be controlled. Mode change alone isn't enough; you must allowlist the apps you want athena to drive. |
-| `computer_app_denylist` | `["1password", "bitwarden", "lastpass", "keychain", "keepass", "banking", "wallet", "ledger live", "metamask"]` | Sensible out-of-box guards for password managers + finance apps. The denylist always wins. |
+| `computer_app_denylist` | `["1password", "bitwarden", "lastpass", "keychain", "keepass", "banking", "wallet", "ledger live", "metamask"]` | Out-of-box guards for password managers + finance apps. The denylist always wins. |
+| `computer_deny_during_goal_loop` | `true` | Autonomous /goal runs can't drive input. See "Goal-loop guarantee" above. |
 | `computer_kill_hotkey` | `"ctrl+alt+k"` | Plus Ctrl+C, always. |
-| `computer_max_actions_per_task` | `40` | Cap; loop stops at this many performs even when the model never says done. |
-| `computer_max_actions_per_sec` | `2.0` | Rate limit. Prevents runaway click storms. |
-| `computer_dry_run` | `false` | Set true → loop runs but `backend.perform` is never called. |
-| `computer_backend` | `"auto"` | Picks by platform. Explicit values: `"windows"`, `"macos"`, `"linux"`, `"noop"`. |
-| `computer_audit_path` | `None` → `<profile_dir>/computer_audit.jsonl` | The audit log. |
+| `computer_max_actions_per_task` | `40` | Hard cap; the loop stops with `status=capped`. |
+| `computer_max_actions_per_sec` | `2.0` | Rate-limit between actions. |
+| `computer_audit_path` | `<profile_dir>/computer_audit.jsonl` | Every action — tier + target + approval decision — appends here. |
 
-Every default is the safe one. To get athena to actually click
-anything, you have to:
+## Where prompts actually show up
 
-1. Set `computer_use_enabled = true`.
-2. Add at least one app to `computer_app_allowlist`.
-3. Switch `computer_permission_mode` from `observe_only` to
-   `per_action` or `per_session`.
+The approval prompt surface is **whatever's bound to
+`approval_callback.get_approval_callback()`** at the moment of
+the prompt:
 
-These are three deliberate steps. If you only do (1), athena
-can still describe your screen but cannot click; if you only do
-(1) + (3), no app is allowlisted so nothing controls anyway.
+  - **REPL session**: the default `_interactive_approval`
+    calls `ui.confirm("Run computer_input?", default=False)`
+    in the terminal.
+  - **IDE / ACP session**: the IDE installs a callback that
+    routes the prompt over the ACP `permission_request` channel.
+    Same approval state — same ContextVar grants — different
+    UI.
+  - **Gateway adapter** (Slack / Discord / Matrix / email / …):
+    each platform installs its own callback that posts the
+    prompt to the conversation and waits for a reply.
+  - **Fork / background**: `AUTO_DENY` is installed at thread
+    entry. With T6-04R the background-origin check refuses
+    BEFORE this callback fires; `AUTO_DENY` is a belt-and-
+    braces fallback for any future code path that reaches the
+    prompt anyway.
 
-## The audit log
+You do not configure where prompts go for computer use
+specifically — the existing approval-callback binding is the
+single source of truth.
 
-Every action — observe AND input, allowed AND denied — gets a
-JSONL row in `<profile_dir>/computer_audit.jsonl` (or
-`cfg.computer_audit_path`).
+## Tier classification, by example
 
-Each row carries:
+  - **observe**: `Action(type="screenshot")`. Always.
+  - **input**: `Action(type="click", target_desc="Tab 2",
+    app="Chrome")` — a click on a labeled element in an
+    allowed app.
+  - **destructive**:
+    - `Action(type="click", target_desc="Delete row")` — the
+      destructive-verb regex (`delete|remove|send|submit|pay|
+      buy|purchase|order|confirm|overwrite|replace|discard|
+      erase|format|wipe|sudo|trash|reset|restart|shutdown|
+      reboot|uninstall|drop|destroy|sign out|log out|don't
+      save|close without saving`) hits.
+    - `Action(type="key", key="alt+f4")` — sensitive key chord.
+    - `Action(type="click", target_desc=None)` — click with no
+      readable target → conservative default → destructive.
+    - `Action(type="type", text="sudo apt remove ...")` — the
+      typed payload itself contains a destructive verb.
+
+The regex tolerates apostrophe variants and arbitrary
+spacing; case-insensitive. The keys list covers the most
+common "close + discard" / "force quit" / "reset" chords on
+Windows/macOS/Linux.
+
+## Audit log
+
+Every action (allowed AND denied) lands in
+`<profile_dir>/computer_audit.jsonl`:
 
 ```json
-{
-  "ts": "2026-05-20T13:42:00.123456Z",
-  "type": "click",
-  "target_desc": "Tab 2",
-  "coords": [842, 310],
-  "app": "VS Code",
-  "tier": "input",
-  "confirmed": true,
-  "executed": true,
-  "screenshot_sha256": "abcd...",
-  "result": "ok"
-}
+{"ts":"2026-05-20T13:42:00.123456Z",
+ "type":"click", "target_desc":"Save",
+ "coords":[100, 240], "app":"VS Code",
+ "tier":"input", "confirmed":true, "executed":true,
+ "screenshot_sha256":"abcd…",
+ "result":"ok"}
 ```
 
-The screenshot **bytes** never land in the log — only the
-SHA-256. The bytes can be megabytes per capture and would grow
-the log unboundedly. The hash is enough to correlate an action
-back to "what athena was looking at" if you re-capture later.
+The screenshot **bytes** are never stored — only a SHA-256.
+Provenance over volume. Same calculus as
+`athena/vision/hashlog.py` and `athena/browser/capture.py`.
 
-## The tools
+## What computer use is NOT
 
-### Observe (no input)
+  - **Not a sandbox.** No isolation. Every action is real.
+  - **Not a coverage of UI testing.** The destructive-verb
+    regex catches the common worst cases; it's not exhaustive.
+    An unlabeled "OK" button next to a "Delete?" dialog is
+    safe under conservative classification (unlabeled click →
+    destructive) but a labeled "OK" button on the same dialog
+    is **input** — a click on it would be approved like any
+    other input. The model + the operator are still the last
+    line of defense.
+  - **Not a CAPTCHA bypass / login-wall defeater.** The
+    classifier doesn't try to recognise login forms vs other
+    forms. A user that allowlists their bank's website + their
+    1Password app is taking on the full risk of an autonomous
+    agent driving both.
+  - **Not always-on.** Disabled by default; opt-in per
+    machine; `observe_only` mode + empty allowlist out of the
+    box. You have to consciously turn it on.
 
-| Tool | What it does |
-|---|---|
-| `computer_screenshot` | Capture the screen. Returns the image as base64 + geometry + audit row. |
-| `computer_observe(question)` | Capture + route the screenshot to a vision-capable provider (T5-01 — local-preferred → offline-capable). The agent runtime performs the multimodal dispatch; the tool surfaces the routing decision + the image payload. |
+## Glossary
 
-### Input (gated)
+  - **Tier** — `observe` / `input` / `destructive`. The single
+    most important taxonomy in the system.
+  - **Grant** — a cached approval for one `resource_id` in the
+    `_approval_grants` ContextVar dict. Lives for the duration
+    of the current scope; dropped by `clear_grants()` or
+    `computer_use_panic()`.
+  - **resource_id** — the cache key. `computer_input` for the
+    stable input grant; `computer_destructive::<sha-prefix>`
+    for the per-action destructive key (different actions
+    get different keys, so destructive prompts are
+    per-action by construction).
+  - **Origin** — `FOREGROUND` / `BACKGROUND_REVIEW` /
+    `CURATOR` / `MIGRATION` / `SYSTEM`. Anything non-FOREGROUND
+    triggers `ApprovalDeniedInBackground` on input/destructive.
 
-Each input tool reaches `backend.perform` **only** after the
-permission gate returns True. Without a real confirmation UI
-wired in, the gate's default callback refuses everything — the
-agent runtime supplies the real confirm via REPL or ACP.
+## Where this lives in the tree
 
-| Tool | What it does |
-|---|---|
-| `computer_click(x, y, target_desc, button)` | Click left / right / double at `(x, y)`. `target_desc` is what's there ("Tab 2" / "Send"). Missing `target_desc` → destructive tier. |
-| `computer_type(text, target_desc)` | Type into the active focus. Payloads with destructive verbs (`sudo`, `rm -rf`) → destructive. |
-| `computer_key(key, target_desc)` | Press a single key or chord (`Return`, `ctrl+c`, `alt+f4`). Sensitive chords → destructive. |
-| `computer_scroll(direction, target_desc)` | Scroll the active window. |
+  - `athena/computer/permission.py` — classifier + the
+    `PermissionGate` that consults `request_approval_sync`
+    via the per-tier resource_id.
+  - `athena/computer/contract.py` — `Action` / `Screenshot` /
+    `Tier` / `DesktopBackend` Protocol.
+  - `athena/computer/backends/*` — per-platform backends (the
+    OS specifics; isolated here so the rest of the module
+    never imports a backend directly).
+  - `athena/computer/tools.py` — the `@tool`-registered
+    surface (`computer_screenshot`, `computer_observe`,
+    `computer_click`, `computer_type`, `computer_key`,
+    `computer_scroll`).
+  - `athena/computer/loop.py` — the `computer_do` orchestrator
+    (vision proposer + gate + audit + kill-switch poll).
+  - `athena/computer/audit.py` — append-only JSONL audit log
+    with screenshot SHA-256.
+  - `athena/safety/approval_guard.py` — the approval gate
+    primitive (sync + async siblings; `clear_grants` for the
+    panic path).
+  - `athena/computer/RECON.md` — the design recon doc for
+    T6-04R, including the gap analysis for the goal-loop case.
 
-### The orchestrator (observe-act loop)
+## See also
 
-`computer_do(task)` (not yet a standalone tool — invoked by the
-agent runtime) runs the loop:
-
-```
-loop:
-  poll kill switch                   (engaged → halt)
-  check actions-per-task cap         (hit → max_actions)
-  screenshot                         (observe; never gated)
-  no-op detection                    (4 unchanged → stuck)
-  vision proposes next action
-  if done → done
-  classify(action)
-  gate.check(action)
-  audit.log(...)
-  if not allowed → continue
-  backend.perform(action)            ← THE ONLY CALL SITE
-  rate-limit sleep                   (kill-switch-aware)
-```
-
-`backend.perform` is **the only** call site in athena's entire
-codebase. It's reached **only** when the gate returns True. The
-loop has tests pinning that contract — gate denial → zero
-performs.
-
-## `athena computer status`
-
-```
-athena computer status [--tail N]
-```
-
-Shows:
-
-- Whether computer use is enabled
-- Current permission mode + allowlist + denylist
-- Kill hotkey + caps
-- Active backend (and which backends the codebase knows about)
-- Audit-log path + the last N rows with colour-coded results
-
-This is your "what is athena set up to do" inspection surface.
-Read-only — use config to change anything.
-
-## Subprocess vs accessibility-tree classification
-
-The classifier reads two signals per proposed action:
-
-1. The **target description** the model surfaces from the
-   screenshot (e.g. "click the *Delete* button"). If the
-   target's text matches a destructive-verb pattern
-   (`delete | send | pay | discard | sudo | …`), tier
-   escalates to destructive.
-
-2. The **accessibility tree** when the platform exposes one
-   (UIAutomation on Windows, AX API on macOS, AT-SPI on
-   Linux). Athena's current Windows backend returns `None`
-   from `accessibility_tree()` — the classifier degrades to
-   target-only reading.
-
-The conservative-default rule fills the gap: when there's no
-readable target *at all*, a click is classified destructive.
-Adding a real a11y tree (a future optional dep) makes the
-classifier more precise — fewer false-positive destructive
-prompts — without changing the safety contract.
-
-## Cross-platform support
-
-| Platform | Observe | Input | Status |
-|---|---|---|---|
-| Windows | screenshot (ctypes + GDI), active app (GetForegroundWindow) | SendInput for click/type/key/scroll | shipped |
-| macOS | — | — | backend skeleton; not implemented |
-| Linux (X11 / Wayland) | — | — | backend skeleton; not implemented |
-
-The contract is platform-agnostic. Adding macOS / Linux backends
-is a new file in `athena/computer/backends/` implementing the
-`DesktopBackend` protocol; the loop, gate, classifier, and
-audit log are platform-independent.
-
-## What this does not do
-
-- **Doesn't auto-merge tabs of windows.** Computer use clicks
-  the buttons you tell it to.
-- **Doesn't bypass OS permissions.** On macOS the user has to
-  grant Screen Recording + Accessibility to athena (or its host
-  Python); on Wayland Linux, screen capture and synthetic input
-  go through the desktop's portal/compositor APIs.
-- **Doesn't share screenshots with a remote model unless you
-  route it that way.** With a local vision model installed,
-  screenshots stay on-device — the local-first stance applied
-  to the most privacy-sensitive input.
-- **Doesn't have an "always allow" mode.** Per-session is the
-  loosest mode, and destructive still confirms each time.
-- **Doesn't catch every dangerous action.** The classifier is
-  conservative but it's not omniscient. Treat the audit log as
-  your second source of truth — what athena actually did is
-  what's in the log.
-
-## How safe is this, really
-
-The honest answer:
-
-- **Observe-only** is genuinely low-risk. It's looking at your
-  screen with a vision model. Local-vision keeps the bytes
-  on-device.
-- **Active control** is exactly as safe as the permission model
-  + the kill switch make it. Tests pin the invariants:
-  destructive always confirms; denylist always wins; gate
-  denial → zero performs; kill switch always halts. But the
-  classifier can still mis-classify a benign button as input
-  (in which case `per_session` would auto-execute it) and
-  there's no second line of defence if it does.
-
-The right mental model: **treat the agent as a careful
-collaborator with a mouse, not as a sandboxed process.** Per-
-session is fine for narrow tasks where you've reviewed the
-plan; per-action is the default for anything you wouldn't hand
-the mouse to. Observe-only is the right answer when you just
-want "see my screen, help me."
-
-## Smoke test
-
-```bash
-# 1. Status (works regardless of enabled/disabled).
-athena computer status
-
-# 2. Observe (with enabled + observe_only):
-#    ~/.athena/config.toml:
-#      computer_use_enabled = true
-#      computer_permission_mode = "observe_only"
-athena
-> what app is on my screen right now?
-  # captures + routes to vision; describes the window;
-  # NO input fires regardless of what the model wants
-
-# 3. Active control (with per_action + an allowlisted app):
-#      computer_app_allowlist = ["editor", "TextEdit", "VS Code Editor"]
-#      computer_permission_mode = "per_action"
-athena
-> open the editor and type 'hello'
-  # → "Click in editor at (...) on 'Window'? [y/N]"   ← per-action prompt
-  # → after click approved: "Type 'hello' in editor? [y/N]"
-  # → each input prompts; clicking a "Delete" control PROMPTS
-  #   even mid-session
-
-# 4. Kill switch:
-#    During a multi-step task, press Ctrl+C (or the hotkey).
-#    Loop halts at the top of the next iteration; audit log
-#    records "halted by Ctrl+C".
-```
-
-## Related
-
-- [Sandbox](sandbox.md) — what computer use is the **inverse**
-  of
-- [Provider capabilities](provider-capabilities.md) — the
-  `vision` capability that local-preferred observe uses
-- [Goal loop](goal.md) — Ctrl+C semantics are shared
+  - `docs/reference/safety.md` — the project-wide safety model.
+  - `docs/reference/vision-analyze.md` — the multimodal model
+    that powers `computer_observe`.
