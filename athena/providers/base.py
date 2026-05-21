@@ -90,6 +90,12 @@ class Capabilities:
     # False; the in-tree video providers declare it explicitly
     # in their static_capabilities().
     video_generation: bool = False
+    # T4-04: speech-to-text. The broker routes ``audio_analyze``
+    # to providers declaring this capability. Defaults False;
+    # the in-tree audio backends declare it explicitly. Pair
+    # with ``is_local=True`` for on-device STT (the privacy win
+    # — recordings stay on the machine).
+    audio_transcription: bool = False
 
     def supports(self, capability: str) -> bool:
         """``True`` when the named field is truthy. Lets callers
