@@ -113,6 +113,60 @@ cli_delegate_worktree_root = "/var/tmp/athena-delegates"
 cli_delegate_sandbox = true
 ```
 
+## Wiring up Codex (one-command setup)
+
+The single most common delegate target. Athena ships a helper:
+
+```bash
+# Detect codex on PATH + see the recommended config without writing it
+athena delegate setup-codex --dry-run
+
+# Detect + write the config (with confirmation)
+athena delegate setup-codex
+
+# Same, no confirmation prompt (CI / scripted setup)
+athena delegate setup-codex --yes
+
+# Sandbox off (Linux bwrap unavailable, or you need network access)
+athena delegate setup-codex --no-sandbox
+
+# Custom config path
+athena delegate setup-codex --config-path /etc/athena/config.toml
+```
+
+Codex install (do this first if `setup-codex` reports it missing):
+
+```bash
+npm install -g @openai/codex     # Node
+brew install openai-codex        # macOS
+# or follow https://github.com/openai/codex for the Rust / pre-built path
+```
+
+After `setup-codex` writes the config, the canonical line in your `~/.athena/config.toml` is:
+
+```toml
+cli_delegate_enabled = true
+cli_delegate_command = "codex exec --quiet {task}"
+cli_delegate_sandbox = true
+cli_delegate_timeout_s = 600.0
+```
+
+To verify the wire-up at any time:
+
+```bash
+athena delegate verify
+# OK  binary=codex  location=/usr/local/bin/codex  version=codex 0.42.1
+#     template=codex exec --quiet {task}
+#     sandbox=true
+```
+
+`--json` for machine-readable output:
+
+```bash
+athena delegate verify --json
+# {"enabled": true, "sandbox": true, "ok": true, "binary": "codex", ...}
+```
+
 ## Treating the delegate as untrusted
 
 The delegate is another agent generating code. Same trust model
