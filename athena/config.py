@@ -589,6 +589,35 @@ class Config:
     browser_min_interval_s: float = 1.0
     browser_block_downloads: bool = True
     browser_user_agent: str | None = None  # None → realistic desktop Chrome UA
+    # T4-04: audio_analyze (transcription + optional diarization +
+    # coarse content classification). Backend resolved via the
+    # T5-05 broker over the `audio_transcription` capability
+    # (local-preferred by default — recordings stay on-device).
+    # The faster-whisper backend is the in-tree default; real
+    # vendor adapters (cloud STT) land alongside one per file.
+    audio_analyze_enabled: bool = True
+    audio_backend_prefer: str = "local"
+    # Diarization is heavier (needs pyannote.audio or similar);
+    # off by default. When True, the backend that supports it
+    # returns speaker labels per segment; backends without
+    # diarization support return segments without the speaker
+    # field (no error).
+    audio_diarization_enabled: bool = False
+    # Long-audio chunking: 30s is the whisper-class default
+    # window. Chunks overlap by audio_chunk_overlap_s so words
+    # at the seam aren't dropped; the stitch dedupes the
+    # overlap region.
+    audio_chunk_seconds: float = 30.0
+    audio_chunk_overlap_s: float = 2.0
+    # Default model for the faster-whisper backend. "base" is
+    # the smallest / fastest reasonable model (~74 MB). Other
+    # options: "tiny" (39 MB), "small" (244 MB), "medium" (769
+    # MB), "large-v3" (1.5 GB). First use downloads the model;
+    # subsequent calls reuse the cache.
+    audio_whisper_model: str = "base"
+    audio_whisper_device: str = "auto"  # auto | cpu | cuda
+    audio_whisper_compute_type: str = "auto"  # auto | int8 | float16 | float32
+    audio_output_dir: str | None = None  # default <profile_dir>/audio
 
 
 def load_config() -> Config:
