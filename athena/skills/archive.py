@@ -47,6 +47,13 @@ def archive_skill(name: str, workspace: Path | None = None) -> Path:
     ``state=archived``. Returns the new path.
 
     Raises :class:`SkillNotFoundError` if no active skill of that name exists.
+
+    Atomic against a frontmatter-write failure: if ``_patch_state``
+    raises after the directory move, the move is reversed so the
+    catalog doesn't end up with a skill living in ``.archive/``
+    whose frontmatter still says ``state=active`` (invisible to
+    default ``discover_skills`` and confusing to anyone running
+    ``include_archived=True``).
     """
     skills = discover_skills(workspace, include_archived=False)
     entry = skills.get(name)
@@ -58,14 +65,25 @@ def archive_skill(name: str, workspace: Path | None = None) -> Path:
     archive_dir.mkdir(parents=True, exist_ok=True)
     dest = _resolve_unique(archive_dir, name)
     shutil.move(str(src), str(dest))
-    _patch_state(dest / "SKILL.md", "archived")
+    try:
+        _patch_state(dest / "SKILL.md", "archived")
+    except Exception:
+        # Frontmatter write failed; undo the move so the catalog
+        # invariant holds (dir location matches state value).
+        try:
+            shutil.move(str(dest), str(src))
+        except OSError:
+            pass
+        raise
     loader.invalidate(name, workspace)
     return dest
 
 
 def unarchive_skill(name: str, workspace: Path | None = None) -> Path:
     """Move ``<base>/.archive/<name>/`` back up to ``<base>/<name>/`` and set
-    ``state=active``. Returns the new path."""
+    ``state=active``. Returns the new path.
+
+    Atomic against a frontmatter-write failure: see :func:`archive_skill`."""
     skills = discover_skills(workspace, include_archived=True)
     entry = skills.get(name)
     if entry is None:
@@ -77,6 +95,13 @@ def unarchive_skill(name: str, workspace: Path | None = None) -> Path:
     base = src.parent.parent
     dest = _resolve_unique(base, name)
     shutil.move(str(src), str(dest))
-    _patch_state(dest / "SKILL.md", "active")
+    try:
+        _patch_state(dest / "SKILL.md", "active")
+    except Exception:
+        try:
+            shutil.move(str(dest), str(src))
+        except OSError:
+            pass
+        raise
     loader.invalidate(name, workspace)
     return dest

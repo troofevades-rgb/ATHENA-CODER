@@ -348,7 +348,26 @@ class TaskStore:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
-            logger.warning("task store unreadable at %s: %s", self.path, e)
+            # Move the unreadable file aside before returning empty
+            # so the FIRST subsequent _save() doesn't atomically
+            # overwrite the user's task board with an empty list.
+            # The .corrupt.<ts> sidecar lets the user recover
+            # manually; we log loudly because silent data loss is
+            # the failure mode this guard exists to prevent.
+            backup = self.path.with_suffix(
+                self.path.suffix + f".corrupt.{int(time.time())}"
+            )
+            try:
+                self.path.rename(backup)
+                logger.error(
+                    "task store unreadable at %s: %s -- moved aside to %s",
+                    self.path, e, backup,
+                )
+            except OSError:
+                logger.error(
+                    "task store unreadable at %s: %s (and could not move aside)",
+                    self.path, e,
+                )
             return {}
         out: dict[str, Task] = {}
         for d in raw if isinstance(raw, list) else []:

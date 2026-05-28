@@ -243,15 +243,29 @@ def test_clear_removes_live_tasks(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
-def test_corrupt_file_starts_empty(tmp_path: Path):
-    """A malformed JSON file → start empty (logged), next save
-    overwrites cleanly. Doesn't crash session start."""
+def test_corrupt_file_starts_empty_and_preserves_original(tmp_path: Path):
+    """A malformed JSON file → start empty (logged), original moved
+    aside to a ``.corrupt.<ts>`` sidecar so it isn't silently
+    overwritten by the first subsequent save. Doesn't crash session
+    start."""
     path = tmp_path / "tasks.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("not valid json {{{", encoding="utf-8")
+    corrupt_body = "not valid json {{{"
+    path.write_text(corrupt_body, encoding="utf-8")
     s = TaskStore(path=path)
     assert s.list() == []
-    # Next create overwrites the bad file.
+    # The unreadable original should be moved to a .corrupt.* sidecar so
+    # the user can recover; the live path itself should be either
+    # missing or fresh after the first save.
+    sidecars = [
+        p for p in tmp_path.iterdir()
+        if p.name.startswith("tasks.json.corrupt.")
+    ]
+    assert len(sidecars) == 1, (
+        f"expected exactly one .corrupt sidecar, found {sidecars}"
+    )
+    assert sidecars[0].read_text(encoding="utf-8") == corrupt_body
+    # Next create still works and writes a clean store.
     s.create(title="fresh", workspace="/ws")
     raw = json.loads(path.read_text(encoding="utf-8"))
     assert len(raw) == 1
