@@ -318,6 +318,37 @@ def test_batch_run_skips_existing_envelopes(tmp_path: Path):
     assert [e.run_id for e in m.entries] == ["r-new", "r-existing"]
 
 
+def test_batch_run_reruns_when_envelope_is_corrupt(tmp_path: Path):
+    """When a resume detects an unreadable envelope, the runner must
+    re-run the entry rather than fabricate a ``status="ok"`` record.
+    The prior behaviour silently substituted a fake success entry
+    into the manifest, hiding the failure from the operator and
+    breaking the resume-safety guarantee."""
+    out = tmp_path / "out"
+    out.mkdir()
+    # An envelope that JSON-decode-fails.
+    (out / "r-corrupt.json").write_text("{ this is not valid", encoding="utf-8")
+
+    seen: list[str] = []
+
+    def _spy(*, task, **kw):
+        seen.append(task)
+        return _stub_run_fn(task=task, **kw)
+
+    entries = [BatchEntry(task="must-rerun", run_id="r-corrupt")]
+    m = batch_run(
+        entries, cfg=_cfg(), workspace_default=tmp_path,
+        output_dir=out, run_fn=_spy,
+    )
+    # The entry was actually re-run (not skipped behind a fake "ok").
+    assert seen == ["must-rerun"]
+    assert m.completed == 1
+    assert m.skipped == 0
+    # Envelope on disk now reflects the real run.
+    real = json.loads((out / "r-corrupt.json").read_text(encoding="utf-8"))
+    assert real["task"] == "must-rerun"
+
+
 def test_batch_run_force_reruns_existing(tmp_path: Path):
     out = tmp_path / "out"
     out.mkdir()

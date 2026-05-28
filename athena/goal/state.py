@@ -194,11 +194,20 @@ def load_state(profile_dir: Path) -> GoalState | None:
 def save_state(profile_dir: Path, state: GoalState) -> Path:
     """Persist ``state`` and bump ``updated_at``. Writes the parent
     directory if it doesn't exist (a fresh profile may not have
-    one). Returns the on-disk path for the caller's logging."""
+    one). Returns the on-disk path for the caller's logging.
+
+    Writes via tmp+``os.replace`` so a crash mid-write can't truncate
+    the live file -- the prior implementation would leave the live
+    state empty on crash, dropping subgoal progress while ``goal.txt``
+    still claimed an active goal. Mirrors the pattern already used by
+    ``curator/state.py`` and ``transform/run_state.py``."""
+    import os
     state.updated_at = time.time()
     p = state_path(profile_dir)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(state.to_json(), encoding="utf-8")
+    tmp = p.with_suffix(p.suffix + ".tmp")
+    tmp.write_text(state.to_json(), encoding="utf-8")
+    os.replace(tmp, p)
     return p
 
 
