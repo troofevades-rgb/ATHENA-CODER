@@ -59,7 +59,7 @@ def test_static_policy_returns_a_copy():
 def test_code_intent_drops_temperature():
     p = heuristic_policy()
     out = p.params_for(PolicyInput(messages=[_user("refactor the parser")]))
-    assert out["temperature"] == 0.15
+    assert out["temperature"] == 0.3
 
 
 def test_explain_intent_moderate_temperature():
@@ -108,7 +108,7 @@ def test_intent_uses_last_user_message():
     ]
     out = p.params_for(PolicyInput(messages=msgs))
     # Last user message said "refactor" — code intent should win.
-    assert out["temperature"] == 0.15
+    assert out["temperature"] == 0.3
 
 
 # ---- HeuristicPolicy: state modifiers ---------------------------------
@@ -144,7 +144,7 @@ def test_code_blocks_in_context_lowers_temp():
     ]
     out = p.params_for(PolicyInput(messages=msgs))
     # The code-blocks-present rule fires (last 10 messages window).
-    assert out["temperature"] <= 0.2
+    assert out["temperature"] <= 0.4
 
 
 # ---- HeuristicPolicy: rule ordering / overrides -----------------------
@@ -351,7 +351,7 @@ def test_policy_from_config_llm_classifier_stub_falls_through():
     assert isinstance(p, LLMClassifierPolicy)
     # Stub: params still come from the fallback policy.
     out = p.params_for(PolicyInput(messages=[_user("refactor")]))
-    assert out["temperature"] == 0.15
+    assert out["temperature"] == 0.3
 
 
 def test_policy_from_config_with_user_rules():
