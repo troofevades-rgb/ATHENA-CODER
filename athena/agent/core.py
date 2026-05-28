@@ -905,7 +905,7 @@ class Agent:
             # behavior and makes BOTH calls feel slow. Reviews are
             # best-effort observability — they should run when the
             # GPU is idle, never compete with the user-visible turn.
-            self._wait_for_background_review(timeout=60.0)
+            self._wait_for_background_review(timeout=3.0)
 
             token = _current_agent.set(self)
             set_active_checkpoint_manager(self.checkpoint_manager)
@@ -1207,32 +1207,31 @@ class Agent:
         ui.warn(f"reached step limit ({max_steps}); stopping for safety.")
         self._fire_stop("step_limit")
 
-    def _wait_for_background_review(self, *, timeout: float = 60.0) -> None:
-        """Block until the previously-spawned background-review thread
-        finishes, capped at ``timeout``. No-op when no review is
-        in flight.
+    def _wait_for_background_review(self, *, timeout: float = 3.0) -> None:
+        """Block at most ``timeout`` seconds for an in-flight background-review
+        thread before starting the foreground turn. No-op when no review
+        is in flight.
 
-        Called at the top of run_turn so the foreground turn's model
-        call doesn't race the review's model call for GPU time.
-        Past the timeout, we proceed anyway — the review will keep
-        running and finish whenever it can; we just don't block the
-        user any longer.
+        Past the timeout, surface a visible status hint and proceed.
+        The review keeps running on its daemon thread; on local Ollama
+        it'll briefly serialize with the foreground call, which is far
+        better than making the user wait indefinitely.
         """
         t = self._active_review_thread
         if t is None or not t.is_alive():
             return
+        import time as _time
+        t0 = _time.monotonic()
         t.join(timeout=timeout)
+        elapsed = _time.monotonic() - t0
         if t.is_alive():
-            # Past the limit — log and proceed. The thread is daemon
-            # so it won't block process exit, but it will keep
-            # competing for GPU until done. Better than blocking the
-            # user indefinitely.
-            import logging as _logging
-            _logging.getLogger(__name__).info(
-                "background review still running after %.0fs; "
-                "proceeding with foreground turn (review will keep "
-                "running in background)", timeout,
-            )
+            try:
+                ui.info(
+                    f"background review still running after {elapsed:.1f}s; "
+                    f"proceeding (review will finish in background)"
+                )
+            except Exception:
+                pass
 
     def _maybe_fire_review(self) -> None:
         """Hand off to the per-turn review orchestrator. Background reviews
@@ -1241,6 +1240,14 @@ class Agent:
 
         # Don't recursively spawn reviews from inside background forks.
         if is_background():
+            return
+        # Skip if the previous review is still running. Stacking review
+        # threads (one per turn boundary) compounds httpx connection
+        # pressure and races for provider rate limits against the
+        # foreground turn. The nudge counter still increments, so the
+        # next idle boundary will trigger a fresh review.
+        prior = self._active_review_thread
+        if prior is not None and prior.is_alive():
             return
         try:
             from ..review.orchestrator import maybe_fire_review
@@ -1875,6 +1882,14 @@ class Agent:
         if self.session_id is not None:
             try:
                 self.plugin_hooks.on_session_end(self.session_id, completed=True, interrupted=False)
+            except Exception:
+                pass
+            # Drop this session's entry from the per-session review
+            # nudge counter so long-lived daemons (gateway, scheduled
+            # cron) don't accumulate stale ints forever.
+            try:
+                from ..review.nudge import reset as _nudge_reset
+                _nudge_reset(self.session_id)
             except Exception:
                 pass
         if self._owns_client:

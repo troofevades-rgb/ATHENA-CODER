@@ -33,6 +33,22 @@ _REGISTRY: dict[str, Tool] = {}
 _TOOLSETS: dict[str, set[str]] = {}
 _ALIASES: dict[str, str] = {}
 
+# Bumped on every mutation that changes which tools the toolset filter
+# would select (registry add/remove). Used to cache the post-filter Tool
+# list so ollama_schema() doesn't walk the whole registry every turn.
+# check_fn results are NOT memoized — they are re-evaluated on every
+# ollama_schema() call for tools that declare one.
+_SCHEMA_VERSION: int = 0
+_FILTER_CACHE: dict[tuple[int, tuple[str, ...] | None, tuple[str, ...]], list["Tool"]] = {}
+
+
+def bump_schema_version() -> None:
+    """Invalidate the registry-filter cache. Call from any mutation that
+    changes which tools the toolset filter would return."""
+    global _SCHEMA_VERSION
+    _SCHEMA_VERSION += 1
+    _FILTER_CACHE.clear()
+
 
 def tool(
     *,
@@ -68,6 +84,7 @@ def tool(
         _TOOLSETS.setdefault(toolset, set()).add(name)
         for alias in t.aliases:
             _ALIASES[alias] = name
+        bump_schema_version()
         return fn
 
     return deco
@@ -112,9 +129,20 @@ def ollama_schema(
 ) -> list[dict[str, Any]]:
     """Build the tools[] array Ollama expects.
 
-    Tools whose ``check_fn`` is set and returns False are omitted; ``check_fn``
-    is called fresh on every invocation, not cached.
+    Tools whose ``check_fn`` is set and returns False are omitted;
+    ``check_fn`` is called fresh on every invocation. The post-toolset,
+    post-disabled tool list is memoized by (schema_version, enabled_toolsets,
+    disabled) so we don't walk the whole registry every turn.
     """
+    key = (
+        _SCHEMA_VERSION,
+        tuple(enabled_toolsets) if enabled_toolsets is not None else None,
+        tuple(disabled or ()),
+    )
+    tools = _FILTER_CACHE.get(key)
+    if tools is None:
+        tools = all_tools(enabled_toolsets=enabled_toolsets, disabled=disabled)
+        _FILTER_CACHE[key] = tools
     return [
         {
             "type": "function",
@@ -124,7 +152,7 @@ def ollama_schema(
                 "parameters": t.parameters,
             },
         }
-        for t in all_tools(enabled_toolsets=enabled_toolsets, disabled=disabled)
+        for t in tools
         if t.check_fn is None or t.check_fn()
     ]
 

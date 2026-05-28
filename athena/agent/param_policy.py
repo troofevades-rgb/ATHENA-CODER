@@ -201,8 +201,12 @@ class LLMClassifierPolicy:
 # Precompiled patterns. Kept at module scope so each turn doesn't pay
 # the regex-compile tax; tweakable for tests via attribute substitution.
 _CODE_INTENT_RE = re.compile(
-    r"\b(refactor|rename|fix|debug|implement|add (?:a |an )?(?:test|function|method|class)|"
-    r"write (?:a |the )?(?:test|function|script)|patch|migrate|port|extract|inline)\b",
+    r"\b(refactor|rename (?:this |the |a )?(?:function|method|class|variable|file)|"
+    r"implement (?:a |the |this )|"
+    r"add (?:a |an )?(?:test|function|method|class)|"
+    r"write (?:a |the )?(?:test|function|script)|"
+    r"patch (?:this |the )|migrate|port (?:this |the )|extract (?:a |the |this )|"
+    r"inline (?:this |the ))",
     re.IGNORECASE,
 )
 _EXPLAIN_INTENT_RE = re.compile(
@@ -323,7 +327,7 @@ def builtin_rules() -> list[Rule]:
         Rule(
             name="intent:code",
             predicate=_matches_code_intent,
-            params={"temperature": 0.15, "top_p": 0.9, "repeat_penalty": 1.05},
+            params={"temperature": 0.3, "top_p": 0.9},
         ),
         Rule(
             name="intent:explain",
@@ -345,7 +349,7 @@ def builtin_rules() -> list[Rule]:
         Rule(
             name="context:code_blocks_present",
             predicate=_has_code_blocks_in_context,
-            params={"temperature": 0.2, "top_p": 0.9},
+            params={"temperature": 0.35},
         ),
         # 4. State modifiers. These layer on top of intent — even a
         # creative request, four tool calls in, should narrow to
