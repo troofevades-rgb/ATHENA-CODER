@@ -171,29 +171,39 @@ def batch_run(
         for idx, entry in enumerate(entries_list, start=1):
             envelope_path = output_dir / f"{_safe_filename(entry.run_id)}.json"
 
-            # Resume-safety: skip when the envelope already exists.
+            # Resume-safety: skip when the envelope already exists AND
+            # is readable. A corrupt envelope used to be substituted with
+            # a fake {"status": "ok", "exit_code": 0} record, which made
+            # the resume-safety guarantee a lie — the operator's
+            # manifest reported success for a run whose outcome was
+            # actually unknown. Treat an unreadable envelope as "we
+            # don't know what happened" and re-run the entry, surfacing
+            # the failure in the logs so the operator can decide.
             if envelope_path.exists() and not force:
-                logger.info(
-                    "batch %s: skipping %s (already done)",
-                    bid, entry.run_id,
-                )
                 try:
                     existing = json.loads(
                         envelope_path.read_text(encoding="utf-8")
                     )
-                except Exception:  # noqa: BLE001
-                    existing = {"run_id": entry.run_id, "status": "ok",
-                                "exit_code": 0, "duration_s": 0.0,
-                                "task": entry.task, "error": None}
-                me = ManifestEntry.from_run_result(
-                    envelope=existing, envelope_path=envelope_path,
-                )
-                manifest.entries.append(me)
-                manifest.skipped += 1
-                manifest.by_status[me.status] = manifest.by_status.get(me.status, 0) + 1
-                if progress is not None:
-                    progress(me, idx, total)
-                continue
+                except (OSError, json.JSONDecodeError) as e:
+                    logger.warning(
+                        "batch %s: envelope %s unreadable (%s); "
+                        "re-running this entry",
+                        bid, envelope_path, e,
+                    )
+                else:
+                    logger.info(
+                        "batch %s: skipping %s (already done)",
+                        bid, entry.run_id,
+                    )
+                    me = ManifestEntry.from_run_result(
+                        envelope=existing, envelope_path=envelope_path,
+                    )
+                    manifest.entries.append(me)
+                    manifest.skipped += 1
+                    manifest.by_status[me.status] = manifest.by_status.get(me.status, 0) + 1
+                    if progress is not None:
+                        progress(me, idx, total)
+                    continue
 
             workspace = (
                 Path(entry.cwd).expanduser().resolve()
