@@ -58,5 +58,13 @@ SLASH_HELP = """\
 
 @command("help")
 def cmd_help(agent, arg: str = "") -> str:
-    ui.console.print(SLASH_HELP)
+    # Print with markup disabled. Several command-line placeholders
+    # in SLASH_HELP are wrapped in square brackets ([file], [path],
+    # [name], [ref], [prompt], [list|show|delete|dir], [goal:<id>])
+    # which Rich's markup parser interprets as tags and silently
+    # eats. Worse: malformed markup can leave parser state in a way
+    # that affects the next console.print call, producing a crash on
+    # the message the user types after /help. ``markup=False`` makes
+    # SLASH_HELP render literally.
+    ui.console.print(SLASH_HELP, markup=False)
     return ""
