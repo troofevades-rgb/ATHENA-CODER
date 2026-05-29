@@ -36,7 +36,23 @@ def get_snapshot_store(profile_dir: Path | None = None) -> SnapshotStore:
     with _LOCK:
         store = _SNAPSHOT_STORES.get(key)
         if store is None:
-            store = SnapshotStore(root=root / "snapshots")
+            # Honor cfg.safety retention policy when the cfg is loadable.
+            # Lazy import avoids an upward dep from athena.safety on
+            # athena.config at module load. If load_config fails (test
+            # fixtures that monkeypatch CONFIG_PATH before importing
+            # safety, etc.) we fall back to SnapshotStore's hardcoded
+            # defaults, which match SafetyConfig's defaults exactly.
+            kwargs: dict = {"root": root / "snapshots"}
+            try:
+                from ..config import load_config as _load_config
+
+                safety = _load_config().safety
+                kwargs["retention_days"] = safety.retention_days
+                kwargs["retention_count"] = safety.retention_count
+                kwargs["retention_bytes"] = safety.retention_bytes
+            except Exception:  # noqa: BLE001
+                pass
+            store = SnapshotStore(**kwargs)
             _SNAPSHOT_STORES[key] = store
         return store
 
