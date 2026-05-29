@@ -43,24 +43,38 @@ def have_ffprobe() -> bool:
 
 def _run(cmd: list[str]) -> None:
     subprocess.run(
-        cmd, capture_output=True, timeout=60, check=False,
+        cmd,
+        capture_output=True,
+        timeout=60,
+        check=False,
     )
 
 
-def _gen_base_clip(out: Path, *, encoder: str = "libx264",
-                   duration: float = 2.0,
-                   w: int = 320, h: int = 240,
-                   fps: int = 24,
-                   faststart: bool = False) -> None:
+def _gen_base_clip(
+    out: Path,
+    *,
+    encoder: str = "libx264",
+    duration: float = 2.0,
+    w: int = 320,
+    h: int = 240,
+    fps: int = 24,
+    faststart: bool = False,
+) -> None:
     """Generate a synthetic clip using ffmpeg's testsrc filter —
     deterministic, no real-world content, tiny."""
     args: list[str] = [
-        "ffmpeg", "-y",
-        "-f", "lavfi",
-        "-i", f"testsrc=duration={duration}:size={w}x{h}:rate={fps}",
-        "-c:v", encoder,
-        "-preset", "ultrafast",
-        "-pix_fmt", "yuv420p",
+        "ffmpeg",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        f"testsrc=duration={duration}:size={w}x{h}:rate={fps}",
+        "-c:v",
+        encoder,
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
     ]
     if faststart:
         args.extend(["-movflags", "+faststart"])
@@ -93,8 +107,7 @@ def ensure_fixtures() -> dict[str, Path]:
     if not paths["generated"].exists():
         # An explicit x264 + faststart combo for the
         # encoder-fingerprint AND the remux-tells together
-        _gen_base_clip(paths["generated"], encoder="libx264",
-                       faststart=True)
+        _gen_base_clip(paths["generated"], encoder="libx264", faststart=True)
     if not paths["short"].exists():
         _gen_base_clip(paths["short"], duration=1.0)
     return paths

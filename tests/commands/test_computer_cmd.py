@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from athena.commands.computer import cmd_computer, main as computer_main
+from athena.commands.computer import cmd_computer
+from athena.commands.computer import main as computer_main
 
 
 def _capture():
@@ -25,33 +26,66 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.computer.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             "athena.commands.computer.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
 
 
 def _fake_cfg(**overrides) -> SimpleNamespace:
-    base = dict(
-        computer_use_enabled=False,
-        computer_permission_mode="observe_only",
-        computer_app_allowlist=[],
-        computer_app_denylist=[],
-        computer_kill_hotkey="ctrl+alt+k",
-        computer_max_actions_per_task=40,
-        computer_max_actions_per_sec=2.0,
-        profile="default",
+    """Stub Config shaped like the post-R4 nested layout.
+
+    R4 stage 3 promoted the ``computer_*`` flat fields into a nested
+    ``computer`` dataclass. Test overrides can still pass the legacy
+    flat names for convenience -- they get translated to the nested
+    SimpleNamespace below.
+    """
+    legacy_to_nested = {
+        "computer_use_enabled": "use_enabled",
+        "computer_permission_mode": "permission_mode",
+        "computer_app_allowlist": "app_allowlist",
+        "computer_app_denylist": "app_denylist",
+        "computer_kill_hotkey": "kill_hotkey",
+        "computer_max_actions_per_task": "max_actions_per_task",
+        "computer_max_actions_per_sec": "max_actions_per_sec",
+        "computer_backend": "backend",
+        "computer_dry_run": "dry_run",
+        "computer_audit_path": "audit_path",
+        "computer_screenshots_dir": "screenshots_dir",
+        "computer_deny_during_goal_loop": "deny_during_goal_loop",
+    }
+    computer_defaults = dict(
+        use_enabled=False,
+        permission_mode="observe_only",
+        app_allowlist=[],
+        app_denylist=[],
+        kill_hotkey="ctrl+alt+k",
+        max_actions_per_task=40,
+        max_actions_per_sec=2.0,
+        backend="auto",
+        dry_run=False,
+        audit_path=None,
+        screenshots_dir=None,
+        deny_during_goal_loop=True,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top_defaults: dict = {"profile": "default"}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            computer_defaults[legacy_to_nested[k]] = v
+        elif k in computer_defaults:
+            computer_defaults[k] = v
+        else:
+            top_defaults[k] = v
+    return SimpleNamespace(
+        computer=SimpleNamespace(**computer_defaults),
+        **top_defaults,
+    )
 
 
 def _fake_backend(name: str = "stub", *, available: bool = True, supports=()):
@@ -201,12 +235,20 @@ def test_no_audit_entries_shows_placeholder() -> None:
 def test_audit_tail_renders_entries() -> None:
     entries = [
         SimpleNamespace(
-            ts="2026-05-23T12:00:00", type="click", tier="trusted",
-            app="vscode", executed=True, result="ok",
+            ts="2026-05-23T12:00:00",
+            type="click",
+            tier="trusted",
+            app="vscode",
+            executed=True,
+            result="ok",
         ),
         SimpleNamespace(
-            ts="2026-05-23T12:01:00", type="type", tier="confirm_needed",
-            app="terminal", executed=False, result="denied",
+            ts="2026-05-23T12:01:00",
+            type="type",
+            tier="confirm_needed",
+            app="terminal",
+            executed=False,
+            result="denied",
         ),
     ]
     out = _run_with_patches("", audit_entries=entries)
@@ -262,8 +304,12 @@ def test_main_status_tail_arg_honored() -> None:
     the audit log tail."""
     entries = [
         SimpleNamespace(
-            ts=f"t{i}", type="click", tier="auto", app="a",
-            executed=True, result="ok",
+            ts=f"t{i}",
+            type="click",
+            tier="auto",
+            app="a",
+            executed=True,
+            result="ok",
         )
         for i in range(5)
     ]

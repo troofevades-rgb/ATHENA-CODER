@@ -31,9 +31,9 @@ from pathlib import Path
 class Atom:
     """One top-level box in an MP4/MOV file."""
 
-    type: str       # 4-char box type ("ftyp", "moov", "mdat", ...)
-    size: int       # box size in bytes including the 8-byte header
-    offset: int     # byte offset in the file
+    type: str  # 4-char box type ("ftyp", "moov", "mdat", ...)
+    size: int  # box size in bytes including the 8-byte header
+    offset: int  # byte offset in the file
 
 
 def parse_top_level_atoms(
@@ -124,9 +124,7 @@ def faststart_remux_signature(atoms: list[Atom]) -> dict:
     order = [a.type for a in atoms]
     moov_idx = order.index("moov") if "moov" in order else -1
     mdat_idx = order.index("mdat") if "mdat" in order else -1
-    moov_before_mdat = (
-        moov_idx != -1 and mdat_idx != -1 and moov_idx < mdat_idx
-    )
+    moov_before_mdat = moov_idx != -1 and mdat_idx != -1 and moov_idx < mdat_idx
     if moov_idx == -1 and mdat_idx == -1:
         interp = (
             "no moov or mdat atom found — input is probably not "

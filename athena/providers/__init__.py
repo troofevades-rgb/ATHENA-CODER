@@ -145,16 +145,6 @@ __all__ = [
 # at import time so the registry is fully populated by the time anyone
 # calls ``get_provider_class``. Order doesn't matter — registration is
 # idempotent and keyed by ``name``.
-from . import anthropic as _anthropic  # noqa: E402,F401
-from . import codex as _codex  # noqa: E402,F401
-from . import google as _google  # noqa: E402,F401
-from . import nous as _nous  # noqa: E402,F401
-from . import ollama as _ollama  # noqa: E402,F401
-from . import openai as _openai  # noqa: E402,F401
-from . import openai_compat as _openai_compat  # noqa: E402,F401
-from . import openrouter as _openrouter  # noqa: E402,F401
-from . import social as _social  # noqa: E402,F401
-
 # T6-05: stub video-generation backend. Declares
 # video_generation in its manifest so the broker has
 # something to resolve out-of-the-box. Real vendor adapters
@@ -166,3 +156,13 @@ from ..videogen.backends import stub_local as _stub_video  # noqa: E402,F401
 # Auth: ATHENA_XAI_API_KEY in ~/.athena/.env. Selected via
 # ``/video set xai_video`` or cfg.video_backend = "xai_video".
 from ..videogen.backends import xai as _xai_video  # noqa: E402,F401
+from . import anthropic as _anthropic  # noqa: E402,F401
+from . import codex as _codex  # noqa: E402,F401
+from . import google as _google  # noqa: E402,F401
+from . import nous as _nous  # noqa: E402,F401
+from . import ollama as _ollama  # noqa: E402,F401
+from . import openai as _openai  # noqa: E402,F401
+from . import openai_compat as _openai_compat  # noqa: E402,F401
+from . import openrouter as _openrouter  # noqa: E402,F401
+from . import social as _social  # noqa: E402,F401
+from . import xai as _xai  # noqa: E402,F401

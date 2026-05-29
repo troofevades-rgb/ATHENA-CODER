@@ -14,10 +14,10 @@ from typing import Any
 class OutlineEntry:
     """One entry in the document's heading outline."""
 
-    level: int       # 1 = top-level heading, 2 = sub, ...
+    level: int  # 1 = top-level heading, 2 = sub, ...
     title: str
-    page: int        # 1-indexed page where the heading starts;
-                     # 0 for formats without page-level positioning
+    page: int  # 1-indexed page where the heading starts;
+    # 0 for formats without page-level positioning
 
     def to_dict(self) -> dict[str, Any]:
         return {"level": int(self.level), "title": self.title, "page": int(self.page)}
@@ -31,8 +31,8 @@ class TableData:
     rectangle, since the underlying document IS ragged in that
     case and pretending otherwise would silently drop data."""
 
-    page: int               # 1-indexed; 0 for DOCX (no pages)
-    rows: list[list[str]]   # row-major
+    page: int  # 1-indexed; 0 for DOCX (no pages)
+    rows: list[list[str]]  # row-major
 
     def to_dict(self) -> dict[str, Any]:
         return {

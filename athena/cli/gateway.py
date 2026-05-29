@@ -161,7 +161,9 @@ def _instantiate_adapter(
                 f"matrix requires {', '.join(missing)}",
             )
         access_token = resolve_credential(
-            settings, "access_token", platform="matrix",
+            settings,
+            "access_token",
+            platform="matrix",
         )
         store_path_raw = settings.get("store_path")
         store_path = Path(store_path_raw).expanduser() if store_path_raw else None
@@ -179,7 +181,11 @@ def _instantiate_adapter(
         # Non-secret fields stay on settings.get; the two
         # password fields go through resolve_credential.
         non_secret_required = (
-            "imap_host", "imap_user", "smtp_host", "smtp_user", "from_address",
+            "imap_host",
+            "imap_user",
+            "smtp_host",
+            "smtp_user",
+            "from_address",
         )
         missing = [k for k in non_secret_required if not settings.get(k)]
         if missing:
@@ -187,10 +193,14 @@ def _instantiate_adapter(
                 f"email requires {', '.join(missing)}",
             )
         imap_password = resolve_credential(
-            settings, "imap_password", platform="email",
+            settings,
+            "imap_password",
+            platform="email",
         )
         smtp_password = resolve_credential(
-            settings, "smtp_password", platform="email",
+            settings,
+            "smtp_password",
+            platform="email",
         )
         return EmailAdapter(
             daemon,

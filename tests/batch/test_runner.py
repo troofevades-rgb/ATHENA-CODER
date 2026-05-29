@@ -27,7 +27,6 @@ from athena.batch.runner import (
 )
 from athena.headless.result import RunResult
 
-
 # ---------------------------------------------------------------
 # parse_tasks_file
 # ---------------------------------------------------------------
@@ -54,12 +53,7 @@ def test_parse_tasks_file_basic(tmp_path: Path):
 def test_parse_tasks_file_skips_blank_and_comment_lines(tmp_path: Path):
     f = tmp_path / "tasks.jsonl"
     f.write_text(
-        "# a comment\n"
-        "\n"
-        '{"task": "real one"}\n'
-        "   \n"
-        "# another comment\n"
-        '{"task": "real two"}\n',
+        '# a comment\n\n{"task": "real one"}\n   \n# another comment\n{"task": "real two"}\n',
         encoding="utf-8",
     )
     entries = parse_tasks_file(f)
@@ -76,8 +70,7 @@ def test_parse_tasks_file_rejects_missing_task(tmp_path: Path):
 def test_parse_tasks_file_rejects_bad_json(tmp_path: Path):
     f = tmp_path / "tasks.jsonl"
     f.write_text(
-        '{"task": "ok"}\n'
-        'not json here\n',
+        '{"task": "ok"}\nnot json here\n',
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="line 2.*not valid JSON"):
@@ -134,7 +127,13 @@ def test_mint_batch_id_format():
 
 
 def _stub_run_fn(
-    *, task, cfg, workspace, model, run_id, timeout_s,
+    *,
+    task,
+    cfg,
+    workspace,
+    model,
+    run_id,
+    timeout_s,
     status: str = "ok",
     error: str | None = None,
     duration_s: float = 0.5,
@@ -153,8 +152,7 @@ def _stub_run_fn(
         profile="default",
         session_id="s-stub-1",
         tool_calls=[{"name": "Read", "count": 2}],
-        tokens={"prompt": 10, "completion": 5,
-                "cache_read": 0, "cache_creation": 0},
+        tokens={"prompt": 10, "completion": 5, "cache_read": 0, "cache_creation": 0},
         cost_est=0.0,
         assistant_text=f"answer for: {task}",
         error=error,
@@ -177,7 +175,9 @@ def test_batch_run_writes_per_run_envelope_and_manifest(tmp_path: Path):
     ]
     out = tmp_path / "out"
     manifest = batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
         output_dir=out,
         run_fn=_stub_run_fn,
     )
@@ -199,7 +199,9 @@ def test_batch_run_writes_per_run_envelope_and_manifest(tmp_path: Path):
 def test_batch_run_envelope_content_matches_runresult(tmp_path: Path):
     entries = [BatchEntry(task="x", run_id="r-payload-check")]
     batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
         output_dir=tmp_path / "out",
         run_fn=_stub_run_fn,
     )
@@ -216,24 +218,33 @@ def test_batch_run_per_entry_overrides_propagate(tmp_path: Path):
     received: list[dict[str, Any]] = []
 
     def _capture(*, task, cfg, workspace, model, run_id, timeout_s):
-        received.append({
-            "task": task, "workspace": str(workspace),
-            "model": model, "timeout_s": timeout_s,
-        })
+        received.append(
+            {
+                "task": task,
+                "workspace": str(workspace),
+                "model": model,
+                "timeout_s": timeout_s,
+            }
+        )
         return _stub_run_fn(
-            task=task, cfg=cfg, workspace=workspace,
-            model=model, run_id=run_id, timeout_s=timeout_s,
+            task=task,
+            cfg=cfg,
+            workspace=workspace,
+            model=model,
+            run_id=run_id,
+            timeout_s=timeout_s,
         )
 
     sub = tmp_path / "sub"
     sub.mkdir()
     entries = [
         BatchEntry(task="t1"),
-        BatchEntry(task="t2", cwd=str(sub),
-                   model="other-model", timeout_s=99.0),
+        BatchEntry(task="t2", cwd=str(sub), model="other-model", timeout_s=99.0),
     ]
     batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
         output_dir=tmp_path / "out",
         run_fn=_capture,
     )
@@ -261,14 +272,21 @@ def test_batch_run_aggregates_status_counts(tmp_path: Path):
         st = statuses[idx]
         err = "boom" if st == "error" else None
         return _stub_run_fn(
-            task=task, cfg=cfg, workspace=workspace,
-            model=model, run_id=run_id, timeout_s=timeout_s,
-            status=st, error=err,
+            task=task,
+            cfg=cfg,
+            workspace=workspace,
+            model=model,
+            run_id=run_id,
+            timeout_s=timeout_s,
+            status=st,
+            error=err,
         )
 
     entries = [BatchEntry(task=f"T{i}", run_id=f"r-{i:03d}") for i in range(5)]
     m = batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
         output_dir=tmp_path / "out",
         run_fn=_per_entry,
     )
@@ -289,10 +307,16 @@ def test_batch_run_skips_existing_envelopes(tmp_path: Path):
     out.mkdir()
     # Pre-existing envelope for r-existing.
     (out / "r-existing.json").write_text(
-        json.dumps({
-            "run_id": "r-existing", "status": "ok", "exit_code": 0,
-            "duration_s": 1.0, "task": "skipped", "error": None,
-        }),
+        json.dumps(
+            {
+                "run_id": "r-existing",
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 1.0,
+                "task": "skipped",
+                "error": None,
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -307,8 +331,11 @@ def test_batch_run_skips_existing_envelopes(tmp_path: Path):
         BatchEntry(task="will-skip", run_id="r-existing"),
     ]
     m = batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=out, run_fn=_spy,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=out,
+        run_fn=_spy,
     )
     # Only the new entry ran.
     assert seen_tasks == ["will-run"]
@@ -318,26 +345,70 @@ def test_batch_run_skips_existing_envelopes(tmp_path: Path):
     assert [e.run_id for e in m.entries] == ["r-new", "r-existing"]
 
 
+def test_batch_run_reruns_when_envelope_is_corrupt(tmp_path: Path):
+    """When a resume detects an unreadable envelope, the runner must
+    re-run the entry rather than fabricate a ``status="ok"`` record.
+    The prior behaviour silently substituted a fake success entry
+    into the manifest, hiding the failure from the operator and
+    breaking the resume-safety guarantee."""
+    out = tmp_path / "out"
+    out.mkdir()
+    # An envelope that JSON-decode-fails.
+    (out / "r-corrupt.json").write_text("{ this is not valid", encoding="utf-8")
+
+    seen: list[str] = []
+
+    def _spy(*, task, **kw):
+        seen.append(task)
+        return _stub_run_fn(task=task, **kw)
+
+    entries = [BatchEntry(task="must-rerun", run_id="r-corrupt")]
+    m = batch_run(
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=out,
+        run_fn=_spy,
+    )
+    # The entry was actually re-run (not skipped behind a fake "ok").
+    assert seen == ["must-rerun"]
+    assert m.completed == 1
+    assert m.skipped == 0
+    # Envelope on disk now reflects the real run.
+    real = json.loads((out / "r-corrupt.json").read_text(encoding="utf-8"))
+    assert real["task"] == "must-rerun"
+
+
 def test_batch_run_force_reruns_existing(tmp_path: Path):
     out = tmp_path / "out"
     out.mkdir()
     (out / "r-existing.json").write_text(
-        json.dumps({
-            "run_id": "r-existing", "status": "ok", "exit_code": 0,
-            "duration_s": 1.0, "task": "old", "error": None,
-        }),
+        json.dumps(
+            {
+                "run_id": "r-existing",
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 1.0,
+                "task": "old",
+                "error": None,
+            }
+        ),
         encoding="utf-8",
     )
 
     ran: list[str] = []
+
     def _spy(*, task, **kw):
         ran.append(task)
         return _stub_run_fn(task=task, **kw)
 
     entries = [BatchEntry(task="new-run", run_id="r-existing")]
     m = batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=out, run_fn=_spy,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=out,
+        run_fn=_spy,
         force=True,
     )
     assert ran == ["new-run"]
@@ -355,10 +426,14 @@ def test_batch_run_force_reruns_existing(tmp_path: Path):
 def test_batch_run_progress_callback_fires_per_entry(tmp_path: Path):
     entries = [BatchEntry(task=f"T{i}") for i in range(4)]
     progress_log: list[tuple[str, int, int]] = []
+
     def _progress(me: ManifestEntry, done: int, total: int):
         progress_log.append((me.status, done, total))
+
     batch_run(
-        entries, cfg=_cfg(), workspace_default=tmp_path,
+        entries,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
         output_dir=tmp_path / "out",
         run_fn=_stub_run_fn,
         progress=_progress,
@@ -375,17 +450,25 @@ def test_batch_run_progress_fires_for_skipped(tmp_path: Path):
     out = tmp_path / "out"
     out.mkdir()
     (out / "r-x.json").write_text(
-        json.dumps({
-            "run_id": "r-x", "status": "ok", "exit_code": 0,
-            "duration_s": 0.0, "task": "done", "error": None,
-        }),
+        json.dumps(
+            {
+                "run_id": "r-x",
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 0.0,
+                "task": "done",
+                "error": None,
+            }
+        ),
         encoding="utf-8",
     )
     progress_log: list[str] = []
     batch_run(
         [BatchEntry(task="done", run_id="r-x")],
-        cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=out, run_fn=_stub_run_fn,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=out,
+        run_fn=_stub_run_fn,
         progress=lambda me, _d, _t: progress_log.append(me.status),
     )
     # Skipped entries still call progress (callers want a
@@ -401,8 +484,10 @@ def test_batch_run_progress_fires_for_skipped(tmp_path: Path):
 def test_batch_id_minted_when_absent(tmp_path: Path):
     m = batch_run(
         [BatchEntry(task="t")],
-        cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", run_fn=_stub_run_fn,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        run_fn=_stub_run_fn,
     )
     assert m.batch_id.startswith("b-")
 
@@ -410,8 +495,10 @@ def test_batch_id_minted_when_absent(tmp_path: Path):
 def test_batch_id_passed_through(tmp_path: Path):
     m = batch_run(
         [BatchEntry(task="t")],
-        cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", run_fn=_stub_run_fn,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        run_fn=_stub_run_fn,
         batch_id="b-my-batch-001",
     )
     assert m.batch_id == "b-my-batch-001"
@@ -424,8 +511,11 @@ def test_batch_id_passed_through(tmp_path: Path):
 
 def test_empty_batch_writes_empty_manifest(tmp_path: Path):
     m = batch_run(
-        [], cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", run_fn=_stub_run_fn,
+        [],
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        run_fn=_stub_run_fn,
     )
     assert m.total == 0
     assert m.completed == 0
@@ -444,8 +534,10 @@ def test_long_task_excerpted_in_manifest(tmp_path: Path):
     long_task = "x" * 500
     m = batch_run(
         [BatchEntry(task=long_task, run_id="r-long")],
-        cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", run_fn=_stub_run_fn,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        run_fn=_stub_run_fn,
     )
     assert len(m.entries[0].task_excerpt) <= 240
     assert m.entries[0].task_excerpt.endswith("…")
@@ -453,12 +545,16 @@ def test_long_task_excerpted_in_manifest(tmp_path: Path):
 
 def test_long_error_excerpted_in_manifest(tmp_path: Path):
     long_err = "boom " * 100
+
     def _err_stub(**kw):
         return _stub_run_fn(**kw, status="error", error=long_err)
+
     m = batch_run(
         [BatchEntry(task="t", run_id="r-err")],
-        cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", run_fn=_err_stub,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        run_fn=_err_stub,
     )
     assert m.entries[0].error_excerpt is not None
     assert len(m.entries[0].error_excerpt) <= 200

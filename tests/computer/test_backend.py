@@ -14,7 +14,6 @@ import pytest
 from athena.computer.backends.noop import NoOpBackend
 from athena.computer.detect import available_backends, select_backend
 
-
 # ---------------------------------------------------------------------------
 # Detector
 # ---------------------------------------------------------------------------
@@ -24,7 +23,7 @@ def test_select_backend_auto_returns_backend():
     """Auto-select always returns *something* — never raises.
     On hosts without a usable platform backend, falls through
     to NoOpBackend."""
-    cfg = SimpleNamespace(computer_backend="auto")
+    cfg = SimpleNamespace(computer=SimpleNamespace(backend="auto"))
     backend = select_backend(cfg)
     assert backend is not None
     assert hasattr(backend, "is_available")
@@ -33,7 +32,7 @@ def test_select_backend_auto_returns_backend():
 
 
 def test_select_backend_noop_forced():
-    cfg = SimpleNamespace(computer_backend="noop")
+    cfg = SimpleNamespace(computer=SimpleNamespace(backend="noop"))
     backend = select_backend(cfg)
     assert backend.name == "noop"
     assert backend.is_available() is False
@@ -43,7 +42,7 @@ def test_select_backend_noop_forced():
 def test_select_backend_unknown_falls_through_to_noop():
     """A typo in computer_backend should NOT crash — it should
     fall through to the noop stub."""
-    cfg = SimpleNamespace(computer_backend="zarquon")
+    cfg = SimpleNamespace(computer=SimpleNamespace(backend="zarquon"))
     backend = select_backend(cfg)
     # Either the requested backend resolved (unlikely for
     # "zarquon") or the noop fallback. Both are acceptable; the
@@ -174,12 +173,9 @@ def test_windows_backend_supports_includes_input_after_t6_04_5():
     backend = WindowsBackend()
     supports = backend.supports()
     assert "screenshot" in supports
-    for input_verb in (
-        "move", "click", "double_click", "right_click", "type", "key", "scroll"
-    ):
+    for input_verb in ("move", "click", "double_click", "right_click", "type", "key", "scroll"):
         assert input_verb in supports, (
-            f"input verb {input_verb!r} missing from supports — "
-            "T6-04.5 should have wired it"
+            f"input verb {input_verb!r} missing from supports — T6-04.5 should have wired it"
         )
     assert "drag" not in supports
 

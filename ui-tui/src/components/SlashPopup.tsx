@@ -8,7 +8,7 @@
  * discover what commands exist — today, you have to know names.
  *
  * The command catalog is static here; if it ever drifts from
- * ``athena/commands/help_cmd.py``, the SLASH_COMMANDS sweep test
+ * ``athena/commands/help.py``, the SLASH_COMMANDS sweep test
  * catches the drift.
  */
 
@@ -24,7 +24,7 @@ export interface SlashCommand {
   description: string;
 }
 
-/** Source of truth — mirrors athena/commands/help_cmd.py SLASH_HELP.
+/** Source of truth — mirrors athena/commands/help.py SLASH_HELP.
  * Parametric over which name expands to which command. */
 export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/help",            description: "show slash-command reference" },
@@ -55,6 +55,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/goal",            description: "set/pause/resume/inspect/clear active goal" },
   { name: "/subgoal",         description: "append (arg: MSG) or 'done' the next subgoal" },
   { name: "/board",           description: "render the kanban (or 'clear' to wipe)" },
+  { name: "/computer",        description: "show computer-use status (backend, mode, allow/deny)" },
+  { name: "/skill",           description: "import a SKILL.md / dir / archive, or 'reload'" },
   { name: "/video",           description: "video backends: list/set/clear" },
   { name: "/theme",           description: "TUI palette: list, 'set NAME', or 'save'" },
   { name: "/hooks",           description: "list configured hooks" },

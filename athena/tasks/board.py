@@ -40,8 +40,8 @@ _COLUMNS: tuple[Status, ...] = ("todo", "doing", "blocked", "done")
 def project_board(
     store: TaskStore,
     *,
-    workspace: Optional[str] = None,
-    goal_id: Optional[str] = None,
+    workspace: str | None = None,
+    goal_id: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Slice the store into columns. Each column is a list of
     card dicts ordered by the store's per-column ``order``.
@@ -110,8 +110,7 @@ def column_counts(cols: dict[str, list[dict]]) -> dict[str, int]:
             "goal_id": {
                 "type": "string",
                 "description": (
-                    "Filter to a single goal's cards. Omit for "
-                    "every card in the workspace."
+                    "Filter to a single goal's cards. Omit for every card in the workspace."
                 ),
             },
         },

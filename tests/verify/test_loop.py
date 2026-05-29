@@ -16,7 +16,6 @@ import pytest
 from athena.verify.loop import VerifiedExecution
 from athena.verify.outcome import VerificationOutcome
 
-
 # ---------------------------------------------------------------------------
 # Fixtures / fakes
 # ---------------------------------------------------------------------------
@@ -25,7 +24,9 @@ from athena.verify.outcome import VerificationOutcome
 class _FakeDiag:
     """Diagnostic-shape stub mirroring the bits the loop touches."""
 
-    def __init__(self, *, is_error: bool, message: str, line: int = 1, col: int = 1, code: str = ""):
+    def __init__(
+        self, *, is_error: bool, message: str, line: int = 1, col: int = 1, code: str = ""
+    ):
         self.is_error = is_error
         self.message = message
         self.line = line
@@ -129,6 +130,7 @@ def test_failed_diagnostics_extracts_errors():
 
 def test_diagnose_exception_becomes_passed():
     """An LSP failure during verify must not block the write."""
+
     def boom(paths):
         raise RuntimeError("LSP exploded")
 
@@ -300,6 +302,7 @@ def test_auto_rollback_without_checkpoint_is_a_no_op():
 
 def test_auto_rollback_exception_logs_and_returns_unmarked():
     """A rollback that raises must not blow up the verify call."""
+
     class _MgrRollbackBoom(_FakeCheckpointManager):
         def rollback_to(self, cp_id: str):
             raise RuntimeError("rollback failed")

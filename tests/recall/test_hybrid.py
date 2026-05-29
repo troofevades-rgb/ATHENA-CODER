@@ -12,7 +12,6 @@ import pytest
 
 from athena.recall.hybrid import rrf_fuse
 
-
 # ---------------------------------------------------------------------------
 # Core fusion properties
 # ---------------------------------------------------------------------------
@@ -84,8 +83,8 @@ def test_rrf_fuse_k_smooths_decay():
     """
     # 'BOTH' is in both lists at rank 9 (low). 'SOLO' is rank 0
     # in keyword only.
-    kw = ["SOLO"] + ["filler%d" % i for i in range(8)] + ["BOTH"]
-    vec = ["v%d" % i for i in range(9)] + ["BOTH"]
+    kw = ["SOLO"] + [f"filler{i}" for i in range(8)] + ["BOTH"]
+    vec = [f"v{i}" for i in range(9)] + ["BOTH"]
     # k=1: rank-0 SOLO score ~ 1/2; BOTH score ~ 2/11 (both
     # rank-9 → 1/11 each) → SOLO wins.
     fused_small = rrf_fuse(kw, vec, k=1)

@@ -17,7 +17,6 @@ import pytest
 from athena.mcp.differentiated import build_differentiated_tools
 from athena.providers.base import Capabilities, Provider
 
-
 # ---------------------------------------------------------------------------
 # Synthetic provider + registry patching
 # ---------------------------------------------------------------------------
@@ -149,9 +148,7 @@ def test_no_raw_bash_tool_advertised(empty_registry, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_verified_write_over_mcp_goes_through_verification(
-    empty_registry, tmp_path, monkeypatch
-):
+def test_verified_write_over_mcp_goes_through_verification(empty_registry, tmp_path, monkeypatch):
     """A verified_write call must run the T5-04 loop — the
     response carries the verification result inline."""
 

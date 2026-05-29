@@ -42,8 +42,7 @@ def test_glob_skips_unreadable_directory(workspace, monkeypatch):
     def _walk_with_one_error(root, onerror=None):
         # Yield normal entries, then call onerror once (as if a real
         # scandir failed), then keep going.
-        for entry in real_walk(root, onerror=onerror):
-            yield entry
+        yield from real_walk(root, onerror=onerror)
         if onerror is not None:
             onerror(OSError("simulated bad directory"))
 
@@ -60,8 +59,7 @@ def test_grep_python_fallback_skips_unreadable_directory(workspace, monkeypatch)
     real_walk = os.walk
 
     def _walk_with_one_error(root, onerror=None):
-        for entry in real_walk(root, onerror=onerror):
-            yield entry
+        yield from real_walk(root, onerror=onerror)
         if onerror is not None:
             onerror(OSError("simulated"))
 

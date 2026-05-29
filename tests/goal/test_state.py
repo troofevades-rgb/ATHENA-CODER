@@ -21,7 +21,6 @@ from athena.goal.state import (
     state_path,
 )
 
-
 # ---------------------------------------------------------------------------
 # Roundtrip
 # ---------------------------------------------------------------------------
@@ -114,9 +113,7 @@ def test_load_unknown_status_normalises_to_active(tmp_path: Path):
     """Forward-compat: a status we don't recognise (older / newer
     version) doesn't crash — falls through to active so the user
     keeps their goal."""
-    state_path(tmp_path).write_text(
-        json.dumps({"text": "x", "status": "weirdo"}), encoding="utf-8"
-    )
+    state_path(tmp_path).write_text(json.dumps({"text": "x", "status": "weirdo"}), encoding="utf-8")
     st = load_state(tmp_path)
     assert st is not None
     assert st.status == "active"

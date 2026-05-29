@@ -124,9 +124,9 @@ def _resolve_mode(mode: str | None) -> str:
     if mode in ("keyword", "semantic", "hybrid"):
         return mode
     try:
-        from ..config import load_config
+        from ._active_cfg import active_cfg
 
-        return getattr(load_config(), "recall_default_mode", "hybrid") or "hybrid"
+        return getattr(active_cfg(), "recall_default_mode", "hybrid") or "hybrid"
     except Exception:
         return "hybrid"
 
@@ -146,8 +146,10 @@ def _ranked_hits(
     if mode == "keyword":
         return store.search(query, k=k, workspace=workspace)
 
-    from ..recall import get_active_vector_store, parse_session_doc_id, rrf_fuse
     import logging as _logging
+
+    from ..recall import get_active_vector_store, parse_session_doc_id, rrf_fuse
+
     _log = _logging.getLogger(__name__)
 
     vector_store = get_active_vector_store()
@@ -163,12 +165,14 @@ def _ranked_hits(
     # other approaches.
     try:
         vec_doc_ids = vector_store.search(
-            query, k=candidate_k, workspace=workspace,
+            query,
+            k=candidate_k,
+            workspace=workspace,
         )
     except Exception as e:  # noqa: BLE001
         _log.info(
-            "search_sessions: vector path unavailable (%s); "
-            "degrading to keyword-only", e,
+            "search_sessions: vector path unavailable (%s); degrading to keyword-only",
+            e,
         )
         return store.search(query, k=k, workspace=workspace)
 
@@ -236,9 +240,7 @@ def _hydrate_session_hit(store: Any, doc_id: str) -> Any | None:
 
     content = target.get("content", "")
     if isinstance(content, list):
-        content = " ".join(
-            c.get("text", "") for c in content if isinstance(c, dict)
-        )
+        content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
     snippet = (content or "")[:240]
     return SearchHit(
         session_id=session_id,

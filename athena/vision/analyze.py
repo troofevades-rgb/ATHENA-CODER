@@ -52,8 +52,9 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..config import load_config, profile_dir
 from .hashlog import HashLogger, audit_path, sha256_file
@@ -66,13 +67,20 @@ from .imageops import (
     perceptual_hash,
     phash_distance,
 )
-from .passthrough import LONG_EDGE_CAP, Provider as PassthroughProvider, passthrough_blocks
+from .passthrough import LONG_EDGE_CAP, passthrough_blocks
+from .passthrough import Provider as PassthroughProvider
 
 logger = logging.getLogger(__name__)
 
 
 VALID_MODES = (
-    "describe", "exif", "ela", "crop", "histogram", "phash", "compare",
+    "describe",
+    "exif",
+    "ela",
+    "crop",
+    "histogram",
+    "phash",
+    "compare",
 )
 
 
@@ -119,8 +127,7 @@ def _default_provider_factory(cfg: Any) -> _VisionProvider | None:
     try:
         instance = provider_cls(api_key=api_key)
     except Exception as e:  # pragma: no cover - covered via stub
-        logger.warning("vision provider %r failed to instantiate: %s",
-                       provider_cls.__name__, e)
+        logger.warning("vision provider %r failed to instantiate: %s", provider_cls.__name__, e)
         return None
     # Adapt the provider's stream_chat into the describe protocol.
     return _StreamingDescribeAdapter(instance, cfg=cfg)
@@ -201,7 +208,9 @@ def _handle_exif(path: Path, log: HashLogger) -> dict[str, Any]:
     ex = extract_exif(path)
     sha = sha256_file(path)
     log.log(
-        mode="exif", path=path, sha256=sha,
+        mode="exif",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
     )
     return {"mode": "exif", "path": str(path), "sha256": sha, "exif": ex}
@@ -217,7 +226,9 @@ def _handle_ela(
     sha = sha256_file(path)
     out = error_level_analysis(path, quality=quality, threshold=threshold)
     log.log(
-        mode="ela", path=path, sha256=sha,
+        mode="ela",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"quality": quality, "threshold": threshold},
     )
@@ -242,7 +253,9 @@ def _handle_crop(
         return_b64=return_b64,
     )
     log.log(
-        mode="crop", path=path, sha256=sha,
+        mode="crop",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"box": list(box), "out_sha256": out["sha256"]},
     )
@@ -258,7 +271,9 @@ def _handle_histogram(
     sha = sha256_file(path)
     out = histogram(path, bins=bins)
     log.log(
-        mode="histogram", path=path, sha256=sha,
+        mode="histogram",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"bins": bins},
     )
@@ -275,7 +290,9 @@ def _handle_phash(
     sha = sha256_file(path)
     out = perceptual_hash(path, algorithm=algorithm, hash_size=hash_size)
     log.log(
-        mode="phash", path=path, sha256=sha,
+        mode="phash",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"algorithm": algorithm, "hash_size": hash_size},
     )
@@ -297,7 +314,9 @@ def _handle_compare(
     h_s = perceptual_hash(suspect, algorithm=algorithm, hash_size=hash_size)
     distance = phash_distance(h_o["hex"], h_s["hex"])
     log.log(
-        mode="compare", path=original, sha256=sha_o,
+        mode="compare",
+        path=original,
+        sha256=sha_o,
         size_bytes=original.stat().st_size,
         extra={
             "suspect_path": str(suspect),
@@ -336,7 +355,9 @@ def _handle_describe(
 ) -> dict[str, Any]:
     sha = sha256_file(path)
     log.log(
-        mode="describe", path=path, sha256=sha,
+        mode="describe",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
     )
     provider = provider_factory(cfg)
@@ -355,7 +376,9 @@ def _handle_describe(
     pass_provider = _passthrough_provider_for(cfg)
     cap = getattr(cfg, "vision_long_edge_cap", None)
     blocks = passthrough_blocks(
-        path, provider=pass_provider, long_edge_cap=cap,
+        path,
+        provider=pass_provider,
+        long_edge_cap=cap,
     )
 
     # Build a single user message with the prompt + image blocks.
@@ -411,23 +434,29 @@ def _run(
     above hands strings to the model)."""
     cfg = _cfg if _cfg is not None else load_config()
     if not getattr(cfg, "vision_enabled", True):
-        return json.dumps({
-            "error": "vision_enabled=False; the operator has disabled vision_analyze",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "error": "vision_enabled=False; the operator has disabled vision_analyze",
+                "mode": mode,
+            }
+        )
     if mode not in VALID_MODES:
-        return json.dumps({
-            "error": f"unknown mode {mode!r}; choose from {list(VALID_MODES)}",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "error": f"unknown mode {mode!r}; choose from {list(VALID_MODES)}",
+                "mode": mode,
+            }
+        )
 
     # Path-input arity check. compare needs two; all others need one.
     if mode == "compare":
         if not paths or len(paths) != 2:
-            return json.dumps({
-                "error": "mode=compare requires paths=[original, suspect]",
-                "mode": mode,
-            })
+            return json.dumps(
+                {
+                    "error": "mode=compare requires paths=[original, suspect]",
+                    "mode": mode,
+                }
+            )
         p_orig, p_sus = Path(paths[0]), Path(paths[1])
         if not p_orig.exists():
             return json.dumps({"error": f"file not found: {paths[0]}", "mode": mode})
@@ -435,10 +464,12 @@ def _run(
             return json.dumps({"error": f"file not found: {paths[1]}", "mode": mode})
     else:
         if not path:
-            return json.dumps({
-                "error": f"mode={mode} requires path=<file>",
-                "mode": mode,
-            })
+            return json.dumps(
+                {
+                    "error": f"mode={mode} requires path=<file>",
+                    "mode": mode,
+                }
+            )
         p = Path(path)
         if not p.exists():
             return json.dumps({"error": f"file not found: {path}", "mode": mode})
@@ -456,33 +487,51 @@ def _run(
         if mode == "crop":
             if box is None:
                 return json.dumps({"error": "crop requires box=[x0,y0,x1,y1]", "mode": mode})
-            return json.dumps(_handle_crop(
-                Path(path), log, box=box,  # type: ignore[arg-type]
-                out_dir=paths_resolved["crops"],
-                return_b64=return_b64,
-            ))
+            return json.dumps(
+                _handle_crop(
+                    Path(path),
+                    log,
+                    box=box,  # type: ignore[arg-type]
+                    out_dir=paths_resolved["crops"],
+                    return_b64=return_b64,
+                )
+            )
         if mode == "histogram":
             return json.dumps(_handle_histogram(Path(path), log, bins=bins))  # type: ignore[arg-type]
         if mode == "phash":
             algo = algorithm or getattr(cfg, "vision_phash_algorithm", "phash")
             hs = hash_size if hash_size is not None else getattr(cfg, "vision_phash_size", 8)
-            return json.dumps(_handle_phash(
-                Path(path), log, algorithm=algo, hash_size=hs,  # type: ignore[arg-type]
-            ))
+            return json.dumps(
+                _handle_phash(
+                    Path(path),
+                    log,
+                    algorithm=algo,
+                    hash_size=hs,  # type: ignore[arg-type]
+                )
+            )
         if mode == "compare":
             algo = algorithm or getattr(cfg, "vision_phash_algorithm", "phash")
             hs = hash_size if hash_size is not None else getattr(cfg, "vision_phash_size", 8)
-            return json.dumps(_handle_compare(
-                Path(paths[0]), Path(paths[1]), log,  # type: ignore[index]
-                algorithm=algo, hash_size=hs,
-            ))
+            return json.dumps(
+                _handle_compare(
+                    Path(paths[0]),
+                    Path(paths[1]),
+                    log,  # type: ignore[index]
+                    algorithm=algo,
+                    hash_size=hs,
+                )
+            )
         if mode == "describe":
             factory = _provider_factory or _default_provider_factory
-            return json.dumps(_handle_describe(
-                Path(path), log, cfg,  # type: ignore[arg-type]
-                prompt=prompt,
-                provider_factory=factory,
-            ))
+            return json.dumps(
+                _handle_describe(
+                    Path(path),
+                    log,
+                    cfg,  # type: ignore[arg-type]
+                    prompt=prompt,
+                    provider_factory=factory,
+                )
+            )
     except ValueError as e:
         return json.dumps({"error": str(e), "mode": mode})
     except Exception as e:

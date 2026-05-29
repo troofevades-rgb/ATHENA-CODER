@@ -63,13 +63,10 @@ def test_concurrent_push_loses_nothing_for_single_session() -> None:
 
     drained = GLOBAL_STEER_QUEUE.drain(sid)
     assert len(drained) == N_THREADS * M_PER_THREAD, (
-        f"lost messages: expected {N_THREADS * M_PER_THREAD}, "
-        f"got {len(drained)}"
+        f"lost messages: expected {N_THREADS * M_PER_THREAD}, got {len(drained)}"
     )
     # Every (thread, msg) pair appears exactly once
-    expected = {
-        f"t{t}-msg{i}" for t in range(N_THREADS) for i in range(M_PER_THREAD)
-    }
+    expected = {f"t{t}-msg{i}" for t in range(N_THREADS) for i in range(M_PER_THREAD)}
     assert set(drained) == expected
     assert len(set(drained)) == len(drained), "duplicates in drained set"
 
@@ -112,6 +109,7 @@ def test_per_thread_fifo_order_preserved_under_concurrency() -> None:
 def test_concurrent_pushes_to_different_sessions_do_not_mix() -> None:
     """Two producers push into different session IDs. Each drain
     must only return its own session's messages."""
+
     def _producer(sid: str, prefix: str, count: int) -> None:
         for i in range(count):
             GLOBAL_STEER_QUEUE.push(sid, f"{prefix}-{i}")
@@ -175,12 +173,9 @@ def test_drain_during_concurrent_push_does_not_lose_or_duplicate() -> None:
 
     # Every push made it into SOME drain
     assert len(all_drained) == push_count[0], (
-        f"push_count={push_count[0]}, drained={len(all_drained)} — "
-        f"messages were lost OR duplicated"
+        f"push_count={push_count[0]}, drained={len(all_drained)} — messages were lost OR duplicated"
     )
-    assert len(set(all_drained)) == len(all_drained), (
-        "duplicates in drained set"
-    )
+    assert len(set(all_drained)) == len(all_drained), "duplicates in drained set"
 
 
 # ---------------------------------------------------------------------------
@@ -245,9 +240,7 @@ def test_sustained_push_drain_does_not_deadlock() -> None:
                 with seen_lock:
                     seen.extend(batch)
 
-    threads = [
-        threading.Thread(target=_producer, daemon=True) for _ in range(20)
-    ] + [
+    threads = [threading.Thread(target=_producer, daemon=True) for _ in range(20)] + [
         threading.Thread(target=_drainer, daemon=True) for _ in range(4)
     ]
     for t in threads:

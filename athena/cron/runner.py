@@ -31,10 +31,18 @@ _AGENT_MAX_ITERATIONS = 20
 def run_agent_job_by_id(job_id: str, *, jobs_db_path: Path | None = None) -> None:
     """Look up the CronJob by ID and run it. Used by APScheduler so the
     target stays picklable across daemon restarts.
-    """
-    from ..config import CONFIG_DIR
 
-    store = JobStore(jobs_db_path or (Path(CONFIG_DIR) / "cron_jobs.db"))
+    Resolves the jobs DB through the same profile-aware helper the CLI
+    uses (`athena.cli.cron._profile_cron_paths`). Previously hardcoded
+    ``CONFIG_DIR / cron_jobs.db``, which silently looked at an empty
+    legacy location after the profile migration moved the live DB to
+    ``profiles/<profile>/``.
+    """
+    if jobs_db_path is None:
+        from ..cli.cron import _profile_cron_paths
+
+        _, jobs_db_path = _profile_cron_paths()
+    store = JobStore(Path(jobs_db_path))
     job = store.get(job_id)
     if job is None:
         logger.warning("agent cron: job %s not found in store; skipping", job_id)
@@ -61,29 +69,44 @@ def run_agent_job(job, *, store: JobStore | None = None) -> dict:
     # just to construct a CronJob.
     from ..agent import Agent
     from ..config import load_config
+    from ..provenance import CRON, reset_current_write_origin, set_current_write_origin
+    from ..safety.approval_callback import (
+        AUTO_DENY,
+        reset_approval_callback,
+        set_approval_callback,
+    )
 
+    # AUTO_DENY: confirmation-required tools (Bash outside the
+    # allowlist, etc.) would otherwise call ui.confirm from a daemon
+    # with no stdin -- the APScheduler thread would block indefinitely.
+    approval_token = set_approval_callback(AUTO_DENY)
+    token = set_current_write_origin(CRON)
     try:
-        cfg = load_config()
-        agent = Agent(cfg, Path.cwd())
         try:
-            agent.run_until_done(prompt, max_iterations=_AGENT_MAX_ITERATIONS)
+            cfg = load_config()
+            agent = Agent(cfg, Path.cwd())
+            try:
+                agent.run_until_done(prompt, max_iterations=_AGENT_MAX_ITERATIONS)
+                result = {
+                    "status": "success",
+                    "response": agent.last_assistant_message(),
+                    "tool_calls": agent.tool_call_trace(),
+                    "started_at": start.isoformat(),
+                }
+                status = "success"
+            finally:
+                agent.close()
+        except Exception as e:
+            logger.exception("agent cron %s failed", job.id)
             result = {
-                "status": "success",
-                "response": agent.last_assistant_message(),
-                "tool_calls": agent.tool_call_trace(),
+                "status": "error",
+                "reason": f"{type(e).__name__}: {e}",
                 "started_at": start.isoformat(),
             }
-            status = "success"
-        finally:
-            agent.close()
-    except Exception as e:
-        logger.exception("agent cron %s failed", job.id)
-        result = {
-            "status": "error",
-            "reason": f"{type(e).__name__}: {e}",
-            "started_at": start.isoformat(),
-        }
-        status = "error"
+            status = "error"
+    finally:
+        reset_current_write_origin(token)
+        reset_approval_callback(approval_token)
 
     if store:
         store.record_run(job.id, status=status)

@@ -16,8 +16,9 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from ..config import Config
 from .manifest import (
@@ -46,9 +47,7 @@ RunFn = Callable[..., Any]
 
 
 def _now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def parse_tasks_file(path: Path | str) -> list[BatchEntry]:
@@ -71,9 +70,7 @@ def parse_tasks_file(path: Path | str) -> list[BatchEntry]:
         try:
             obj = json.loads(s)
         except json.JSONDecodeError as e:
-            raise ValueError(
-                f"tasks file line {line_no}: not valid JSON: {e}"
-            ) from None
+            raise ValueError(f"tasks file line {line_no}: not valid JSON: {e}") from None
         if not isinstance(obj, dict):
             raise ValueError(
                 f"tasks file line {line_no}: expected an object, got {type(obj).__name__}"
@@ -140,6 +137,7 @@ def batch_run(
 
     if run_fn is None:
         from ..headless import run_headless as _run_headless
+
         run_fn = _run_headless
 
     # Pre-allocate run_ids so the manifest's entries list has a
@@ -148,6 +146,7 @@ def batch_run(
     # internally, but is minted here so resume-safety can key off
     # it before the run even starts.
     import uuid
+
     for i, entry in enumerate(entries_list):
         if not entry.run_id:
             entry.run_id = f"r-{uuid.uuid4().hex[:12]}"
@@ -171,34 +170,42 @@ def batch_run(
         for idx, entry in enumerate(entries_list, start=1):
             envelope_path = output_dir / f"{_safe_filename(entry.run_id)}.json"
 
-            # Resume-safety: skip when the envelope already exists.
+            # Resume-safety: skip when the envelope already exists AND
+            # is readable. A corrupt envelope used to be substituted with
+            # a fake {"status": "ok", "exit_code": 0} record, which made
+            # the resume-safety guarantee a lie — the operator's
+            # manifest reported success for a run whose outcome was
+            # actually unknown. Treat an unreadable envelope as "we
+            # don't know what happened" and re-run the entry, surfacing
+            # the failure in the logs so the operator can decide.
             if envelope_path.exists() and not force:
-                logger.info(
-                    "batch %s: skipping %s (already done)",
-                    bid, entry.run_id,
-                )
                 try:
-                    existing = json.loads(
-                        envelope_path.read_text(encoding="utf-8")
+                    existing = json.loads(envelope_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError) as e:
+                    logger.warning(
+                        "batch %s: envelope %s unreadable (%s); re-running this entry",
+                        bid,
+                        envelope_path,
+                        e,
                     )
-                except Exception:  # noqa: BLE001
-                    existing = {"run_id": entry.run_id, "status": "ok",
-                                "exit_code": 0, "duration_s": 0.0,
-                                "task": entry.task, "error": None}
-                me = ManifestEntry.from_run_result(
-                    envelope=existing, envelope_path=envelope_path,
-                )
-                manifest.entries.append(me)
-                manifest.skipped += 1
-                manifest.by_status[me.status] = manifest.by_status.get(me.status, 0) + 1
-                if progress is not None:
-                    progress(me, idx, total)
-                continue
+                else:
+                    logger.info(
+                        "batch %s: skipping %s (already done)",
+                        bid,
+                        entry.run_id,
+                    )
+                    me = ManifestEntry.from_run_result(
+                        envelope=existing,
+                        envelope_path=envelope_path,
+                    )
+                    manifest.entries.append(me)
+                    manifest.skipped += 1
+                    manifest.by_status[me.status] = manifest.by_status.get(me.status, 0) + 1
+                    if progress is not None:
+                        progress(me, idx, total)
+                    continue
 
-            workspace = (
-                Path(entry.cwd).expanduser().resolve()
-                if entry.cwd else workspace_default
-            )
+            workspace = Path(entry.cwd).expanduser().resolve() if entry.cwd else workspace_default
 
             result = run_fn(
                 task=entry.task,
@@ -216,7 +223,8 @@ def batch_run(
             )
 
             me = ManifestEntry.from_run_result(
-                envelope=envelope, envelope_path=envelope_path,
+                envelope=envelope,
+                envelope_path=envelope_path,
             )
             manifest.entries.append(me)
             manifest.completed += 1
@@ -241,7 +249,8 @@ def batch_run(
             }
             ph_path = output_dir / f"{_safe_filename(entry.run_id)}.json"
             me = ManifestEntry.from_run_result(
-                envelope=placeholder_envelope, envelope_path=ph_path,
+                envelope=placeholder_envelope,
+                envelope_path=ph_path,
             )
             manifest.entries.append(me)
             manifest.by_status["interrupted"] = manifest.by_status.get("interrupted", 0) + 1
@@ -249,7 +258,8 @@ def batch_run(
         manifest.finished_at = _now_iso()
         manifest.duration_s = time.monotonic() - t0
         (output_dir / "manifest.json").write_text(
-            manifest.to_json(indent=2), encoding="utf-8",
+            manifest.to_json(indent=2),
+            encoding="utf-8",
         )
 
     return manifest

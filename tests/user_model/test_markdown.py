@@ -15,7 +15,6 @@ from athena.user_model.markdown import (
     _split_sources,
 )
 
-
 # ---- helpers ----------------------------------------------------
 
 
@@ -146,11 +145,7 @@ async def test_ingest_handles_extractor_error(tmp_path: Path):
 async def test_ingest_strips_markdown_fence(tmp_path: Path):
     """Extractor models love adding ```json fences despite
     instructions. Tolerant parser must strip them."""
-    fenced = (
-        "```json\n"
-        '[{"id":"a-fact","body":"b","category":"c","confidence":0.5}]\n'
-        "```"
-    )
+    fenced = '```json\n[{"id":"a-fact","body":"b","category":"c","confidence":0.5}]\n```'
     backend = MarkdownUserModel(
         storage_dir=tmp_path,
         llm_call=make_fake_llm(ingest_json=fenced),
@@ -181,9 +176,7 @@ async def test_query_parses_sources_line(tmp_path: Path):
     )
     backend = MarkdownUserModel(
         storage_dir=tmp_path,
-        llm_call=make_fake_llm(
-            query_text="The user likes pytest.\nSOURCES: f1, f2"
-        ),
+        llm_call=make_fake_llm(query_text="The user likes pytest.\nSOURCES: f1, f2"),
     )
     result = await backend.query("does user like pytest?")
     assert result.answer == "The user likes pytest."

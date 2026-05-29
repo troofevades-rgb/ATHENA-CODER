@@ -16,7 +16,6 @@ import pytest
 from athena.media.registry import MediaRegistry
 from athena.providers.base import Capabilities, Provider
 
-
 # ---------------------------------------------------------------------------
 # Synthetic provider classes
 # ---------------------------------------------------------------------------
@@ -64,15 +63,9 @@ def test_backend_for_returns_none_when_no_capability(patched_registry):
 def test_backend_for_prefers_local(patched_registry):
     """When multiple providers declare a capability and one is
     local, local wins under the default preference."""
-    patched_registry["hosted"] = _make_provider(
-        "hosted", Capabilities(vision=True, is_local=False)
-    )
-    patched_registry["onsite"] = _make_provider(
-        "onsite", Capabilities(vision=True, is_local=True)
-    )
-    patched_registry["alt"] = _make_provider(
-        "alt", Capabilities(vision=True, is_local=False)
-    )
+    patched_registry["hosted"] = _make_provider("hosted", Capabilities(vision=True, is_local=False))
+    patched_registry["onsite"] = _make_provider("onsite", Capabilities(vision=True, is_local=True))
+    patched_registry["alt"] = _make_provider("alt", Capabilities(vision=True, is_local=False))
 
     mr = MediaRegistry(cfg=SimpleNamespace(media_backend_prefer="local"))
     result = mr.backend_for("vision")
@@ -83,12 +76,8 @@ def test_backend_for_prefers_local(patched_registry):
 def test_backend_for_falls_back_to_first_when_no_local(patched_registry):
     """No local backend → return the alphabetically-first
     declared provider for determinism."""
-    patched_registry["zeta"] = _make_provider(
-        "zeta", Capabilities(vision=True, is_local=False)
-    )
-    patched_registry["alpha"] = _make_provider(
-        "alpha", Capabilities(vision=True, is_local=False)
-    )
+    patched_registry["zeta"] = _make_provider("zeta", Capabilities(vision=True, is_local=False))
+    patched_registry["alpha"] = _make_provider("alpha", Capabilities(vision=True, is_local=False))
 
     mr = MediaRegistry(cfg=SimpleNamespace(media_backend_prefer="local"))
     result = mr.backend_for("vision")
@@ -99,9 +88,7 @@ def test_backend_for_falls_back_to_first_when_no_local(patched_registry):
 def test_backend_for_ignores_local_under_any(patched_registry):
     """media_backend_prefer='any' → first alphabetical wins
     regardless of locality."""
-    patched_registry["zlocal"] = _make_provider(
-        "zlocal", Capabilities(vision=True, is_local=True)
-    )
+    patched_registry["zlocal"] = _make_provider("zlocal", Capabilities(vision=True, is_local=True))
     patched_registry["ahosted"] = _make_provider(
         "ahosted", Capabilities(vision=True, is_local=False)
     )
@@ -118,9 +105,7 @@ def test_backend_for_ignores_local_under_any(patched_registry):
 
 
 def test_routing_decision_logged(patched_registry, caplog):
-    patched_registry["onsite"] = _make_provider(
-        "onsite", Capabilities(vision=True, is_local=True)
-    )
+    patched_registry["onsite"] = _make_provider("onsite", Capabilities(vision=True, is_local=True))
 
     mr = MediaRegistry(cfg=SimpleNamespace(media_backend_prefer="local"))
     with caplog.at_level(logging.INFO, logger="athena.media.registry"):
@@ -224,4 +209,3 @@ def test_available_backend_for_falls_back_when_no_local(patched_registry):
     chosen = mr.available_backend_for("vision", pool=pool)
     assert chosen is not None
     assert chosen.name == "alpha"
-

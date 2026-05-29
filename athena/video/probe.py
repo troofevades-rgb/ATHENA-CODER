@@ -56,12 +56,18 @@ def ffprobe_json(
     try:
         out = subprocess.run(
             [
-                ffprobe, "-v", "quiet",
-                "-print_format", "json",
-                "-show_format", "-show_streams",
+                ffprobe,
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
                 str(path),
             ],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
         logger.warning("ffprobe timed out on %s", path)
@@ -81,10 +87,7 @@ def codec_summary(probe: dict[str, Any]) -> dict[str, Any]:
     Returns ``{"error": "..."}`` shape when the probe has no
     video stream — callers branch on the "error" key.
     """
-    video_streams = [
-        s for s in probe.get("streams", [])
-        if s.get("codec_type") == "video"
-    ]
+    video_streams = [s for s in probe.get("streams", []) if s.get("codec_type") == "video"]
     if not video_streams:
         return {"error": "no video stream"}
     v = video_streams[0]
@@ -196,15 +199,23 @@ def gop_structure(
     try:
         out = subprocess.run(
             [
-                ffprobe, "-v", "quiet",
-                "-select_streams", "v:0",
+                ffprobe,
+                "-v",
+                "quiet",
+                "-select_streams",
+                "v:0",
                 "-show_frames",
-                "-show_entries", "frame=pict_type",
-                "-print_format", "json",
-                "-read_intervals", f"%+#{limit}",
+                "-show_entries",
+                "frame=pict_type",
+                "-print_format",
+                "json",
+                "-read_intervals",
+                f"%+#{limit}",
                 str(path),
             ],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
         return {"error": "ffprobe timeout"}
@@ -225,7 +236,5 @@ def gop_structure(
         "p_frame_count": types.count("P"),
         "b_frame_count": types.count("B"),
         "keyframe_intervals": intervals,
-        "regular_gop": (
-            len(set(intervals)) <= 2 if intervals else None
-        ),
+        "regular_gop": (len(set(intervals)) <= 2 if intervals else None),
     }

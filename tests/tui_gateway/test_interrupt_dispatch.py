@@ -74,6 +74,7 @@ def _make_gateway_stub(frames: list[bytes]):
 def _frame(method: str, params: dict | None = None) -> bytes:
     """JSON-RPC notification frame as a single line."""
     import json
+
     obj: dict = {"jsonrpc": "2.0", "method": method}
     if params is not None:
         obj["params"] = params
@@ -100,8 +101,7 @@ def test_interrupt_does_not_land_on_cmd_queue(
         "the in-flight turn finishes, defeating the whole purpose"
     )
     assert interrupt_main_calls[0] == 1, (
-        f"interrupt_main was called {interrupt_main_calls[0]} times; "
-        "expected exactly 1"
+        f"interrupt_main was called {interrupt_main_calls[0]} times; expected exactly 1"
     )
 
 
@@ -132,10 +132,12 @@ def test_interrupt_after_user_input_does_not_block_queue(
         lambda: interrupt_main_calls.__setitem__(0, interrupt_main_calls[0] + 1),
     )
 
-    g = _make_gateway_stub([
-        _frame("user.input", {"text": "first"}),
-        _frame("interrupt"),
-    ])
+    g = _make_gateway_stub(
+        [
+            _frame("user.input", {"text": "first"}),
+            _frame("interrupt"),
+        ]
+    )
     g._read_loop()
 
     # user.input is on the queue
@@ -153,6 +155,7 @@ def test_interrupt_main_runtime_error_falls_back_to_queue(
     RuntimeError from ``_thread.interrupt_main`` because they
     monkey-patch the main thread. Must fall back to the queue so
     the request is at least observable to the REPL later."""
+
     def _boom() -> None:
         raise RuntimeError("can't signal main in this context")
 
@@ -174,13 +177,13 @@ def test_confirm_reply_still_bypasses_queue(
     monkeypatch.setattr("_thread.interrupt_main", lambda: None)
     dispatched = [0]
 
-    g = _make_gateway_stub([
-        _frame("confirm.reply", {"request_id": "r1", "accepted": True}),
-    ])
-    # Override the no-op stub with a counter
-    g._dispatch_confirm_reply = lambda cmd: dispatched.__setitem__(
-        0, dispatched[0] + 1
+    g = _make_gateway_stub(
+        [
+            _frame("confirm.reply", {"request_id": "r1", "accepted": True}),
+        ]
     )
+    # Override the no-op stub with a counter
+    g._dispatch_confirm_reply = lambda cmd: dispatched.__setitem__(0, dispatched[0] + 1)
     g._read_loop()
 
     assert g._cmd_queue.empty()

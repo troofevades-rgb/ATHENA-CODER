@@ -37,7 +37,6 @@ from athena.safety.approval_callback import (
 )
 from athena.safety.approval_guard import current_grants
 
-
 # ---------------------------------------------------------------
 # Spy backend — every perform call is recorded; nothing reaches
 # the OS.
@@ -71,18 +70,47 @@ class _SpyBackend:
 
 
 def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
-    base = dict(
-        computer_use_enabled=True,
-        computer_permission_mode="per_action",
-        computer_app_allowlist=["TestApp"],
-        computer_app_denylist=[],
-        computer_audit_path=str(tmp_path / "audit.jsonl"),
-        computer_screenshots_dir=str(tmp_path / "shots"),
-        computer_deny_during_goal_loop=False,
-        profile="default",
+    """Stub Config shaped for post-R4 nested ``cfg.computer.*`` reads."""
+    legacy_to_nested = {
+        "computer_use_enabled": "use_enabled",
+        "computer_permission_mode": "permission_mode",
+        "computer_app_allowlist": "app_allowlist",
+        "computer_app_denylist": "app_denylist",
+        "computer_audit_path": "audit_path",
+        "computer_screenshots_dir": "screenshots_dir",
+        "computer_deny_during_goal_loop": "deny_during_goal_loop",
+        "computer_kill_hotkey": "kill_hotkey",
+        "computer_max_actions_per_task": "max_actions_per_task",
+        "computer_max_actions_per_sec": "max_actions_per_sec",
+        "computer_backend": "backend",
+        "computer_dry_run": "dry_run",
+    }
+    computer_defaults = dict(
+        use_enabled=True,
+        permission_mode="per_action",
+        app_allowlist=["TestApp"],
+        app_denylist=[],
+        kill_hotkey="ctrl+alt+k",
+        max_actions_per_task=40,
+        max_actions_per_sec=2.0,
+        backend="auto",
+        dry_run=False,
+        audit_path=str(tmp_path / "audit.jsonl"),
+        screenshots_dir=str(tmp_path / "shots"),
+        deny_during_goal_loop=False,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top_defaults: dict = {"profile": "default"}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            computer_defaults[legacy_to_nested[k]] = v
+        elif k in computer_defaults:
+            computer_defaults[k] = v
+        else:
+            top_defaults[k] = v
+    return SimpleNamespace(
+        computer=SimpleNamespace(**computer_defaults),
+        **top_defaults,
+    )
 
 
 @pytest.fixture
@@ -113,9 +141,13 @@ def _deny():
 def test_click_goes_through_gate(_spy_setup):
     token = _allow()
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Tab 2",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Tab 2",
+            )
+        )
         assert out["performed"] is True
         assert len(_spy_setup.perform_calls) == 1
         assert _spy_setup.perform_calls[0].type == "click"
@@ -147,9 +179,13 @@ def test_submit_takes_destructive_path(_spy_setup):
 
     token = set_approval_callback(_cb)
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Submit form",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Submit form",
+            )
+        )
         assert out["performed"] is True
         assert asks == ["destructive"]
     finally:
@@ -166,9 +202,13 @@ def test_denied_input_never_touches_backend(_spy_setup):
     structured."""
     token = _deny()
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Save",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Save",
+            )
+        )
         assert out["performed"] is False
         assert out["tier"] == "input"
         assert "denied" in out["reason"]
@@ -180,9 +220,13 @@ def test_denied_input_never_touches_backend(_spy_setup):
 def test_denied_destructive_never_touches_backend(_spy_setup):
     token = _deny()
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Delete file",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Delete file",
+            )
+        )
         assert out["performed"] is False
         assert out["tier"] == "destructive"
         assert _spy_setup.perform_calls == []
@@ -250,7 +294,8 @@ def test_disabled_short_circuits_input_too(monkeypatch, tmp_path: Path):
     invocations."""
     backend = _SpyBackend()
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, computer_use_enabled=False),
     )
     monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: backend)
@@ -263,9 +308,13 @@ def test_disabled_short_circuits_input_too(monkeypatch, tmp_path: Path):
 
     token = set_approval_callback(_record)
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Save",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Save",
+            )
+        )
         assert out["available"] is False
         assert backend.perform_calls == []
         assert callback_calls == []

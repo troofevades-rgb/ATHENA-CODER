@@ -47,12 +47,8 @@ def test_kitty_output_starts_and_ends_with_dcs_markers() -> None:
     """Kitty wraps every chunk in ESC_G ... ESC\\ . Without the
     framing the terminal prints the payload as garbage text."""
     out = encode_kitty(_solid_image((10, 10)))
-    assert out.startswith("\033_G"), (
-        f"missing DCS opener; first 10 bytes={out[:10]!r}"
-    )
-    assert out.endswith("\033\\"), (
-        f"missing DCS terminator; last 5 bytes={out[-5:]!r}"
-    )
+    assert out.startswith("\033_G"), f"missing DCS opener; first 10 bytes={out[:10]!r}"
+    assert out.endswith("\033\\"), f"missing DCS terminator; last 5 bytes={out[-5:]!r}"
 
 
 def test_kitty_first_chunk_declares_png_format_and_action() -> None:
@@ -73,18 +69,20 @@ def test_kitty_chunks_large_payload_with_m_flag() -> None:
     # Make an image that produces a base64 payload > 4096 bytes.
     # 200x200 noise compresses poorly enough.
     import random
+
     random.seed(0)
     img = PIL.new("RGB", (200, 200))
-    img.putdata([
-        (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        for _ in range(200 * 200)
-    ])
+    img.putdata(
+        [
+            (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            for _ in range(200 * 200)
+        ]
+    )
     out = encode_kitty(img)
     # Multiple chunks
     chunks = out.split("\033_G")[1:]  # split-on-opener; first is empty
     assert len(chunks) >= 2, (
-        f"large image not chunked; got {len(chunks)} chunks. "
-        f"Output size={len(out)}"
+        f"large image not chunked; got {len(chunks)} chunks. Output size={len(out)}"
     )
     # All but last carry m=1
     for c in chunks[:-1]:
@@ -125,9 +123,7 @@ def test_iterm2_output_uses_osc_1337_framing() -> None:
     assert out.startswith("\033]1337;File="), (
         f"missing OSC 1337 opener; first 20 bytes={out[:20]!r}"
     )
-    assert out.endswith("\007"), (
-        f"missing BEL terminator; iTerm2 will hang waiting for it"
-    )
+    assert out.endswith("\007"), "missing BEL terminator; iTerm2 will hang waiting for it"
 
 
 def test_iterm2_name_is_base64_in_header() -> None:
@@ -149,9 +145,7 @@ def test_iterm2_size_field_matches_payload_length() -> None:
     declared = int(m.group(1))
     # Extract payload between ':' and BEL
     payload = out.split(":", 1)[1].rstrip("\007")
-    assert declared == len(payload), (
-        f"size={declared} but actual payload is {len(payload)} bytes"
-    )
+    assert declared == len(payload), f"size={declared} but actual payload is {len(payload)} bytes"
 
 
 def test_iterm2_inline_flag_controls_display() -> None:
@@ -175,12 +169,8 @@ def test_sixel_output_wrapped_in_dcs_pq() -> None:
     """Sixel starts with DCS Pq (\\033Pq) and ends with ST (\\033\\).
     Without these the terminal prints the palette + bitmap as text."""
     out = encode_sixel(_solid_image((6, 6)))
-    assert out.startswith("\033Pq"), (
-        f"missing DCS Pq opener; first 10 bytes={out[:10]!r}"
-    )
-    assert out.endswith("\033\\"), (
-        f"missing ST terminator; last 5 bytes={out[-5:]!r}"
-    )
+    assert out.startswith("\033Pq"), f"missing DCS Pq opener; first 10 bytes={out[:10]!r}"
+    assert out.endswith("\033\\"), f"missing ST terminator; last 5 bytes={out[-5:]!r}"
 
 
 def test_sixel_includes_palette_definitions() -> None:
@@ -188,9 +178,7 @@ def test_sixel_includes_palette_definitions() -> None:
     terminal has no colors to draw with."""
     out = encode_sixel(_solid_image((6, 6), color=(0, 200, 100)))
     # Palette format: #<num>;2;<r>;<g>;<b>
-    assert re.search(r"#\d+;2;\d+;\d+;\d+", out), (
-        f"no palette definitions found in sixel output"
-    )
+    assert re.search(r"#\d+;2;\d+;\d+;\d+", out), "no palette definitions found in sixel output"
 
 
 def test_sixel_data_chars_are_in_legal_range() -> None:
@@ -203,7 +191,7 @@ def test_sixel_data_chars_are_in_legal_range() -> None:
     # and ESC\\. Approximate: every char between ESC Pq and ESC\\
     # that isn't part of an escape sequence or palette/control
     # sigil must be in the sixel range.
-    body = out[len("\033Pq"):-len("\033\\")]
+    body = out[len("\033Pq") : -len("\033\\")]
     # Strip palette + RLE/color/control sigils that aren't data:
     # #N;2;R;G;B  → palette
     # #N           → color select

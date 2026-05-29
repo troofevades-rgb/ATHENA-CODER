@@ -88,9 +88,7 @@ def test_respects_model_id(tmp_path: Path):
     # Swap to v2 embedder; even though "hello" still embeds as
     # the same numbers in this fixture, the model_id filter
     # excludes the v1 entry.
-    emb_v2 = _StubEmbedder(
-        {"hello": [1.0, 0.0], "query": [1.0, 0.0]}, model_id="v2"
-    )
+    emb_v2 = _StubEmbedder({"hello": [1.0, 0.0], "query": [1.0, 0.0]}, model_id="v2")
     store.embedder = emb_v2
     hits = store.search("query", k=5, workspace="/proj")
     assert hits == []  # v1 entry excluded

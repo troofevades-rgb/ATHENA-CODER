@@ -181,9 +181,7 @@ def _run_install(args: argparse.Namespace, cfg: Any) -> int:
             _emit_status(f"athena {current} is up to date.")
             return 0
         target = latest
-        _emit_status(
-            f"update available: {current} → {target}", kind="success"
-        )
+        _emit_status(f"update available: {current} → {target}", kind="success")
         preview = changelog_between(current, target, method=method)
         ui.console.print("")
         ui.console.print("[bold]Changelog preview[/]")
@@ -213,7 +211,8 @@ def _run_install(args: argparse.Namespace, cfg: Any) -> int:
 def _run_rollback(args: argparse.Namespace, cfg: Any) -> int:
     """The `--rollback` path. Installs the previously-recorded
     version via the detected method."""
-    from ..update.apply import read_prior, rollback as do_rollback
+    from ..update.apply import read_prior
+    from ..update.apply import rollback as do_rollback
 
     prior = read_prior(cfg=cfg)
     if prior is None:
@@ -334,8 +333,7 @@ def startup_notice(cfg: Any) -> None:
         if not is_newer(current, latest):
             return
         _emit_status(
-            f"athena {latest} is available (current {current}); "
-            "run `athena update` to install.",
+            f"athena {latest} is available (current {current}); run `athena update` to install.",
         )
     except Exception:  # noqa: BLE001
         # Silent — the notice is a courtesy, not a gate.

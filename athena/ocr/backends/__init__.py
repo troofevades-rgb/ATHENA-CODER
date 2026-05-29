@@ -18,8 +18,8 @@ try:
     from . import tesseract_local as _ts  # noqa: F401
 except Exception:  # noqa: BLE001 — defensive at import time
     import logging
+
     logging.getLogger(__name__).debug(
-        "tesseract_local OCR backend not loaded "
-        "(pytesseract missing or import failed)",
+        "tesseract_local OCR backend not loaded (pytesseract missing or import failed)",
         exc_info=True,
     )

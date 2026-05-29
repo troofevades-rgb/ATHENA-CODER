@@ -11,11 +11,10 @@ cleanly.
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Iterator
 
 import pytest
-
 
 _TEST_HTML = b"""<!doctype html>
 <html lang="en">

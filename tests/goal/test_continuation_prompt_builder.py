@@ -60,29 +60,35 @@ def test_no_subgoals_nudges_decomposition():
 
 
 def test_pending_subgoal_surfaced_explicitly():
-    state = _state(subgoals=[
-        Subgoal(text="Write the policy module", done=False),
-        Subgoal(text="Add the @tool wrapper", done=False),
-    ])
+    state = _state(
+        subgoals=[
+            Subgoal(text="Write the policy module", done=False),
+            Subgoal(text="Add the @tool wrapper", done=False),
+        ]
+    )
     out = build_continuation_prompt(state)
     assert "Next subgoal: Write the policy module" in out
 
 
 def test_done_subgoals_summarized():
-    state = _state(subgoals=[
-        Subgoal(text="Read the hermes source", done=True),
-        Subgoal(text="Write the policy module", done=False),
-    ])
+    state = _state(
+        subgoals=[
+            Subgoal(text="Read the hermes source", done=True),
+            Subgoal(text="Write the policy module", done=False),
+        ]
+    )
     out = build_continuation_prompt(state)
     assert "Read the hermes source" in out
     assert "Next subgoal: Write the policy module" in out
 
 
 def test_all_subgoals_done_prompts_verification():
-    state = _state(subgoals=[
-        Subgoal(text="First step", done=True),
-        Subgoal(text="Second step", done=True),
-    ])
+    state = _state(
+        subgoals=[
+            Subgoal(text="First step", done=True),
+            Subgoal(text="Second step", done=True),
+        ]
+    )
     out = build_continuation_prompt(state)
     assert "subgoals are done" in out.lower()
     # Sentinel reminder still present so the model knows how to finish.
@@ -92,9 +98,7 @@ def test_all_subgoals_done_prompts_verification():
 def test_many_pending_subgoals_shows_next_three():
     """Surface the next subgoal explicitly + a 'then' list of the
     following few so the model can plan ahead."""
-    state = _state(subgoals=[
-        Subgoal(text=f"step {i}", done=False) for i in range(6)
-    ])
+    state = _state(subgoals=[Subgoal(text=f"step {i}", done=False) for i in range(6)])
     out = build_continuation_prompt(state)
     assert "Next subgoal: step 0" in out
     assert "step 1" in out

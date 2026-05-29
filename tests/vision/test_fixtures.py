@@ -15,8 +15,12 @@ from tests.vision.fixtures import FIXTURES_DIR, ensure_fixtures
 def test_all_six_fixtures_exist():
     out = ensure_fixtures()
     assert set(out.keys()) == {
-        "original", "stripped", "edited",
-        "recompressed", "large", "small",
+        "original",
+        "stripped",
+        "edited",
+        "recompressed",
+        "large",
+        "small",
     }
     for p in out.values():
         assert p.exists() and p.stat().st_size > 0
@@ -25,8 +29,8 @@ def test_all_six_fixtures_exist():
 def test_original_has_exif_make_model_datetime():
     ensure_fixtures()
     ex = Image.open(FIXTURES_DIR / "original.jpg").getexif()
-    assert ex.get(0x010F) == "AthenaCam"      # Make
-    assert ex.get(0x0110) == "T4-01"          # Model
+    assert ex.get(0x010F) == "AthenaCam"  # Make
+    assert ex.get(0x0110) == "T4-01"  # Model
     assert ex.get(0x0132) == "2026:05:20 12:34:56"  # DateTime
 
 

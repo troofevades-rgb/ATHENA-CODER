@@ -56,20 +56,26 @@ logger = logging.getLogger(__name__)
 )
 def tirith_check(command: str = "", **_kw: Any) -> str:
     if not command:
-        return json.dumps({
-            "action": "allow", "findings": [],
-            "summary": "no command provided",
-            "available": False,
-        })
+        return json.dumps(
+            {
+                "action": "allow",
+                "findings": [],
+                "summary": "no command provided",
+                "available": False,
+            }
+        )
     from ..safety.tirith import check_command_security
+    from ._active_cfg import active_cfg
 
-    v = check_command_security(command, cfg=load_config())
-    return json.dumps({
-        "action": v.action,
-        "findings": v.findings,
-        "summary": v.summary,
-        "available": v.available,
-    })
+    v = check_command_security(command, cfg=active_cfg())
+    return json.dumps(
+        {
+            "action": v.action,
+            "findings": v.findings,
+            "summary": v.summary,
+            "available": v.available,
+        }
+    )
 
 
 # ---------------------------------------------------------------
@@ -103,41 +109,53 @@ def tirith_check(command: str = "", **_kw: Any) -> str:
 )
 def url_safety_check(url: str = "", **_kw: Any) -> str:
     if not url:
-        return json.dumps({
-            "safe": False,
-            "reason": "no URL provided",
-            "resolved_ip": None,
-        })
-    cfg = load_config()
+        return json.dumps(
+            {
+                "safe": False,
+                "reason": "no URL provided",
+                "resolved_ip": None,
+            }
+        )
+    from ._active_cfg import active_cfg
+
+    cfg = active_cfg()
     if not getattr(cfg, "url_safety_enabled", True):
-        return json.dumps({
-            "safe": True,
-            "reason": "url_safety_enabled=False; check skipped",
-            "resolved_ip": None,
-        })
+        return json.dumps(
+            {
+                "safe": True,
+                "reason": "url_safety_enabled=False; check skipped",
+                "resolved_ip": None,
+            }
+        )
     from ..safety.url_safety import URLSecurityDenied, validate_url
 
     try:
         v = validate_url(url)
     except URLSecurityDenied as e:
-        return json.dumps({
-            "safe": False,
-            "reason": str(e),
-            "resolved_ip": None,
-        })
+        return json.dumps(
+            {
+                "safe": False,
+                "reason": str(e),
+                "resolved_ip": None,
+            }
+        )
     except Exception as e:  # noqa: BLE001
         # validate_url raises URLSecurityDenied + ValueError; catch
         # broadly so a future change doesn't crash this advisory.
-        return json.dumps({
-            "safe": False,
-            "reason": f"validation error: {type(e).__name__}: {e}",
-            "resolved_ip": None,
-        })
-    return json.dumps({
-        "safe": True,
-        "reason": "validated",
-        "resolved_ip": v.resolved_ip,
-    })
+        return json.dumps(
+            {
+                "safe": False,
+                "reason": f"validation error: {type(e).__name__}: {e}",
+                "resolved_ip": None,
+            }
+        )
+    return json.dumps(
+        {
+            "safe": True,
+            "reason": "validated",
+            "resolved_ip": v.resolved_ip,
+        }
+    )
 
 
 # ---------------------------------------------------------------
@@ -188,28 +206,39 @@ def osv_check(
     ecosystem: str = "",
     **_kw: Any,
 ) -> str:
-    cfg = load_config()
+    from ._active_cfg import active_cfg
+
+    cfg = active_cfg()
     if not getattr(cfg, "osv_enabled", True):
-        return json.dumps({
-            "available": False,
-            "error": "osv_enabled=False; check skipped",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "osv_enabled=False; check skipped",
+            }
+        )
     if not package or not version or not ecosystem:
-        return json.dumps({
-            "available": False,
-            "error": "package + version + ecosystem all required",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "package + version + ecosystem all required",
+            }
+        )
 
     from ..safety.osv import query
 
     vulns, error = query(
-        package, version, ecosystem=ecosystem, cfg=cfg,
+        package,
+        version,
+        ecosystem=ecosystem,
+        cfg=cfg,
     )
-    return json.dumps({
-        "available": error is None,
-        "package": package,
-        "version": version,
-        "ecosystem": ecosystem,
-        "vulns": [v.to_dict() for v in vulns],
-        "error": error,
-    })
+    return json.dumps(
+        {
+            "available": error is None,
+            "package": package,
+            "version": version,
+            "ecosystem": ecosystem,
+            "vulns": [v.to_dict() for v in vulns],
+            "error": error,
+        }
+    )

@@ -70,7 +70,9 @@ def _load_model(name: str, device: str, compute_type: str):
 
         logger.info(
             "faster-whisper: loading model=%r device=%r compute_type=%r",
-            name, device, compute_type,
+            name,
+            device,
+            compute_type,
         )
         _model = WhisperModel(
             name,
@@ -126,6 +128,7 @@ class FasterWhisperLocalBackend(Provider):
         model load happens lazily on first ``transcribe``."""
         try:
             import faster_whisper  # noqa: F401
+
             return True
         except Exception:  # noqa: BLE001
             return False
@@ -142,9 +145,7 @@ class FasterWhisperLocalBackend(Provider):
         model = _load_model(
             getattr(cfg, "audio_whisper_model", "base"),
             _resolve_device(getattr(cfg, "audio_whisper_device", "auto")),
-            _resolve_compute_type(
-                getattr(cfg, "audio_whisper_compute_type", "auto")
-            ),
+            _resolve_compute_type(getattr(cfg, "audio_whisper_compute_type", "auto")),
         )
 
         # faster-whisper's transcribe returns (segments_iter, info).
@@ -198,6 +199,7 @@ class FasterWhisperLocalBackend(Provider):
         if self._cfg_override is not None:
             return self._cfg_override
         from ...config import load_config
+
         return load_config()
 
 

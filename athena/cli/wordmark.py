@@ -30,7 +30,6 @@ from typing import Any
 
 from .. import ui
 
-
 # Curated list — kept short on purpose. We don't want to dump 100
 # fonts on the user; these are the ones I think actually look good
 # for a brand wordmark in a TUI.
@@ -94,10 +93,7 @@ def _render_with_gradient(
     width = max(len(r) for r in rows)
     col_is_letter: list[bool] = []
     for c in range(width):
-        any_nonspace = any(
-            c < len(r) and not r[c].isspace() and r[c] != " "
-            for r in rows
-        )
+        any_nonspace = any(c < len(r) and not r[c].isspace() and r[c] != " " for r in rows)
         col_is_letter.append(any_nonspace)
 
     # Group consecutive letter columns into bands. Bands separated
@@ -127,10 +123,7 @@ def _render_with_gradient(
             # The band itself, colored
             color = gradient[band_idx % len(gradient)]
             rgb = _hex_to_rgb(color)
-            band_text = (
-                row_text[start:end] if start < len(row_text)
-                else " " * (end - start)
-            )
+            band_text = row_text[start:end] if start < len(row_text) else " " * (end - start)
             # Pad if row is short
             if start < len(row_text) and end > len(row_text):
                 band_text = row_text[start:] + " " * (end - len(row_text))
@@ -159,18 +152,21 @@ def _figlet(text: str, font: str) -> str | None:
 def _cmd_gallery(args: argparse.Namespace) -> int:
     text = args.text or "ATHENA"
     palette = ui.theme()
-    gradient = list(palette.gradient) if palette.gradient else [
-        palette.accent, palette.primary, palette.primary_dim,
-    ]
+    gradient = (
+        list(palette.gradient)
+        if palette.gradient
+        else [
+            palette.accent,
+            palette.primary,
+            palette.primary_dim,
+        ]
+    )
 
     fonts = [args.font] if args.font else list(_GALLERY_FONTS)
     n_letters = len(text)
     any_rendered = False
 
-    sys.stdout.write(
-        f"{_BOLD}wordmark gallery — text={text!r}  "
-        f"theme={palette.name}{_RESET}\n\n"
-    )
+    sys.stdout.write(f"{_BOLD}wordmark gallery — text={text!r}  theme={palette.name}{_RESET}\n\n")
 
     for i, font in enumerate(fonts):
         rendered = _figlet(text, font)
@@ -179,11 +175,11 @@ def _cmd_gallery(args: argparse.Namespace) -> int:
             continue
         any_rendered = True
         # Header
-        sys.stdout.write(
-            f"{_BOLD}{_ansi_fg((180, 180, 180))}── {font} ──{_RESET}\n"
-        )
+        sys.stdout.write(f"{_BOLD}{_ansi_fg((180, 180, 180))}── {font} ──{_RESET}\n")
         colored = _render_with_gradient(
-            rendered, gradient=gradient, letters_in_text=n_letters,
+            rendered,
+            gradient=gradient,
+            letters_in_text=n_letters,
         )
         sys.stdout.write(colored)
         sys.stdout.write("\n")
@@ -192,10 +188,7 @@ def _cmd_gallery(args: argparse.Namespace) -> int:
 
     sys.stdout.write("\n")
     if not any_rendered:
-        sys.stderr.write(
-            "no fonts rendered. Install pyfiglet:\n"
-            "  pip install pyfiglet\n"
-        )
+        sys.stderr.write("no fonts rendered. Install pyfiglet:\n  pip install pyfiglet\n")
         return 1
 
     sys.stdout.write(
@@ -231,7 +224,8 @@ def main(argv: list[str]) -> int:
     g = sub.add_parser("gallery", help="Render a curated set of fonts.")
     g.add_argument("--font", help="Render only this font.")
     g.add_argument(
-        "--text", default="ATHENA",
+        "--text",
+        default="ATHENA",
         help="Text to render (default: ATHENA).",
     )
     g.set_defaults(func=_cmd_gallery)

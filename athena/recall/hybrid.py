@@ -39,7 +39,4 @@ def rrf_fuse(
     for ranked in (keyword_ranked, vector_ranked):
         for rank, doc_id in enumerate(ranked):
             scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank + 1)
-    return [
-        doc_id
-        for doc_id, _ in sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-    ]
+    return [doc_id for doc_id, _ in sorted(scores.items(), key=lambda kv: kv[1], reverse=True)]

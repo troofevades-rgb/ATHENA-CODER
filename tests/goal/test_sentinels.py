@@ -14,7 +14,6 @@ import pytest
 
 from athena.goal.loop import scan_sentinels
 
-
 # ---------------------------------------------------------------------------
 # ACHIEVED — positive cases
 # ---------------------------------------------------------------------------
@@ -70,11 +69,9 @@ def test_sentinel_no_match_partial():
 
 
 def test_sentinel_no_match_when_quoted_in_middle_of_line():
-    """"...the goal achieved earlier was..." mid-sentence isn't
+    """ "...the goal achieved earlier was..." mid-sentence isn't
     the sentinel — the regex anchors to a line start."""
-    achieved, _ = scan_sentinels(
-        "Note the goal achieved earlier was different from this one."
-    )
+    achieved, _ = scan_sentinels("Note the goal achieved earlier was different from this one.")
     assert achieved is False
 
 

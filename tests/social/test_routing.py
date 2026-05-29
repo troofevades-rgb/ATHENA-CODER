@@ -28,9 +28,9 @@ def test_router_heuristic_off_by_default():
     """Even a textbook social-search phrase doesn't trigger the
     router when cfg.social_router_heuristic is False (default)."""
     assert should_route("search X for athena", cfg=_cfg(enabled=False)) is False
-    assert should_route(
-        "what's on Twitter about the new release?", cfg=_cfg(enabled=False)
-    ) is False
+    assert (
+        should_route("what's on Twitter about the new release?", cfg=_cfg(enabled=False)) is False
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +156,4 @@ def test_primary_model_unchanged_after_search(monkeypatch):
     # Compare ID sets — the dict values are functions / regexes
     # and their identity should be unchanged after a routing
     # decision.
-    assert {k: id(v) for k, v in before.items()} == {
-        k: id(v) for k, v in after.items()
-    }
+    assert {k: id(v) for k, v in before.items()} == {k: id(v) for k, v in after.items()}
