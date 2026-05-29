@@ -779,3 +779,123 @@ def test_mcp_config_paths_returns_three_in_precedence_order(
     assert paths[0] == cfg_mod.USER_MCP_PATH
     assert paths[1] == workspace / ".athena" / "mcp.json"
     assert paths[2] == workspace / "mcp.json"
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 6 -- ProvidersConfig promotion (closes R4)
+# ---------------------------------------------------------------------------
+
+
+def test_providers_defaults_match_legacy_dict(isolated: Path) -> None:
+    """No [providers] table -> ProvidersConfig has empty routing +
+    empty per_provider. Matches the legacy ``dict[str, Any] = {}``
+    behaviour."""
+    cfg = cfg_mod.load_config()
+    assert isinstance(cfg.providers, cfg_mod.ProvidersConfig)
+    assert cfg.providers.routing == {}
+    assert cfg.providers.per_provider == {}
+    # The empty dataclass is falsy so ``(cfg.providers or {}).get(...)``
+    # still short-circuits the way the runtime resolver expects.
+    assert not cfg.providers
+
+
+def test_providers_routing_table_loads(isolated: Path) -> None:
+    """``[providers.routing]`` populates ProvidersConfig.routing."""
+    _write_toml(isolated, """
+        [providers.routing]
+        "qwen-special" = "anthropic"
+        "my-vllm-model" = "openai_compat"
+    """)
+    cfg = cfg_mod.load_config()
+    assert cfg.providers.routing == {
+        "qwen-special": "anthropic",
+        "my-vllm-model": "openai_compat",
+    }
+    assert cfg.providers.per_provider == {}
+
+
+def test_providers_per_provider_tables_load(isolated: Path) -> None:
+    """Each ``[providers.<name>]`` (not "routing") goes into
+    ProvidersConfig.per_provider[<name>]."""
+    _write_toml(isolated, """
+        [providers.openai_compat]
+        host = "http://vllm.local:8000"
+
+        [providers.anthropic]
+        fallback = ["openrouter", "ollama"]
+        base_url = "https://eu.anthropic.test/v1"
+    """)
+    cfg = cfg_mod.load_config()
+    assert cfg.providers.per_provider["openai_compat"] == {
+        "host": "http://vllm.local:8000"
+    }
+    assert cfg.providers.per_provider["anthropic"] == {
+        "fallback": ["openrouter", "ollama"],
+        "base_url": "https://eu.anthropic.test/v1",
+    }
+    # Routing left untouched when only per-provider tables are set.
+    assert cfg.providers.routing == {}
+
+
+def test_providers_dict_style_readers_still_work(isolated: Path) -> None:
+    """Existing readers in athena.providers.runtime_resolver do
+    ``(cfg.providers or {}).get("routing")`` and ``.get(name, {})``.
+    The dataclass implements __getitem__ / get / __contains__ so the
+    pattern keeps working without changes."""
+    cfg = cfg_mod.Config()
+    cfg.providers.routing["qwen-x"] = "anthropic"
+    cfg.providers.per_provider["openai_compat"] = {"host": "http://x:1"}
+
+    assert cfg.providers.get("routing") == {"qwen-x": "anthropic"}
+    assert cfg.providers.get("openai_compat") == {"host": "http://x:1"}
+    assert cfg.providers.get("missing") is None
+    assert cfg.providers.get("missing", {"d": 1}) == {"d": 1}
+
+    assert "routing" in cfg.providers
+    assert "openai_compat" in cfg.providers
+    assert "missing" not in cfg.providers
+
+    assert cfg.providers["routing"] == {"qwen-x": "anthropic"}
+    assert cfg.providers["openai_compat"] == {"host": "http://x:1"}
+
+
+def test_providers_dict_constructor_coerces_to_dataclass() -> None:
+    """``Config(providers={...})`` -- the legacy fixture shape used
+    by 20+ existing test sites -- is coerced into a ProvidersConfig
+    by __post_init__. The routing key splits out from per-provider
+    slices. Non-dict garbage in the dict is dropped, not crashing."""
+    cfg = cfg_mod.Config(
+        providers={
+            "routing": {"qwen-x": "anthropic"},
+            "openai_compat": {"host": "http://x"},
+            "anthropic": {"fallback": ["openrouter"]},
+            # The next entry is malformed (str value where the dict
+            # expects a sub-table). Verified silent drop.
+            "garbage": "not-a-dict",
+        }
+    )
+    assert isinstance(cfg.providers, cfg_mod.ProvidersConfig)
+    assert cfg.providers.routing == {"qwen-x": "anthropic"}
+    assert cfg.providers.per_provider == {
+        "openai_compat": {"host": "http://x"},
+        "anthropic": {"fallback": ["openrouter"]},
+    }
+
+
+def test_providers_from_dict_classmethod_isolates_nonsense() -> None:
+    """``ProvidersConfig.from_dict`` is the coercion entry point.
+    Confirm it tolerates non-string routing values and non-dict
+    per-provider slices without raising."""
+    out = cfg_mod.ProvidersConfig.from_dict(
+        {
+            "routing": {"ok": "anthropic", "bad": 12345, 42: "also-bad"},
+            "openai_compat": {"host": "http://x"},
+            "broken": 7,
+        }
+    )
+    assert out.routing == {"ok": "anthropic"}
+    assert out.per_provider == {"openai_compat": {"host": "http://x"}}
+
+    # Also: ``from_dict`` called on something that isn't a dict at all
+    # returns an empty ProvidersConfig rather than blowing up.
+    assert cfg_mod.ProvidersConfig.from_dict(None) == cfg_mod.ProvidersConfig()  # type: ignore[arg-type]
