@@ -212,13 +212,25 @@ def migrate_workspace_memory(
     target = _profile_dir(profile, home=base) / "memory" / "legacy" / slug
 
     if not source.exists():
-        return {"copied": [], "skipped": [], "ran": False, "source": str(source), "target": str(target)}
+        return {
+            "copied": [],
+            "skipped": [],
+            "ran": False,
+            "source": str(source),
+            "target": str(target),
+        }
 
     if target.exists():
         # Someone already migrated this workspace -- maybe a prior
         # session under the same profile + workspace, or the user
         # copied it by hand. Skip to keep the function idempotent.
-        return {"copied": [], "skipped": [], "ran": False, "source": str(source), "target": str(target)}
+        return {
+            "copied": [],
+            "skipped": [],
+            "ran": False,
+            "source": str(source),
+            "target": str(target),
+        }
 
     copied: list[str] = []
     skipped: list[str] = []
@@ -265,5 +277,5 @@ def maybe_migrate_workspace_memory(cfg, workspace: Path) -> dict[str, list[str] 
     :func:`migrate_workspace_memory` summary."""
     if not getattr(cfg, "migrate_legacy_memory", False):
         return None
-    profile = (getattr(cfg, "profile", None) or "default")
+    profile = getattr(cfg, "profile", None) or "default"
     return migrate_workspace_memory(profile=profile, workspace=workspace)

@@ -63,14 +63,11 @@ def _estimate_seconds(duration_s: float) -> float:
 
 def _resolve_api_key() -> str | None:
     """Lookup priority:
-       1. ATHENA_XAI_API_KEY in ~/.athena/.env or os.environ
-       2. XAI_API_KEY (xAI's own canonical env var name)
-       3. None — caller errors with a clear message.
+    1. ATHENA_XAI_API_KEY in ~/.athena/.env or os.environ
+    2. XAI_API_KEY (xAI's own canonical env var name)
+    3. None — caller errors with a clear message.
     """
-    return (
-        get_credential("ATHENA_XAI_API_KEY")
-        or get_credential("XAI_API_KEY")
-    )
+    return get_credential("ATHENA_XAI_API_KEY") or get_credential("XAI_API_KEY")
 
 
 class XAIAPIError(RuntimeError):
@@ -109,17 +106,14 @@ def _http(
             body_text = e.read().decode("utf-8", errors="replace")[:500]
         except Exception:  # noqa: BLE001
             pass
-        raise XAIAPIError(
-            f"xAI {method} {url} → HTTP {e.code}: {body_text or '(no body)'}"
-        ) from e
+        raise XAIAPIError(f"xAI {method} {url} → HTTP {e.code}: {body_text or '(no body)'}") from e
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise XAIAPIError(f"xAI {method} {url} → network: {e}") from e
     try:
         return json.loads(text) if text else {}
     except json.JSONDecodeError as e:
         raise XAIAPIError(
-            f"xAI {method} {url} → non-JSON response (first 300 chars): "
-            f"{text[:300]}"
+            f"xAI {method} {url} → non-JSON response (first 300 chars): {text[:300]}"
         ) from e
 
 
@@ -209,13 +203,13 @@ class XAIVideoBackend(Provider):
     # VideoGenerationBackend protocol
     # ------------------------------------------------------------------
 
-    def estimate(self, request: "job_mod.GenerationRequest") -> "job_mod.CostEstimate":
+    def estimate(self, request: job_mod.GenerationRequest) -> job_mod.CostEstimate:
         return job_mod.CostEstimate(
             seconds_est=_estimate_seconds(request.duration_s),
             cost_est=None,  # xAI per-second pricing not documented yet
         )
 
-    def submit(self, request: "job_mod.GenerationRequest") -> "job_mod.JobHandle":
+    def submit(self, request: job_mod.GenerationRequest) -> job_mod.JobHandle:
         api_key = _resolve_api_key()
         if not api_key:
             raise XAIAPIError(
@@ -230,8 +224,7 @@ class XAIVideoBackend(Provider):
         # current API surface, so error clearly.
         if request.mode != "text_to_video":
             raise XAIAPIError(
-                f"xAI video adapter only supports text_to_video; "
-                f"got mode={request.mode!r}."
+                f"xAI video adapter only supports text_to_video; got mode={request.mode!r}."
             )
 
         # xAI's API expects `duration` as a positive integer (seconds).
@@ -259,9 +252,7 @@ class XAIVideoBackend(Provider):
         )
         request_id = resp.get("request_id") or resp.get("id")
         if not request_id:
-            raise XAIAPIError(
-                f"xAI submit returned no request_id; body: {resp!r}"
-            )
+            raise XAIAPIError(f"xAI submit returned no request_id; body: {resp!r}")
 
         return job_mod.JobHandle(
             backend=self.name,
@@ -270,7 +261,7 @@ class XAIVideoBackend(Provider):
             extra={"submit_response": resp},
         )
 
-    def poll(self, handle: "job_mod.JobHandle") -> "job_mod.JobHandle":
+    def poll(self, handle: job_mod.JobHandle) -> job_mod.JobHandle:
         api_key = _resolve_api_key()
         if not api_key:
             # Can't poll without auth; mark as failed so the loop
@@ -316,7 +307,10 @@ class XAIVideoBackend(Provider):
         return handle
 
     def fetch(
-        self, handle: "job_mod.JobHandle", *, out_dir: Path,
+        self,
+        handle: job_mod.JobHandle,
+        *,
+        out_dir: Path,
     ) -> Path:
         if handle.status != "done":
             raise XAIAPIError(
@@ -327,10 +321,7 @@ class XAIVideoBackend(Provider):
         video = resp.get("video") if isinstance(resp, dict) else None
         url = (video or {}).get("url") if isinstance(video, dict) else None
         if not url:
-            raise XAIAPIError(
-                f"xAI fetch: no video.url in poll response; got "
-                f"{resp!r}"
-            )
+            raise XAIAPIError(f"xAI fetch: no video.url in poll response; got {resp!r}")
 
         out_dir.mkdir(parents=True, exist_ok=True)
         target = out_dir / f"{handle.job_id}.mp4"

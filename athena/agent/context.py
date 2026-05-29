@@ -24,11 +24,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # ContextVar so a fork running on its own thread can register itself as the
 # current parent for any grand-children it spawns, without clobbering the
 # foreground agent on the main thread.
-_current_agent: contextvars.ContextVar["Agent | None"] = contextvars.ContextVar(
+_current_agent: contextvars.ContextVar[Agent | None] = contextvars.ContextVar(
     "athena_current_agent", default=None
 )
 
 
-def get_current_agent() -> "Agent | None":
+def get_current_agent() -> Agent | None:
     """Return the Agent whose run_turn is currently active on this context, or None."""
     return _current_agent.get()

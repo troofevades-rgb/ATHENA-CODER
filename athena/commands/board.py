@@ -29,15 +29,12 @@ from typing import Any
 from .. import ui
 from . import command
 
-
 # ---------------------------------------------------------------------------
 # Resolution
 # ---------------------------------------------------------------------------
 
 
-def _resolve_state(
-    *, profile: str | None = None, goal_id: str | None = None
-) -> dict[str, Any]:
+def _resolve_state(*, profile: str | None = None, goal_id: str | None = None) -> dict[str, Any]:
     """Build the projection state the renderers need.
 
     Returns ``{workspace, goal_id, counts, columns}`` — same
@@ -87,10 +84,10 @@ def _active_workspace() -> str:
 
 _COLUMN_DISPLAY: tuple[tuple[str, str, str], ...] = (
     # (status, label, colour)
-    ("todo",    "TODO",    "yellow"),
-    ("doing",   "DOING",   "cyan"),
+    ("todo", "TODO", "yellow"),
+    ("doing", "DOING", "cyan"),
     ("blocked", "BLOCKED", "red"),
-    ("done",    "DONE",    "green"),
+    ("done", "DONE", "green"),
 )
 
 
@@ -169,8 +166,7 @@ def _try_run_tui(state: dict[str, Any]) -> bool:
         def compose(self) -> ComposeResult:
             yield Header()
             workspace = self.state.get("workspace") or "(no workspace)"
-            yield Static(f"workspace: {workspace}    "
-                          f"goal: {self.state.get('goal_id') or '(any)'}")
+            yield Static(f"workspace: {workspace}    goal: {self.state.get('goal_id') or '(any)'}")
             with Horizontal():
                 for status, label, _colour in _COLUMN_DISPLAY:
                     cards = self.state["columns"].get(status, [])
@@ -204,13 +200,13 @@ def _try_run_tui(state: dict[str, Any]) -> bool:
 def cmd_board(agent, arg: str = "") -> str:
     """``/board`` subcommands:
 
-      /board                  show the board (default)
-      /board goal:<id>        filter to one goal's cards
-      /board clear            delete every live task in this workspace
-                              (archive untouched — recoverable on demand)
-      /board clear --all      drop everything across all goals (same as
-                              ``clear`` today; reserved for future
-                              per-goal scoping)
+    /board                  show the board (default)
+    /board goal:<id>        filter to one goal's cards
+    /board clear            delete every live task in this workspace
+                            (archive untouched — recoverable on demand)
+    /board clear --all      drop everything across all goals (same as
+                            ``clear`` today; reserved for future
+                            per-goal scoping)
     """
     arg = (arg or "").strip()
 
@@ -234,7 +230,7 @@ def cmd_board(agent, arg: str = "") -> str:
 
     goal_id = None
     if arg.startswith("goal:"):
-        goal_id = arg[len("goal:"):].strip() or None
+        goal_id = arg[len("goal:") :].strip() or None
     state = _resolve_state(goal_id=goal_id)
     _print_static(state)
     return ""
@@ -263,10 +259,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument(
         "--static",
         action="store_true",
-        help=(
-            "Force the plain text render (skip the textual TUI even "
-            "if it's installed)."
-        ),
+        help=("Force the plain text render (skip the textual TUI even if it's installed)."),
     )
     args = ap.parse_args(argv)
 

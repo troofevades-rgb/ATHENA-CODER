@@ -20,7 +20,6 @@ from athena.transform.run_state import (
     load,
 )
 
-
 # ---- Fresh state -------------------------------------------------------
 
 
@@ -75,8 +74,11 @@ def test_canonical_phase_order(tmp_path: Path):
 
 def test_start_increments_attempts(tmp_path: Path):
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     state.start_phase("sft")
     assert state.phases["sft"].attempts == 1
@@ -87,8 +89,11 @@ def test_start_increments_attempts(tmp_path: Path):
 
 def test_complete_sets_timestamps_and_exit_code(tmp_path: Path):
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     state.start_phase("sft")
     state.complete_phase("sft", exit_code=0)
@@ -103,8 +108,11 @@ def test_fail_clears_on_restart(tmp_path: Path):
     """A new ``start_phase`` after a failure clears the prior error
     rather than letting it leak into the new attempt's record."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     state.start_phase("sft")
     state.fail_phase("sft", exit_code=1, error="OOM at step 450")
@@ -115,8 +123,11 @@ def test_fail_clears_on_restart(tmp_path: Path):
 
 def test_unknown_phase_raises(tmp_path: Path):
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     with pytest.raises(KeyError):
         state.start_phase("nonexistent")
@@ -126,8 +137,11 @@ def test_is_complete_requires_at_least_one_completed(tmp_path: Path):
     """A run with everything ``skipped`` shouldn't count as complete —
     nothing actually ran."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     state.skip_phase("sft")
     assert state.is_complete() is False
@@ -141,8 +155,11 @@ def test_needs_run_treats_failed_and_running_as_resumable(tmp_path: Path):
     """A run interrupted mid-phase (status still ``running``) should be
     picked up on resume the same as a ``failed`` one."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=True, export_enabled=True,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=True,
+        export_enabled=True,
     )
     state.start_phase("sft")
     state.complete_phase("sft")
@@ -175,7 +192,9 @@ def test_save_and_load_roundtrip(tmp_path: Path):
     assert reloaded.run_id == "r1"
     assert reloaded.args == {"base_model": "qwen2.5:14b", "epochs": 3}
     assert reloaded.status_of("sft") == "completed"
-    assert reloaded.phases["sft"].checkpoint and "checkpoint-450" in reloaded.phases["sft"].checkpoint
+    assert (
+        reloaded.phases["sft"].checkpoint and "checkpoint-450" in reloaded.phases["sft"].checkpoint
+    )
     assert reloaded.status_of("dpo") == "failed"
     assert reloaded.phases["dpo"].error == "segfault in trl 0.9.0"
     assert reloaded.status_of("export") == "pending"
@@ -189,8 +208,11 @@ def test_save_is_atomic_under_crash(tmp_path: Path, monkeypatch):
     """A crash mid-write must leave the prior file untouched, not
     a half-written one that downstream loads would error on."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     state.save()
     original = (tmp_path / STATE_FILE_NAME).read_text(encoding="utf-8")
@@ -236,8 +258,11 @@ def test_state_file_is_human_readable(tmp_path: Path):
     """The point of JSON-not-pickle is debuggability — assert the file
     is indented and sorted so a human can cat it and orient themselves."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     state.save()
     raw = (tmp_path / STATE_FILE_NAME).read_text(encoding="utf-8")
@@ -327,8 +352,11 @@ def test_invalidate_downstream_resets_completed(tmp_path: Path):
     (which may have been completed via the SFT-only path) need to
     re-run on top of the new adapter."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=True, export_enabled=True,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=True,
+        export_enabled=True,
     )
     state.start_phase("sft")
     state.complete_phase("sft")
@@ -349,8 +377,11 @@ def test_invalidate_downstream_leaves_skipped_alone(tmp_path: Path):
     """The user opted out of DPO. A late SFT change should NOT
     silently turn DPO back on."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=True,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=True,
     )
     state.start_phase("sft")
     state.complete_phase("sft")
@@ -365,8 +396,11 @@ def test_invalidate_downstream_keeps_attempts(tmp_path: Path):
     """Phases reset by invalidation should keep their cumulative attempt
     count — the resetting was caused by upstream, not a fresh restart."""
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=True, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=True,
+        export_enabled=False,
     )
     state.start_phase("sft")
     state.complete_phase("sft")
@@ -381,8 +415,11 @@ def test_invalidate_downstream_keeps_attempts(tmp_path: Path):
 
 def test_invalidate_downstream_unknown_phase_raises(tmp_path: Path):
     state = RunState.new(
-        run_id="r1", output_dir=tmp_path, args={},
-        dpo_enabled=False, export_enabled=False,
+        run_id="r1",
+        output_dir=tmp_path,
+        args={},
+        dpo_enabled=False,
+        export_enabled=False,
     )
     with pytest.raises(KeyError):
         state.invalidate_downstream("nope")

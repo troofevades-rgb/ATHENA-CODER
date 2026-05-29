@@ -149,6 +149,7 @@ def test_diagnose_returns_none_treated_as_empty():
 def test_diagnose_raises_becomes_passed():
     """An LSP transport error during verify must not become a
     failure — it should degrade to "passed" (with a debug log)."""
+
     def boom(paths):
         raise ConnectionError("LSP went away")
 
@@ -168,6 +169,7 @@ def test_diagnose_raises_becomes_passed():
 
 def test_run_raises_becomes_failed_run_with_minus_one():
     """A runner exception → failed_run outcome (not propagation)."""
+
     def boom(cmd, **kw):
         raise OSError("sandbox spawn failed")
 

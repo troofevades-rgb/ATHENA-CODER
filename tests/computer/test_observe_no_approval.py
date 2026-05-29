@@ -39,7 +39,6 @@ from athena.safety.approval_callback import (
 )
 from athena.safety.approval_guard import current_grants
 
-
 # ----- stub backend -----
 
 
@@ -110,9 +109,7 @@ def _stub_backend(monkeypatch, tmp_path):
     """Plug the stub backend in for the duration of every test
     so the OS is never touched."""
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
     yield
 
 
@@ -149,6 +146,7 @@ def test_observe_succeeds_in_curator_origin(monkeypatch):
     # is intentionally optional — we're testing the gate, not
     # the vision routing here.
     import athena.media.registry as media_reg
+
     monkeypatch.setattr(media_reg, "_REGISTRY", {})
 
     token = set_current_write_origin(CURATOR)
@@ -179,7 +177,8 @@ def test_observe_disabled_short_circuits_without_approval(monkeypatch, tmp_path)
     consulted. Pinned by setting AUTO_DENY and asserting the
     callback was never invoked."""
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, computer_use_enabled=False),
     )
 

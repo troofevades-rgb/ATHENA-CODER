@@ -34,14 +34,12 @@ def cmd_add(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: {source} does not exist\n")
         return 1
     base = _import_base(args)
-    policy = (
-        "overwrite" if args.overwrite
-        else "rename" if args.rename
-        else "abort"
-    )
+    policy = "overwrite" if args.overwrite else "rename" if args.rename else "abort"
 
-    if source.is_file() and source.suffix.lower() in (".zip", ".tar", ".tgz") or (
-        source.is_file() and "".join(source.suffixes[-2:]).lower().endswith(".tar.gz")
+    if (
+        source.is_file()
+        and source.suffix.lower() in (".zip", ".tar", ".tgz")
+        or (source.is_file() and "".join(source.suffixes[-2:]).lower().endswith(".tar.gz"))
     ):
         result = import_archive(source, base=base, on_conflict=policy)
     else:
@@ -55,7 +53,7 @@ def _print_import_result(result: ImportResult) -> int:
     exit code matching its status (0 on installed/overwritten/renamed,
     nonzero otherwise)."""
     if result.status == "rejected":
-        sys.stderr.write(f"error: import rejected\n")
+        sys.stderr.write("error: import rejected\n")
         for e in result.errors:
             sys.stderr.write(f"  - {e}\n")
         return 1

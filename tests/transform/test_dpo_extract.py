@@ -43,18 +43,14 @@ def test_steer_extract_clean_split():
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [
-                {"function": {"name": "Bash", "arguments": {"cmd": "mv foo bar"}}}
-            ],
+            "tool_calls": [{"function": {"name": "Bash", "arguments": {"cmd": "mv foo bar"}}}],
         },
         {"role": "tool", "name": "Bash", "content": "ok"},
         {"role": "user", "content": "[/steer] no, I meant all references in the code"},
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [
-                {"function": {"name": "Grep", "arguments": {"pattern": "foo"}}}
-            ],
+            "tool_calls": [{"function": {"name": "Grep", "arguments": {"pattern": "foo"}}}],
         },
         {"role": "tool", "name": "Grep", "content": "src/a.py:1: foo"},
         {"role": "assistant", "content": "Updated 3 files."},
@@ -126,9 +122,7 @@ def test_steer_extract_failure_mode_format_error():
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [
-                {"function": {"name": "Bash", "arguments": "this is not json {{"}}
-            ],
+            "tool_calls": [{"function": {"name": "Bash", "arguments": "this is not json {{"}}],
         },
         {"role": "user", "content": "[/steer] valid json please"},
         {
@@ -151,18 +145,14 @@ def test_steer_extract_failure_mode_tool_error():
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [
-                {"function": {"name": "Read", "arguments": {"path": "/etc/missing"}}}
-            ],
+            "tool_calls": [{"function": {"name": "Read", "arguments": {"path": "/etc/missing"}}}],
         },
         {"role": "tool", "name": "Read", "content": "Error: file not found"},
         {"role": "user", "content": "[/steer] try the user dir"},
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [
-                {"function": {"name": "Read", "arguments": {"path": "~/.cfg"}}}
-            ],
+            "tool_calls": [{"function": {"name": "Read", "arguments": {"path": "~/.cfg"}}}],
         },
         {"role": "tool", "name": "Read", "content": "ok"},
         {"role": "assistant", "content": "got it"},
@@ -181,9 +171,7 @@ def test_steer_extract_failure_mode_missing_tool():
         {
             "role": "assistant",
             "content": "",
-            "tool_calls": [
-                {"function": {"name": "Read", "arguments": {"path": "f.txt"}}}
-            ],
+            "tool_calls": [{"function": {"name": "Read", "arguments": {"path": "f.txt"}}}],
         },
         {"role": "tool", "name": "Read", "content": "hello"},
         {"role": "assistant", "content": "it says hello"},
@@ -331,9 +319,7 @@ def test_builder_user_label_overrides_auto():
         user_label="bad",  # human says no, drop this
         auto_label="preference_pair",
     )
-    assert (
-        build_dpo_dataset_from_trajectories([overridden], include_auto_labels=True) == []
-    )
+    assert build_dpo_dataset_from_trajectories([overridden], include_auto_labels=True) == []
 
 
 def test_builder_drops_unqualified_trajectories_silently():

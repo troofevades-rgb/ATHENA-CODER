@@ -50,9 +50,7 @@ def build_vector_store(*, cfg: Any, profile_dir: Path) -> VectorStore | None:
     embedder = resolve_embedder(cfg=cfg)
     if embedder is None:
         return None
-    idx_path = getattr(cfg, "vector_store_path", None) or (
-        Path(profile_dir) / "vectors.json"
-    )
+    idx_path = getattr(cfg, "vector_store_path", None) or (Path(profile_dir) / "vectors.json")
     return VectorStore(path=Path(str(idx_path)), embedder=embedder)
 
 
@@ -123,9 +121,7 @@ def record_turn(
         # blocks for embedding purposes; non-text blocks are
         # skipped.
         parts = [
-            c.get("text", "")
-            for c in content
-            if isinstance(c, dict) and c.get("type") == "text"
+            c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text"
         ]
         content = " ".join(p for p in parts if p)
     if not isinstance(content, str):

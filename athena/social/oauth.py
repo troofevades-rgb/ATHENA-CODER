@@ -39,8 +39,9 @@ import json
 import logging
 import time
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..safety.secure_files import secure_read_json, secure_write_json
 
@@ -86,9 +87,7 @@ class TokenStore:
     def from_dict(cls, d: dict[str, Any]) -> TokenStore:
         return cls(
             access_token=str(d.get("access_token", "")),
-            refresh_token=(
-                str(d["refresh_token"]) if d.get("refresh_token") else None
-            ),
+            refresh_token=(str(d["refresh_token"]) if d.get("refresh_token") else None),
             expires_at=float(d.get("expires_at", 0.0)),
             scope=str(d.get("scope", "")),
             token_type=str(d.get("token_type", "Bearer")),
@@ -171,9 +170,7 @@ class SocialOAuth:
         when refresh fails with no fallback."""
         tok = self._load()
         if tok is None:
-            raise RuntimeError(
-                "no social token on disk; run the authorize flow first"
-            )
+            raise RuntimeError("no social token on disk; run the authorize flow first")
         if tok.is_alive():
             return tok.access_token
         if not tok.refresh_token:
@@ -257,12 +254,8 @@ class SocialOAuth:
             logger.warning("social oauth %s transport failed: %s", kind, e)
             raise RuntimeError(f"social oauth {kind} failed: transport error") from e
         if resp.status != 200:
-            logger.warning(
-                "social oauth %s returned HTTP %s", kind, resp.status
-            )
-            raise RuntimeError(
-                f"social oauth {kind} failed: HTTP {resp.status}"
-            )
+            logger.warning("social oauth %s returned HTTP %s", kind, resp.status)
+            raise RuntimeError(f"social oauth {kind} failed: HTTP {resp.status}")
         token = _parse_token_response(resp.body, fallback_refresh=body.get("refresh_token"))
         self._persist(token)
         logger.info(
@@ -304,9 +297,7 @@ class SocialOAuth:
 # ---------------------------------------------------------------------------
 
 
-def _parse_token_response(
-    body: dict[str, Any], *, fallback_refresh: str | None
-) -> TokenStore:
+def _parse_token_response(body: dict[str, Any], *, fallback_refresh: str | None) -> TokenStore:
     """Map a vendor token response to :class:`TokenStore`.
 
     The standard OAuth2 shape — ``{"access_token", "refresh_token",
@@ -316,9 +307,7 @@ def _parse_token_response(
     needed (none here today).
     """
     if "access_token" not in body:
-        raise RuntimeError(
-            "social oauth response missing access_token"
-        )
+        raise RuntimeError("social oauth response missing access_token")
     expires_in = float(body.get("expires_in") or 0)
     expires_at = (time.time() + expires_in) if expires_in > 0 else 0.0
     refresh = body.get("refresh_token") or fallback_refresh
@@ -347,8 +336,7 @@ def _required(cfg: Any, name: str) -> str:
     value = getattr(cfg, name, None)
     if not value:
         raise RuntimeError(
-            f"social oauth config missing: cfg.{name}. "
-            "Set it before invoking the adapter."
+            f"social oauth config missing: cfg.{name}. Set it before invoking the adapter."
         )
     return str(value)
 

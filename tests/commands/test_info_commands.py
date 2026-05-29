@@ -17,7 +17,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 # ---- shared helpers -------------------------------------------------
 
 
@@ -31,15 +30,13 @@ def _capture_ui(module_path: str):
         patches.append(
             patch(
                 f"{module_path}.ui.{fn_name}",
-                side_effect=lambda msg, *a, _n=fn_name, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn_name, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             f"{module_path}.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -69,12 +66,34 @@ def test_help_lists_every_documented_command() -> None:
 
     out = _run(cmd_help, SimpleNamespace(), "", "athena.commands.help")
     for expected in [
-        "/help", "/model", "/models", "/tools", "/mcp",
-        "/clear", "/cost", "/status", "/save", "/dump",
-        "/cwd", "/init", "/review", "/loop", "/checkpoint",
-        "/compact", "/resume", "/memory", "/plan", "/steer",
-        "/queue", "/goal", "/subgoal", "/board", "/video",
-        "/theme", "/hooks", "/exit",
+        "/help",
+        "/model",
+        "/models",
+        "/tools",
+        "/mcp",
+        "/clear",
+        "/cost",
+        "/status",
+        "/save",
+        "/dump",
+        "/cwd",
+        "/init",
+        "/review",
+        "/loop",
+        "/checkpoint",
+        "/compact",
+        "/resume",
+        "/memory",
+        "/plan",
+        "/steer",
+        "/queue",
+        "/goal",
+        "/subgoal",
+        "/board",
+        "/video",
+        "/theme",
+        "/hooks",
+        "/exit",
     ]:
         assert expected in out, f"{expected} missing from /help output"
 
@@ -273,6 +292,7 @@ def test_cost_prints_session_counters() -> None:
     assert "elapsed" in out
     # Pluck out the elapsed number — should be roughly 60.
     import re
+
     match = re.search(r"elapsed:\s*([\d.]+)s", out)
     assert match, f"no elapsed line in: {out!r}"
     elapsed = float(match.group(1))

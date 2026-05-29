@@ -77,15 +77,12 @@ def test_ui_info_ships_status_flash(gw):
     polluting the transcript."""
     ui.info("hello world")
     flashes = [e for e in gw.events if isinstance(e, StatusFlashEvent)]
-    assert any(
-        f.text == "hello world" and f.level == "info" for f in flashes
-    )
+    assert any(f.text == "hello world" and f.level == "info" for f in flashes)
     # Must NOT also land as a MessageAppendEvent — that would
     # bring back the interleaving problem the flash is supposed
     # to fix.
     assert not any(
-        isinstance(e, MessageAppendEvent) and "hello world" in e.content
-        for e in gw.events
+        isinstance(e, MessageAppendEvent) and "hello world" in e.content for e in gw.events
     )
 
 
@@ -94,18 +91,14 @@ def test_ui_warn_ships_status_flash(gw):
     failures should use ``ui.error`` instead."""
     ui.warn("something fishy")
     flashes = [e for e in gw.events if isinstance(e, StatusFlashEvent)]
-    assert any(
-        f.text == "something fishy" and f.level == "warn" for f in flashes
-    )
+    assert any(f.text == "something fishy" and f.level == "warn" for f in flashes)
 
 
 def test_ui_error_ships_persistent_system_message(gw):
     """Errors matter — they stay in the transcript."""
     ui.error("oops")
     assert any(
-        isinstance(e, MessageAppendEvent)
-        and e.role == "system"
-        and "oops" in e.content
+        isinstance(e, MessageAppendEvent) and e.role == "system" and "oops" in e.content
         for e in gw.events
     )
 
@@ -115,9 +108,7 @@ def test_ui_error_ships_persistent_system_message(gw):
 
 def test_tool_call_summary_ships_tool_start(gw):
     ui.tool_call_summary("Bash", {"command": "ls"})
-    assert any(
-        isinstance(e, ToolStartEvent) and e.tool == "Bash" for e in gw.events
-    )
+    assert any(isinstance(e, ToolStartEvent) and e.tool == "Bash" for e in gw.events)
 
 
 def test_tool_result_ships_tool_complete(gw):
@@ -137,8 +128,7 @@ def test_console_print_inside_user_facing_context_bridges(gw):
     with ui.user_facing_render():
         ui.console.print("a slash command would print this")
     assert any(
-        isinstance(e, MessageAppendEvent)
-        and "a slash command would print this" in e.content
+        isinstance(e, MessageAppendEvent) and "a slash command would print this" in e.content
         for e in gw.events
     )
 
@@ -150,9 +140,7 @@ def test_console_print_outside_context_does_not_bridge(gw):
     streaming text and turn-time logging."""
     ui.console.print("internal log — should not appear")
     assert not any(
-        isinstance(e, MessageAppendEvent)
-        and "should not appear" in e.content
-        for e in gw.events
+        isinstance(e, MessageAppendEvent) and "should not appear" in e.content for e in gw.events
     )
 
 
@@ -171,11 +159,7 @@ def test_console_print_empty_in_context_is_dropped(gw):
     pollute the transcript with empty system messages."""
     with ui.user_facing_render():
         ui.console.print("")
-    msgs = [
-        e
-        for e in gw.events
-        if isinstance(e, MessageAppendEvent) and e.content.strip() == ""
-    ]
+    msgs = [e for e in gw.events if isinstance(e, MessageAppendEvent) and e.content.strip() == ""]
     assert msgs == []
 
 
@@ -256,9 +240,7 @@ def test_confirm_ships_request_and_blocks_on_reply(gw):
     # Wait for the request to ship.
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
-        requests = [
-            e for e in gw.events if isinstance(e, ConfirmRequestEvent)
-        ]
+        requests = [e for e in gw.events if isinstance(e, ConfirmRequestEvent)]
         if requests:
             break
         time.sleep(0.02)

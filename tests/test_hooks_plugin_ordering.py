@@ -61,9 +61,7 @@ def fake_agent(call_log: list[str], tmp_path: Path):
         plugin_hooks=_RecordingPluginDispatcher(),
         workspace=tmp_path,
         messages=[{"role": "system", "content": "sys"}],
-        _record_tool_result=lambda call, name, result: call_log.append(
-            f"record_result:{name}"
-        ),
+        _record_tool_result=lambda call, name, result: call_log.append(f"record_result:{name}"),
         _preview_write=lambda args: None,
         _maybe_store_tool_result=lambda name, result: result,
     )
@@ -85,7 +83,9 @@ def _mk_call(tool_name: str = "Read", args: dict | None = None) -> dict:
 
 
 def test_dispatch_runs_between_pre_and_post(
-    fake_agent, call_log: list[str], monkeypatch: pytest.MonkeyPatch,
+    fake_agent,
+    call_log: list[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Sanity: pre_tool_call fires, then tools.dispatch runs, then
     post_tool_call fires. The plugin dispatcher is the single entry
@@ -114,11 +114,14 @@ def test_dispatch_runs_between_pre_and_post(
 
 
 def test_plugin_pre_veto_blocks_dispatch(
-    fake_agent, call_log: list[str], monkeypatch: pytest.MonkeyPatch,
+    fake_agent,
+    call_log: list[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When a plugin pre_tool_call returns ``False``, the tool must not
     dispatch. ShellHookPlugin bridges legacy settings.json PreToolUse
     hooks into this path, so the same veto semantics cover both."""
+
     class _BlockingPluginDispatcher:
         def pre_tool_call(self, name, args):
             call_log.append(f"plugin:pre:{name}")
@@ -141,16 +144,16 @@ def test_plugin_pre_veto_blocks_dispatch(
     fake_agent._handle_tool_call(_mk_call())
 
     assert "plugin:pre:Read" in call_log
-    assert dispatched == [], (
-        f"tool dispatched despite plugin veto: {dispatched!r}"
-    )
+    assert dispatched == [], f"tool dispatched despite plugin veto: {dispatched!r}"
 
 
 # ---- Resilience ------------------------------------------------------------
 
 
 def test_real_dispatcher_isolates_individual_plugin_failures(
-    fake_agent, call_log: list[str], monkeypatch: pytest.MonkeyPatch,
+    fake_agent,
+    call_log: list[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A single plugin that raises must not poison the rest of the chain
     or break the agent. Test by giving the REAL HookDispatcher a crashing

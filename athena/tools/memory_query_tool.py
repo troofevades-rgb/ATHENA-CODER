@@ -18,9 +18,7 @@ def _build_llm_call(agent):
     ``(system, user) -> str`` callable for the user-model backend."""
 
     extract_model = (
-        agent.cfg.user_model.extract_model
-        if agent.cfg.user_model.extract_model
-        else agent.model
+        agent.cfg.user_model.extract_model if agent.cfg.user_model.extract_model else agent.model
     )
 
     async def _call(system_prompt: str, user_prompt: str) -> str:
@@ -111,6 +109,7 @@ def memory_query(question: str) -> str:
         # would re-raise "This event loop is already running" because
         # asyncio's thread-loop binding still points at the outer loop.
         import threading as _threading
+
         holder: dict[str, object] = {}
 
         def _runner() -> None:

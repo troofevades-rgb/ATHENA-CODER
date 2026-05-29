@@ -37,7 +37,6 @@ from athena.safety.approval_callback import (
 )
 from athena.safety.approval_guard import current_grants
 
-
 # ---------------------------------------------------------------
 # Spy backend — every perform call is recorded; nothing reaches
 # the OS.
@@ -142,9 +141,13 @@ def _deny():
 def test_click_goes_through_gate(_spy_setup):
     token = _allow()
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Tab 2",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Tab 2",
+            )
+        )
         assert out["performed"] is True
         assert len(_spy_setup.perform_calls) == 1
         assert _spy_setup.perform_calls[0].type == "click"
@@ -176,9 +179,13 @@ def test_submit_takes_destructive_path(_spy_setup):
 
     token = set_approval_callback(_cb)
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Submit form",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Submit form",
+            )
+        )
         assert out["performed"] is True
         assert asks == ["destructive"]
     finally:
@@ -195,9 +202,13 @@ def test_denied_input_never_touches_backend(_spy_setup):
     structured."""
     token = _deny()
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Save",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Save",
+            )
+        )
         assert out["performed"] is False
         assert out["tier"] == "input"
         assert "denied" in out["reason"]
@@ -209,9 +220,13 @@ def test_denied_input_never_touches_backend(_spy_setup):
 def test_denied_destructive_never_touches_backend(_spy_setup):
     token = _deny()
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Delete file",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Delete file",
+            )
+        )
         assert out["performed"] is False
         assert out["tier"] == "destructive"
         assert _spy_setup.perform_calls == []
@@ -279,7 +294,8 @@ def test_disabled_short_circuits_input_too(monkeypatch, tmp_path: Path):
     invocations."""
     backend = _SpyBackend()
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, computer_use_enabled=False),
     )
     monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: backend)
@@ -292,9 +308,13 @@ def test_disabled_short_circuits_input_too(monkeypatch, tmp_path: Path):
 
     token = set_approval_callback(_record)
     try:
-        out = json.loads(tools_mod.computer_click(
-            x=10, y=10, target_desc="Save",
-        ))
+        out = json.loads(
+            tools_mod.computer_click(
+                x=10,
+                y=10,
+                target_desc="Save",
+            )
+        )
         assert out["available"] is False
         assert backend.perform_calls == []
         assert callback_calls == []

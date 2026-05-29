@@ -257,7 +257,7 @@ class ProvidersConfig:
     per_provider: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ProvidersConfig":
+    def from_dict(cls, d: dict[str, Any]) -> ProvidersConfig:
         """Build a ProvidersConfig from the legacy flat-dict envelope.
 
         ``d["routing"]`` (if a dict) populates :attr:`routing`; every
@@ -976,7 +976,7 @@ class Config:
     browser_engine: str = "chromium"
     browser_headless: bool = True
     browser_user_data_root: str | None = None  # default ~/.athena/browser
-    browser_capture_path: str | None = None    # default <profile_dir>/browser_capture.jsonl
+    browser_capture_path: str | None = None  # default <profile_dir>/browser_capture.jsonl
     browser_screenshots_dir: str | None = None  # default <profile_dir>/browser/shots
     browser_nav_timeout_s: float = 30.0
     browser_min_interval_s: float = 1.0
@@ -1091,9 +1091,7 @@ class Config:
         if isinstance(self.providers, dict):
             # Bypass __setattr__ so we don't trip the legacy-map shim
             # on something that is plainly not a legacy flat name.
-            object.__setattr__(
-                self, "providers", ProvidersConfig.from_dict(self.providers)
-            )
+            object.__setattr__(self, "providers", ProvidersConfig.from_dict(self.providers))
 
     def __getattr__(self, name: str) -> Any:
         """Resolve legacy flat field names to their new nested locations.
@@ -1111,9 +1109,7 @@ class Config:
         """
         mapping = _LEGACY_FIELD_MAP.get(name)
         if mapping is None:
-            raise AttributeError(
-                f"{type(self).__name__!r} object has no attribute {name!r}"
-            )
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
         import warnings as _warnings
 
         nested_name, sub_name = mapping
@@ -1223,9 +1219,7 @@ def load_config() -> Config:
             if legacy_key not in data:
                 continue
             nested_block = data.get(nested_name)
-            already_set_in_new_shape = (
-                isinstance(nested_block, dict) and sub_name in nested_block
-            )
+            already_set_in_new_shape = isinstance(nested_block, dict) and sub_name in nested_block
             if already_set_in_new_shape:
                 data.pop(legacy_key)
                 continue
@@ -1246,9 +1240,7 @@ def load_config() -> Config:
         if isinstance(plugins_block, dict):
             enabled_block = plugins_block.pop("enabled", None)
             if isinstance(enabled_block, dict):
-                cfg.plugins.enabled.update(
-                    {k: bool(v) for k, v in enabled_block.items()}
-                )
+                cfg.plugins.enabled.update({k: bool(v) for k, v in enabled_block.items()})
             for plugin_name, plugin_cfg in plugins_block.items():
                 if isinstance(plugin_cfg, dict):
                     cfg.plugins.per_plugin[plugin_name] = dict(plugin_cfg)
@@ -1272,9 +1264,7 @@ def load_config() -> Config:
                 )
             for provider_name, provider_cfg in providers_block.items():
                 if isinstance(provider_cfg, dict):
-                    cfg.providers.per_provider[provider_name] = dict(
-                        provider_cfg
-                    )
+                    cfg.providers.per_provider[provider_name] = dict(provider_cfg)
         for k, v in data.items():
             if hasattr(cfg, k):
                 _assign_field(cfg, k, v)
@@ -1401,6 +1391,4 @@ def _merge_plugin_state(plugins_cfg: PluginsConfig) -> None:
         return
     state_enabled = state.get("enabled")
     if isinstance(state_enabled, dict):
-        plugins_cfg.enabled.update(
-            {k: bool(v) for k, v in state_enabled.items()}
-        )
+        plugins_cfg.enabled.update({k: bool(v) for k, v in state_enabled.items()})

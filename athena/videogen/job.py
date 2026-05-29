@@ -33,8 +33,9 @@ import dataclasses
 import hashlib
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, Protocol, runtime_checkable
+from typing import Any, Literal, Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +59,11 @@ class GenerationRequest:
 
     mode: GenerationMode
     prompt: str = ""
-    image_path: Optional[Path] = None
+    image_path: Path | None = None
     motion_prompt: str = ""
     duration_s: float = 5.0
     aspect: str = "16:9"
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -77,7 +78,7 @@ class CostEstimate:
     """
 
     seconds_est: float
-    cost_est: Optional[float] = None
+    cost_est: float | None = None
 
     def needs_confirm(self, cfg: Any) -> bool:
         """Decide whether this estimate trips a confirmation
@@ -89,11 +90,7 @@ class CostEstimate:
         cost_threshold = float(vg.confirm_over_cost if vg is not None else 1.0)
         if sec_threshold > 0 and self.seconds_est > sec_threshold:
             return True
-        if (
-            self.cost_est is not None
-            and cost_threshold > 0
-            and self.cost_est > cost_threshold
-        ):
+        if self.cost_est is not None and cost_threshold > 0 and self.cost_est > cost_threshold:
             return True
         return False
 
@@ -110,7 +107,7 @@ class JobHandle:
     job_id: str
     status: JobStatus = "pending"
     progress: float = 0.0  # 0..1
-    error: Optional[str] = None
+    error: str | None = None
     # Backends can stash their own state here; the orchestrator
     # passes the handle back unchanged.
     extra: dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -122,15 +119,15 @@ class GenerationResult:
     tools in T6-05.3) surface to the model."""
 
     status: str  # done | declined | timeout | error | cancelled
-    path: Optional[Path] = None
-    sha256: Optional[str] = None
-    duration_s: Optional[float] = None
-    seconds_taken: Optional[float] = None
-    cost_est: Optional[float] = None
-    estimate: Optional[CostEstimate] = None
-    backend: Optional[str] = None
-    frame_check: Optional[str] = None
-    error: Optional[str] = None
+    path: Path | None = None
+    sha256: str | None = None
+    duration_s: float | None = None
+    seconds_taken: float | None = None
+    cost_est: float | None = None
+    estimate: CostEstimate | None = None
+    backend: str | None = None
+    frame_check: str | None = None
+    error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -186,7 +183,7 @@ class VideoGenerationBackend(Protocol):
 # ---------------------------------------------------------------------------
 
 
-def resolve_backend(cfg: Any) -> Optional["VideoGenerationBackend"]:
+def resolve_backend(cfg: Any) -> VideoGenerationBackend | None:
     """Pick a video-generation backend via the T5-05 media
     broker. Returns None when no provider declares the
     ``video_generation`` capability OR when the chosen class
@@ -240,7 +237,8 @@ def resolve_backend(cfg: Any) -> Optional["VideoGenerationBackend"]:
                     logger.warning(
                         "videogen: could not instantiate pinned backend %r: %s. "
                         "Falling back to broker.",
-                        pinned_name, e,
+                        pinned_name,
+                        e,
                     )
 
     # video_backend_prefer overrides media_backend_prefer for
@@ -303,8 +301,7 @@ def default_deny(estimate: CostEstimate, request: GenerationRequest) -> bool:
     the user gets a structured payload telling them to approve
     explicitly."""
     logger.info(
-        "videogen: no confirm callback registered; declining job over "
-        "thresholds (%.1fs / $%s)",
+        "videogen: no confirm callback registered; declining job over thresholds (%.1fs / $%s)",
         estimate.seconds_est,
         estimate.cost_est,
     )
@@ -316,7 +313,7 @@ def default_deny(estimate: CostEstimate, request: GenerationRequest) -> bool:
 # ---------------------------------------------------------------------------
 
 
-VisionCheckFn = Callable[[Path], Optional[str]]
+VisionCheckFn = Callable[[Path], str | None]
 """Optional first/last-frame sanity check. Pass through to the
 T4-01 vision-analyze surface in production; tests omit."""
 
@@ -367,9 +364,7 @@ def run_generation(
         except Exception as e:  # noqa: BLE001
             # A buggy confirm UI must not open-fail. Treat any
             # exception as denial — same contract as T6-04.
-            logger.warning(
-                "videogen: confirm callback raised (%s); declining", e
-            )
+            logger.warning("videogen: confirm callback raised (%s); declining", e)
             approved = False
         if not approved:
             return GenerationResult(
@@ -394,10 +389,7 @@ def run_generation(
     vg_for_poll = getattr(cfg, "video_generation", None)
     poll_interval = max(
         0.1,
-        float(
-            vg_for_poll.poll_interval_s if vg_for_poll is not None
-            else _POLL_FALLBACK_S
-        ),
+        float(vg_for_poll.poll_interval_s if vg_for_poll is not None else _POLL_FALLBACK_S),
     )
     started_at = time.monotonic()
     while True:
@@ -462,7 +454,7 @@ def run_generation(
     )
 
     # 7. Optional frame check.
-    frame_check_str: Optional[str] = None
+    frame_check_str: str | None = None
     if vision_check is not None:
         try:
             frame_check_str = vision_check(path)
@@ -535,11 +527,7 @@ def _log_media(
 
     log_path = path.parent / "media_log.jsonl"
     row = {
-        "ts": (
-            datetime.datetime.now(datetime.timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        ),
+        "ts": (datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")),
         "kind": "video_generation",
         "mode": request.mode,
         "backend": backend_name,

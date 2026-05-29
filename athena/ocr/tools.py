@@ -52,8 +52,8 @@ def _resolve_backend(cfg: Any) -> OCRBackend | None:
     when no provider declares ``ocr`` or the chosen class
     can't be constructed / isn't actually available on this
     host (e.g. tesseract binary missing)."""
-    from . import backends  # noqa: F401 — trigger registration
     from ..media.registry import MediaRegistry
+    from . import backends  # noqa: F401 — trigger registration
 
     reg = MediaRegistry(cfg=cfg)
     cls = reg.backend_for("ocr")
@@ -114,9 +114,7 @@ def ocr_recognize(
         return OCRResult(blocks=[])
 
     ocr_cfg = getattr(cfg, "ocr", None)
-    langs = languages or list(
-        (ocr_cfg.languages if ocr_cfg is not None else ["eng"]) or ["eng"]
-    )
+    langs = languages or list((ocr_cfg.languages if ocr_cfg is not None else ["eng"]) or ["eng"])
 
     try:
         result = backend.recognize(p, langs=langs, with_boxes=with_boxes)
@@ -125,10 +123,9 @@ def ocr_recognize(
         return OCRResult(blocks=[])
 
     threshold = (
-        min_confidence if min_confidence is not None
-        else float(
-            (ocr_cfg.min_confidence if ocr_cfg is not None else 0) or 0
-        )
+        min_confidence
+        if min_confidence is not None
+        else float((ocr_cfg.min_confidence if ocr_cfg is not None else 0) or 0)
     )
     if threshold > 0:
         filtered = [b for b in result.blocks if b.confidence >= threshold]
@@ -154,34 +151,46 @@ def _run(
     cfg = _cfg if _cfg is not None else load_config()
     ocr_cfg = getattr(cfg, "ocr", None)
     if ocr_cfg is not None and not ocr_cfg.enabled:
-        return json.dumps({
-            "available": False,
-            "error": "cfg.ocr.enabled=False; operator disabled OCR",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "cfg.ocr.enabled=False; operator disabled OCR",
+            }
+        )
     if not path:
-        return json.dumps({
-            "available": False, "error": "path is required",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "path is required",
+            }
+        )
     p = Path(path)
     if not p.exists():
-        return json.dumps({
-            "available": False, "error": f"file not found: {path}",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": f"file not found: {path}",
+            }
+        )
 
     backend = _backend if _backend is not None else _resolve_backend(cfg)
     if backend is None:
-        return json.dumps({
-            "available": False,
-            "reason": (
-                "no OCR backend configured — declare an ocr-capable "
-                "provider (e.g. install tesseract + pytesseract) or "
-                "set cfg.ocr_enabled=False"
-            ),
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "reason": (
+                    "no OCR backend configured — declare an ocr-capable "
+                    "provider (e.g. install tesseract + pytesseract) or "
+                    "set cfg.ocr_enabled=False"
+                ),
+            }
+        )
 
     try:
         result = ocr_recognize(
-            p, cfg=cfg, backend=backend,
+            p,
+            cfg=cfg,
+            backend=backend,
             languages=languages,
             with_boxes=with_boxes,
             min_confidence=min_confidence,
@@ -190,11 +199,13 @@ def _run(
         return json.dumps({"available": False, "error": str(e)})
     except Exception as e:  # noqa: BLE001
         logger.exception("ocr: recognize failed")
-        return json.dumps({
-            "available": True,
-            "error": f"ocr failed: {type(e).__name__}: {e}",
-            "path": str(p),
-        })
+        return json.dumps(
+            {
+                "available": True,
+                "error": f"ocr failed: {type(e).__name__}: {e}",
+                "path": str(p),
+            }
+        )
 
     payload: dict[str, Any] = {
         "available": True,
@@ -234,8 +245,7 @@ def _run(
             "with_boxes": {
                 "type": "boolean",
                 "description": (
-                    "Include per-block bounding boxes + confidence "
-                    "in the result. Default true."
+                    "Include per-block bounding boxes + confidence in the result. Default true."
                 ),
             },
             "min_confidence": {

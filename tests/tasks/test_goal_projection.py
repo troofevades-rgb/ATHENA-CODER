@@ -54,9 +54,7 @@ def _store_in_tmp(monkeypatch, tmp_path: Path):
         board_auto_maintain=True,
     )
     monkeypatch.setattr("athena.config.load_config", lambda: cfg)
-    monkeypatch.setattr(
-        "athena.config.profile_dir", lambda profile: tmp_path / "profile_dir"
-    )
+    monkeypatch.setattr("athena.config.profile_dir", lambda profile: tmp_path / "profile_dir")
     task_mod._reset_for_tests()
     yield
     task_mod._reset_for_tests()
@@ -162,9 +160,7 @@ def test_one_store_no_parallel_lists(tmp_path: Path):
 
     # Same done status in both.
     state_done = {sg.text for sg in state.subgoals if sg.done}
-    store_done = {
-        t.title for t in store.list(goal_id=state.goal_id, status="done")
-    }
+    store_done = {t.title for t in store.list(goal_id=state.goal_id, status="done")}
     assert state_done == store_done == {"alpha"}
 
 

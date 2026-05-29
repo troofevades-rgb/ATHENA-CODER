@@ -134,11 +134,11 @@ class TesseractLocalBackend(Provider):
             else:
                 # Plain text — faster than image_to_data.
                 text = pytesseract.image_to_string(
-                    str(path), lang=lang_str,
+                    str(path),
+                    lang=lang_str,
                 )
                 return OCRResult(
-                    blocks=[OCRBlock(text=text.strip(), bbox=(0, 0, 0, 0),
-                                     confidence=0.0)],
+                    blocks=[OCRBlock(text=text.strip(), bbox=(0, 0, 0, 0), confidence=0.0)],
                     language=lang_str,
                 )
         except Exception as e:  # noqa: BLE001
@@ -156,6 +156,7 @@ class TesseractLocalBackend(Provider):
         if self._cfg_override is not None:
             return self._cfg_override
         from ...config import load_config
+
         return load_config()
 
 
@@ -216,10 +217,12 @@ def _coalesce_blocks(data: dict[str, list[Any]]) -> list[OCRBlock]:
         g["left"] = min(g["left"], int(data["left"][i]))
         g["top"] = min(g["top"], int(data["top"][i]))
         g["right"] = max(
-            g["right"], int(data["left"][i]) + int(data["width"][i]),
+            g["right"],
+            int(data["left"][i]) + int(data["width"][i]),
         )
         g["bottom"] = max(
-            g["bottom"], int(data["top"][i]) + int(data["height"][i]),
+            g["bottom"],
+            int(data["top"][i]) + int(data["height"][i]),
         )
 
     out: list[OCRBlock] = []
@@ -227,9 +230,11 @@ def _coalesce_blocks(data: dict[str, list[Any]]) -> list[OCRBlock]:
         g = grouped[key]
         text = " ".join(g["words"])
         avg_conf = sum(g["confs"]) / max(1, len(g["confs"]))
-        out.append(OCRBlock(
-            text=text,
-            bbox=(g["left"], g["top"], g["right"], g["bottom"]),
-            confidence=avg_conf,
-        ))
+        out.append(
+            OCRBlock(
+                text=text,
+                bbox=(g["left"], g["top"], g["right"], g["bottom"]),
+                confidence=avg_conf,
+            )
+        )
     return out

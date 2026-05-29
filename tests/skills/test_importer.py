@@ -73,7 +73,7 @@ def test_import_validates_frontmatter(isolated_home: Path, tmp_path: Path) -> No
     src = tmp_path / "src" / "broken"
     src.mkdir(parents=True)
     (src / "SKILL.md").write_text(
-        "---\nname: \"NOT-LOWERCASE\"\ndescription: bad name\n---\n",
+        '---\nname: "NOT-LOWERCASE"\ndescription: bad name\n---\n',
         encoding="utf-8",
     )
     base = isolated_home / ".athena" / "skills"
@@ -138,7 +138,8 @@ def test_import_zip_archive(isolated_home: Path, tmp_path: Path) -> None:
 
 
 def test_import_zip_rejects_path_traversal(
-    isolated_home: Path, tmp_path: Path,
+    isolated_home: Path,
+    tmp_path: Path,
 ) -> None:
     """Archive members with ``..`` segments must not be extracted —
     otherwise a malicious bundle could write outside the temp dir."""

@@ -21,10 +21,15 @@ def test_falls_back_to_load_config_when_no_agent():
     historical behaviour the helper preserves for tools that run
     outside an Agent context (CLI startup, eval bootstrap)."""
     sentinel = SimpleNamespace(model="from-disk")
-    with patch(
-        "athena.config.load_config", return_value=sentinel,
-    ), patch(
-        "athena.agent.core.get_current_agent", return_value=None,
+    with (
+        patch(
+            "athena.config.load_config",
+            return_value=sentinel,
+        ),
+        patch(
+            "athena.agent.core.get_current_agent",
+            return_value=None,
+        ),
     ):
         assert active_cfg() is sentinel
 
@@ -36,10 +41,15 @@ def test_prefers_live_agent_cfg_over_disk():
     live = SimpleNamespace(model="live-cfg", bash_allowlist=["echo"])
     disk = SimpleNamespace(model="from-disk", bash_allowlist=[])
     fake_agent = SimpleNamespace(cfg=live)
-    with patch(
-        "athena.agent.core.get_current_agent", return_value=fake_agent,
-    ), patch(
-        "athena.config.load_config", return_value=disk,
+    with (
+        patch(
+            "athena.agent.core.get_current_agent",
+            return_value=fake_agent,
+        ),
+        patch(
+            "athena.config.load_config",
+            return_value=disk,
+        ),
     ):
         result = active_cfg()
     assert result is live
@@ -52,9 +62,14 @@ def test_falls_back_when_agent_has_no_cfg():
     in normal flow but the helper must not crash callers."""
     disk = SimpleNamespace(model="from-disk")
     fake_agent = SimpleNamespace()  # no cfg attribute
-    with patch(
-        "athena.agent.core.get_current_agent", return_value=fake_agent,
-    ), patch(
-        "athena.config.load_config", return_value=disk,
+    with (
+        patch(
+            "athena.agent.core.get_current_agent",
+            return_value=fake_agent,
+        ),
+        patch(
+            "athena.config.load_config",
+            return_value=disk,
+        ),
     ):
         assert active_cfg() is disk

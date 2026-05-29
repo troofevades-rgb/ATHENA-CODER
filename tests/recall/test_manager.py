@@ -31,7 +31,6 @@ from athena.recall.manager import (
     set_active_vector_store,
 )
 
-
 # ---------------------------------------------------------------------------
 # Doc-id construction
 # ---------------------------------------------------------------------------
@@ -158,11 +157,13 @@ def test_build_returns_none_when_semantic_recall_disabled(
 
 
 def test_build_returns_none_when_no_embedder_available(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``resolve_embedder`` returning None → build returns None
     too. Recall degrades to keyword-only silently."""
     from athena.recall import manager as _m
+
     monkeypatch.setattr(_m, "resolve_embedder", lambda *, cfg: None)
     out = build_vector_store(cfg=_Cfg(), profile_dir=tmp_path)
     assert out is None
@@ -175,14 +176,19 @@ def test_build_returns_none_when_no_embedder_available(
 
 class _RecordingStore:
     """Stand-in vector store that records calls to .add()."""
+
     def __init__(self):
         self.added: list[dict] = []
 
     def add(self, *, doc_id, text, workspace, text_preview):
-        self.added.append({
-            "doc_id": doc_id, "text": text,
-            "workspace": workspace, "text_preview": text_preview,
-        })
+        self.added.append(
+            {
+                "doc_id": doc_id,
+                "text": text,
+                "workspace": workspace,
+                "text_preview": text_preview,
+            }
+        )
 
 
 @pytest.fixture
@@ -197,8 +203,11 @@ def test_record_turn_no_store_is_silent_noop() -> None:
     """Outside a session (no active store) — must not raise."""
     set_active_vector_store(None)
     record_turn(
-        session_id="s", turn_index=0, role="user",
-        content="hi", workspace="/tmp",
+        session_id="s",
+        turn_index=0,
+        role="user",
+        content="hi",
+        workspace="/tmp",
     )  # no exception = pass
 
 
@@ -206,20 +215,29 @@ def test_record_turn_skips_tool_role(_store: _RecordingStore) -> None:
     """Tool results pollute the vector store with verbose JSON;
     skip them. Same for system messages."""
     record_turn(
-        session_id="s", turn_index=0, role="tool",
-        content="result blob", workspace="/tmp",
+        session_id="s",
+        turn_index=0,
+        role="tool",
+        content="result blob",
+        workspace="/tmp",
     )
     record_turn(
-        session_id="s", turn_index=1, role="system",
-        content="system msg", workspace="/tmp",
+        session_id="s",
+        turn_index=1,
+        role="system",
+        content="system msg",
+        workspace="/tmp",
     )
     assert _store.added == []
 
 
 def test_record_turn_embeds_user_messages(_store: _RecordingStore) -> None:
     record_turn(
-        session_id="s", turn_index=0, role="user",
-        content="what is in this file?", workspace="/ws",
+        session_id="s",
+        turn_index=0,
+        role="user",
+        content="what is in this file?",
+        workspace="/ws",
     )
     assert len(_store.added) == 1
     assert _store.added[0]["doc_id"] == "s#0"
@@ -229,8 +247,11 @@ def test_record_turn_embeds_user_messages(_store: _RecordingStore) -> None:
 
 def test_record_turn_embeds_assistant_messages(_store: _RecordingStore) -> None:
     record_turn(
-        session_id="s", turn_index=1, role="assistant",
-        content="the file defines class Foo", workspace="/ws",
+        session_id="s",
+        turn_index=1,
+        role="assistant",
+        content="the file defines class Foo",
+        workspace="/ws",
     )
     assert len(_store.added) == 1
 
@@ -239,8 +260,11 @@ def test_record_turn_skips_empty_content(_store: _RecordingStore) -> None:
     """Empty / whitespace-only content is noise."""
     for empty in ("", "   ", "\n\n\t"):
         record_turn(
-            session_id="s", turn_index=0, role="user",
-            content=empty, workspace="/ws",
+            session_id="s",
+            turn_index=0,
+            role="user",
+            content=empty,
+            workspace="/ws",
         )
     assert _store.added == []
 
@@ -257,8 +281,11 @@ def test_record_turn_handles_anthropic_list_content(
         {"type": "text", "text": "second text"},
     ]
     record_turn(
-        session_id="s", turn_index=0, role="user",
-        content=content, workspace="/ws",  # type: ignore[arg-type]
+        session_id="s",
+        turn_index=0,
+        role="user",
+        content=content,
+        workspace="/ws",  # type: ignore[arg-type]
     )
     assert len(_store.added) == 1
     assert "first text" in _store.added[0]["text"]
@@ -274,8 +301,11 @@ def test_record_turn_handles_list_content_with_only_images(
         {"type": "image", "source": "..."},
     ]
     record_turn(
-        session_id="s", turn_index=0, role="user",
-        content=content, workspace="/ws",  # type: ignore[arg-type]
+        session_id="s",
+        turn_index=0,
+        role="user",
+        content=content,
+        workspace="/ws",  # type: ignore[arg-type]
     )
     assert _store.added == []
 
@@ -287,8 +317,11 @@ def test_record_turn_truncates_preview_at_200_chars(
     truncate at 200 chars so the index file doesn't bloat."""
     big = "x" * 500
     record_turn(
-        session_id="s", turn_index=0, role="user",
-        content=big, workspace="/ws",
+        session_id="s",
+        turn_index=0,
+        role="user",
+        content=big,
+        workspace="/ws",
     )
     assert len(_store.added[0]["text_preview"]) == 200
 
@@ -297,6 +330,7 @@ def test_record_turn_swallows_store_add_exception() -> None:
     """The silent-best-effort contract: if store.add raises (full
     disk, embedding API down, etc.) the agent loop must NOT see
     it. Pin via a store that always raises."""
+
     class _BombStore:
         def add(self, **kw):
             raise RuntimeError("simulated embed failure")
@@ -305,8 +339,11 @@ def test_record_turn_swallows_store_add_exception() -> None:
     try:
         # Must not raise
         record_turn(
-            session_id="s", turn_index=0, role="user",
-            content="hi", workspace="/ws",
+            session_id="s",
+            turn_index=0,
+            role="user",
+            content="hi",
+            workspace="/ws",
         )
     finally:
         set_active_vector_store(None)
@@ -326,8 +363,10 @@ def test_record_memory_entry_writes_with_memory_doc_id(
     _store: _RecordingStore,
 ) -> None:
     record_memory_entry(
-        profile="default", name="user_role",
-        content="user is a data scientist", workspace="/ws",
+        profile="default",
+        name="user_role",
+        content="user is a data scientist",
+        workspace="/ws",
     )
     assert _store.added[0]["doc_id"] == "memory:default:user_role"
 
@@ -345,8 +384,10 @@ def test_record_memory_entry_skips_empty() -> None:
 
 def test_record_memory_entry_swallows_exceptions() -> None:
     """Silent contract — memory writes never break the caller."""
+
     class _BombStore:
-        def add(self, **kw): raise OSError("disk full")
+        def add(self, **kw):
+            raise OSError("disk full")
 
     set_active_vector_store(_BombStore())  # type: ignore[arg-type]
     try:

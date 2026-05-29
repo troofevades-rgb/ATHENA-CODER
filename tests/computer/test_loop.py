@@ -25,7 +25,6 @@ from athena.computer.loop import (
 )
 from athena.computer.permission import PermissionGate
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -247,9 +246,7 @@ def test_loop_halts_on_killswitch(tmp_path: Path):
             killswitch.engage(reason="mid-loop test halt")
         return ActionProposal(
             done=False,
-            action=Action(
-                type="click", coords=(10, 10), target_desc="OK", app="TestApp"
-            ),
+            action=Action(type="click", coords=(10, 10), target_desc="OK", app="TestApp"),
         )
 
     result = computer_do(
@@ -288,9 +285,7 @@ def test_loop_respects_max_actions(tmp_path: Path):
     def _propose(task, shot, history):
         return ActionProposal(
             done=False,
-            action=Action(
-                type="click", coords=(10, 10), target_desc="Tab", app="TestApp"
-            ),
+            action=Action(type="click", coords=(10, 10), target_desc="Tab", app="TestApp"),
         )
 
     result = computer_do(
@@ -372,9 +367,7 @@ def test_loop_observe_only_blocks_input_entirely(tmp_path: Path):
     def _propose(task, shot, history):
         return ActionProposal(
             done=False,
-            action=Action(
-                type="click", coords=(5, 5), target_desc="OK", app="TestApp"
-            ),
+            action=Action(type="click", coords=(5, 5), target_desc="OK", app="TestApp"),
         )
 
     result = computer_do(
@@ -480,9 +473,7 @@ def test_loop_handles_perform_exception(tmp_path: Path):
     def _propose(task, shot, history):
         return ActionProposal(
             done=False,
-            action=Action(
-                type="click", coords=(10, 10), target_desc="OK", app="TestApp"
-            ),
+            action=Action(type="click", coords=(10, 10), target_desc="OK", app="TestApp"),
         )
 
     result = computer_do(
@@ -511,9 +502,7 @@ def test_dry_run_logs_but_does_not_perform(tmp_path: Path):
     def _propose(task, shot, history):
         return ActionProposal(
             done=False,
-            action=Action(
-                type="click", coords=(5, 5), target_desc="Tab", app="TestApp"
-            ),
+            action=Action(type="click", coords=(5, 5), target_desc="Tab", app="TestApp"),
         )
 
     result = computer_do(

@@ -18,7 +18,6 @@ import pytest
 from athena.eval.agent.runner import run_eval, run_task
 from athena.eval.agent.task import EvalTask, VerifyContext
 
-
 # ---------------------------------------------------------------------------
 # Stub agent that the seam swaps in for the real one
 # ---------------------------------------------------------------------------
@@ -60,6 +59,7 @@ class StubAgent:
         self.run_until_done_calls.append(user_prompt)
         if self._sleep:
             import time as _t
+
             _t.sleep(self._sleep)
         if self._raise:
             raise self._raise
@@ -81,8 +81,10 @@ class StubAgent:
 def _make_factory(**stub_kwargs: Any):
     """Build an agent_factory that returns a StubAgent with the
     given kwargs."""
+
     def _factory(*, workspace: Path, **_ignored: Any) -> StubAgent:
         return StubAgent(workspace=workspace, **stub_kwargs)
+
     return _factory
 
 
@@ -171,8 +173,10 @@ def test_tempdir_cleaned_up_after_run():
 
 def test_setup_fn_raising_is_error_not_fail():
     """Bad test author setup => ERROR. The model never ran."""
+
     def _broken(ws):
         raise RuntimeError("setup broke")
+
     task = EvalTask(
         id="bad-setup",
         prompt="...",
@@ -187,8 +191,10 @@ def test_setup_fn_raising_is_error_not_fail():
 
 def test_agent_factory_raising_is_error():
     """Couldn't build the agent => ERROR, not fail."""
+
     def _bad_factory(**_):
         raise RuntimeError("no provider")
+
     task = EvalTask(
         id="no-agent",
         prompt="...",
@@ -220,8 +226,10 @@ def test_verify_fn_raising_is_failed_with_error_details():
     """A buggy verifier shouldn't crash the suite. Verify-raised is
     counted as FAIL (not ERROR — the model DID run), with the
     exception preserved in ``error`` for diagnosis."""
+
     def _bad_verify(ctx):
         raise ValueError("oops")
+
     task = EvalTask(
         id="bad-verify",
         prompt="...",
@@ -259,12 +267,14 @@ def test_timeout_is_its_own_status():
 
 def test_verify_context_exposes_workspace_and_messages():
     captured: dict[str, Any] = {}
+
     def _verify(ctx: VerifyContext) -> bool:
         captured["workspace"] = ctx.workspace
         captured["messages"] = ctx.agent_messages
         captured["tool_calls"] = ctx.tool_calls
         captured["mcp"] = ctx.mcp_call_log
         return True
+
     task = EvalTask(
         id="ctx",
         prompt="hi",
@@ -291,10 +301,12 @@ def test_verify_context_exposes_workspace_and_messages():
 
 def test_agent_close_called_even_on_failure():
     instances: list[StubAgent] = []
+
     def _factory(*, workspace, **_):
         a = StubAgent(workspace=workspace, raise_on_run=RuntimeError("x"))
         instances.append(a)
         return a
+
     task = EvalTask(
         id="close-on-fail",
         prompt="...",
@@ -364,22 +376,29 @@ def test_run_eval_progress_callback_fires_per_task():
 
 def test_run_eval_one_bad_task_does_not_kill_the_suite():
     """ERROR in task 2 must not skip tasks 3+."""
+
     def _factory_for_id(target_id: str):
         def _factory(*, workspace, **_):
             if target_id == "boom":
                 raise RuntimeError("only this one")
             return StubAgent(workspace=workspace)
+
         return _factory
 
     # Build a single factory that crashes for one specific call.
     call_count = {"n": 0}
+
     def _factory(*, workspace, **_):
         call_count["n"] += 1
         if call_count["n"] == 2:
             raise RuntimeError("targeted")
         return StubAgent(workspace=workspace)
 
-    tasks = [_trivial_task("t1", passes=True), _trivial_task("t2", passes=True), _trivial_task("t3", passes=True)]
+    tasks = [
+        _trivial_task("t1", passes=True),
+        _trivial_task("t2", passes=True),
+        _trivial_task("t3", passes=True),
+    ]
     report = run_eval(tasks, model="m", agent_factory=_factory)
     assert report.total == 3
     statuses = [r.status for r in report.results]
@@ -393,6 +412,7 @@ def test_run_eval_one_bad_task_does_not_kill_the_suite():
 
 def test_policy_config_is_passed_to_agent_factory():
     received: dict[str, Any] = {}
+
     def _factory(*, workspace, policy_config=None, **_):
         received["policy_config"] = policy_config
         return StubAgent(workspace=workspace)
@@ -409,6 +429,7 @@ def test_policy_config_is_passed_to_agent_factory():
 
 def test_required_tools_passed_through_to_factory():
     received: dict[str, Any] = {}
+
     def _factory(*, workspace, enabled_toolsets=None, **_):
         received["enabled_toolsets"] = enabled_toolsets
         return StubAgent(workspace=workspace)

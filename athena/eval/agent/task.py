@@ -17,7 +17,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # VerifyContext — what verify_fn sees after the agent has run
 # ---------------------------------------------------------------------------
@@ -96,9 +95,7 @@ class EvalTask:
     required_tools: list[str] = dataclasses.field(default_factory=list)
     bucket: str = "general"
     description: str = ""
-    mcp_servers: list[Callable[[Path], Any]] = dataclasses.field(
-        default_factory=list
-    )
+    mcp_servers: list[Callable[[Path], Any]] = dataclasses.field(default_factory=list)
 
     def short_description(self) -> str:
         """One-line summary for catalog displays. Prefers ``description``

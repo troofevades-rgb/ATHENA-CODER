@@ -145,14 +145,14 @@ def build_dpo_dataset(
 # and so post-hoc evaluation can ask whether DPO moved the needle on
 # each category specifically.
 FAILURE_MODES = (
-    "wrong_tool",      # rejected called a different tool than chosen at the same step
-    "bad_args",        # same tool name, different arguments
-    "missing_tool",    # rejected made no tool calls; chosen used at least one
-    "extra_tool",      # rejected made tool calls; chosen made none (model over-acted)
-    "tool_error",      # rejected's tool output contained an error indicator
-    "truncated",       # rejected is substantially shorter than chosen (>4x diff)
-    "format_error",    # rejected has malformed tool_call json or stray markers
-    "other",           # signal exists but didn't match a specific bucket
+    "wrong_tool",  # rejected called a different tool than chosen at the same step
+    "bad_args",  # same tool name, different arguments
+    "missing_tool",  # rejected made no tool calls; chosen used at least one
+    "extra_tool",  # rejected made tool calls; chosen made none (model over-acted)
+    "tool_error",  # rejected's tool output contained an error indicator
+    "truncated",  # rejected is substantially shorter than chosen (>4x diff)
+    "format_error",  # rejected has malformed tool_call json or stray markers
+    "other",  # signal exists but didn't match a specific bucket
 )
 
 
@@ -262,6 +262,7 @@ def write_jsonl(path: Path, examples: list[dict[str, Any]]) -> None:
     is also atomic when both paths are on the same volume (which
     they are by construction here)."""
     import os
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
@@ -310,11 +311,7 @@ def _is_good(t: Trajectory, *, include_auto_labels: bool) -> bool:
 def _is_preference_pair(t: Trajectory, *, include_auto_labels: bool) -> bool:
     if t.user_label == "preference_pair":
         return True
-    if (
-        include_auto_labels
-        and t.user_label == "unreviewed"
-        and t.auto_label == "preference_pair"
-    ):
+    if include_auto_labels and t.user_label == "unreviewed" and t.auto_label == "preference_pair":
         return True
     return False
 

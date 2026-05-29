@@ -29,9 +29,7 @@ def _clean_module(monkeypatch, tmp_path: Path):
         profile="default",
     )
     monkeypatch.setattr("athena.config.load_config", lambda: cfg)
-    monkeypatch.setattr(
-        "athena.config.profile_dir", lambda profile: tmp_path / "profile"
-    )
+    monkeypatch.setattr("athena.config.profile_dir", lambda profile: tmp_path / "profile")
     task_mod._reset_for_tests()
 
     # Workspace resolution reads file_ops._WORKSPACE — point it
@@ -112,9 +110,7 @@ def test_update_with_no_changes_short_circuits():
 
 
 def test_update_subject_and_description():
-    out = task_mod.TaskCreate(
-        subject="old subject", description="old description"
-    )
+    out = task_mod.TaskCreate(subject="old subject", description="old description")
     tid = _extract_id(out)
     task_mod.TaskUpdate(taskId=tid, subject="new subject", description="new desc")
     listing = task_mod.TaskList()

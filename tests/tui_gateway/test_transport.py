@@ -25,12 +25,11 @@ import pytest
 
 from athena.tui_gateway.events import MessageAppendEvent
 from athena.tui_gateway.server import (
+    _make_transport,
     _TcpLoopbackTransport,
     _Transport,
     _UnixDomainTransport,
-    _make_transport,
 )
-
 
 # ---- _make_transport resolution -----------------------------------------
 
@@ -108,6 +107,7 @@ def test_uds_replaces_stale_path():
         # The stale regular file was replaced by a real socket.
         st = os.stat(t._path)
         import stat as st_mod
+
         assert st_mod.S_ISSOCK(st.st_mode), (
             f"path is not a socket after bind: mode={oct(st.st_mode)}"
         )
@@ -156,11 +156,13 @@ def _round_trip(transport: _Transport) -> None:
 
     # Server → client.
     server_frame = (
-        json.dumps({
-            "jsonrpc": "2.0",
-            "method": "message.append",
-            "params": {"role": "system", "content": "hello"},
-        })
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "message.append",
+                "params": {"role": "system", "content": "hello"},
+            }
+        )
         + "\n"
     )
     server_conn.sendall(server_frame.encode("utf-8"))
@@ -169,11 +171,13 @@ def _round_trip(transport: _Transport) -> None:
 
     # Client → server.
     client_frame = (
-        json.dumps({
-            "jsonrpc": "2.0",
-            "method": "user.input",
-            "params": {"text": "ping"},
-        })
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "method": "user.input",
+                "params": {"text": "ping"},
+            }
+        )
         + "\n"
     )
     client.sendall(client_frame.encode("utf-8"))

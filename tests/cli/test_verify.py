@@ -116,9 +116,7 @@ def test_command_flag_forces_run_mode(tmp_path, monkeypatch, capsys):
 
     # Start with diagnose-only config; --command should override.
     monkeypatch.setattr(cli_verify, "VerifiedExecution", _Spy)
-    monkeypatch.setattr(
-        cli_verify, "load_config", lambda: _cfg(verify_on_write="diagnose")
-    )
+    monkeypatch.setattr(cli_verify, "load_config", lambda: _cfg(verify_on_write="diagnose"))
 
     target = tmp_path / "x.py"
     target.write_text("x = 1\n")

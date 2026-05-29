@@ -37,4 +37,5 @@ def active_cfg() -> Any:
         if cfg is not None:
             return cfg
     from ..config import load_config
+
     return load_config()

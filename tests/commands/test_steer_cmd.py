@@ -34,15 +34,13 @@ def _capture_ui(module_path: str):
         patches.append(
             patch(
                 f"{module_path}.ui.{fn_name}",
-                side_effect=lambda msg, *a, _n=fn_name, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn_name, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             f"{module_path}.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches

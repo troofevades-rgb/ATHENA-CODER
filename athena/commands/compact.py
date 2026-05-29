@@ -110,12 +110,8 @@ def _maybe_fire_user_model_ingest(agent: Any, transcript: list[dict]) -> None:
             return
         session_id = getattr(agent, "session_id", None) or uuid.uuid4().hex
         try:
-            asyncio.run(
-                backend.ingest_session(transcript, session_id=session_id)
-            )
+            asyncio.run(backend.ingest_session(transcript, session_id=session_id))
         except Exception:  # noqa: BLE001 — fire-and-forget
             return
 
-    threading.Thread(
-        target=_worker, name="athena-user-model-ingest", daemon=True
-    ).start()
+    threading.Thread(target=_worker, name="athena-user-model-ingest", daemon=True).start()

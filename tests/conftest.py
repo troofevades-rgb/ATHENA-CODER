@@ -36,6 +36,7 @@ def _disable_background_curator() -> None:
     ``tests/curator/`` still hit the real function.
     """
     import os
+
     saved = os.environ.get("ATHENA_DISABLE_BACKGROUND_CURATOR")
     os.environ["ATHENA_DISABLE_BACKGROUND_CURATOR"] = "1"
     yield
@@ -78,6 +79,7 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # athena.config so subsystems reading via profile_dir() see the tmp
     # home too.
     import athena.config as _athena_config
+
     tmp_config_dir = home / ".athena"
     monkeypatch.setattr(_athena_config, "CONFIG_DIR", tmp_config_dir)
     monkeypatch.setattr(_athena_config, "CONFIG_PATH", tmp_config_dir / "config.toml")

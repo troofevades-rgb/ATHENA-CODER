@@ -107,9 +107,7 @@ def test_empty_provider_does_not_inject_user_content(
     # Plant a sentinel at the legacy on-disk location -- if the agent
     # still falls back to it, the system prompt will contain the
     # sentinel string.
-    legacy_dir = (
-        isolated_home / ".athena" / "projects" / short_slug / "memory"
-    )
+    legacy_dir = isolated_home / ".athena" / "projects" / short_slug / "memory"
     legacy_dir.mkdir(parents=True)
     (legacy_dir / "MEMORY.md").write_text(
         "# MEMORY index\n\n- [should_not_appear](x.md) — user: legacy-leak-sentinel\n",

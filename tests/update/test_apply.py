@@ -41,7 +41,6 @@ from athena.update.apply import (
 )
 from athena.update.detect import InstallMethod
 
-
 # ---------------------------------------------------------------------------
 # Subprocess recorder
 # ---------------------------------------------------------------------------
@@ -131,9 +130,7 @@ def test_install_pipx_pinned_uses_force(monkeypatch, tmp_path: Path):
     _which_yes(monkeypatch)
 
     install(InstallMethod.PIPX, version="0.2.5")
-    assert recorder.calls[0] == [
-        "pipx", "install", "athena-coder==0.2.5", "--force"
-    ]
+    assert recorder.calls[0] == ["pipx", "install", "athena-coder==0.2.5", "--force"]
 
 
 def test_install_pipx_missing_returns_error(monkeypatch, tmp_path: Path):
@@ -155,9 +152,7 @@ def test_install_via_git_with_version(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(apply_module, "_run", recorder)
     _which_yes(monkeypatch)
 
-    result = install(
-        InstallMethod.GIT, version="0.3.0", repo_root=str(tmp_path)
-    )
+    result = install(InstallMethod.GIT, version="0.3.0", repo_root=str(tmp_path))
     assert result.status == "done"
     # Three calls: fetch, checkout, install.
     assert len(recorder.calls) == 3
@@ -174,18 +169,16 @@ def test_install_via_git_falls_back_to_bare_version(monkeypatch, tmp_path: Path)
     # checkout v0.3.0 fails (rc=1), checkout 0.3.0 succeeds, pip install ok.
     recorder = _RunRecorder(
         [
-            (0, "", ""),           # fetch
-            (1, "", "no v-tag"),   # checkout v0.3.0 fails
-            (0, "", ""),           # checkout 0.3.0 succeeds
-            (0, "", ""),           # pip install .
+            (0, "", ""),  # fetch
+            (1, "", "no v-tag"),  # checkout v0.3.0 fails
+            (0, "", ""),  # checkout 0.3.0 succeeds
+            (0, "", ""),  # pip install .
         ]
     )
     monkeypatch.setattr(apply_module, "_run", recorder)
     _which_yes(monkeypatch)
 
-    result = install(
-        InstallMethod.GIT, version="0.3.0", repo_root=str(tmp_path)
-    )
+    result = install(InstallMethod.GIT, version="0.3.0", repo_root=str(tmp_path))
     assert result.status == "done"
     # Both refs tried.
     checkout_refs = [c[4] for c in recorder.calls if "checkout" in c]

@@ -283,14 +283,14 @@ def cmd_test(args: argparse.Namespace) -> int:
 
 def cmd_install(args: argparse.Namespace) -> int:
     """Install an MCP server from a URL (e.g., mcpmarket.com installer).
-    
+
     Fetches the installer script, runs it, and writes the resulting
     server configuration to mcp.json.
     """
     import subprocess
     import tempfile
+    from urllib.error import HTTPError, URLError
     from urllib.request import urlopen
-    from urllib.error import URLError, HTTPError
 
     try:
         # Fetch the installer script
@@ -331,6 +331,7 @@ def cmd_install(args: argparse.Namespace) -> int:
 
     # Read the generated mcp.json
     from ..config import CONFIG_DIR
+
     mcp_path = CONFIG_DIR / "mcp.json"
     if not mcp_path.exists():
         sys.stderr.write("error: installer did not create mcp.json\n")
@@ -342,7 +343,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: failed to parse mcp.json: {e}\n")
         return 1
 
-    sys.stdout.write(f"success: installed MCP server(s)\n")
+    sys.stdout.write("success: installed MCP server(s)\n")
     if "mcpServers" in data:
         for name in data["mcpServers"]:
             sys.stdout.write(f"  - {name}\n")

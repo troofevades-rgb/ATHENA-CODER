@@ -94,11 +94,7 @@ def prepare_worktree(
     if not (repo_path / ".git").exists() and not _is_git_dir(repo_path):
         raise DelegateError(f"not a git repository: {repo_path}")
 
-    base_root = (
-        Path(worktree_root).resolve()
-        if worktree_root
-        else Path(tempfile.gettempdir())
-    )
+    base_root = Path(worktree_root).resolve() if worktree_root else Path(tempfile.gettempdir())
     base_root.mkdir(parents=True, exist_ok=True)
     suffix = uuid.uuid4().hex[:12]
     branch = f"{branch_prefix}/{suffix}"
@@ -117,9 +113,7 @@ def prepare_worktree(
         base_ref,
     )
     if result.returncode != 0:
-        raise DelegateError(
-            f"git worktree add failed: {result.stderr.strip() or 'unknown error'}"
-        )
+        raise DelegateError(f"git worktree add failed: {result.stderr.strip() or 'unknown error'}")
     return WorktreeHandle(branch=branch, worktree=worktree, base_ref=base_ref)
 
 
@@ -134,9 +128,7 @@ def capture_diff(handle: WorktreeHandle) -> str:
     delegate that committed AND a delegate that just edited
     files both get fully captured.
     """
-    committed = _git(
-        handle.worktree, "diff", handle.base_ref, "HEAD"
-    )
+    committed = _git(handle.worktree, "diff", handle.base_ref, "HEAD")
     # Unstaged + untracked. We add then diff --cached so newly-
     # created files show up too, then restore the index by
     # reset --mixed afterwards is overkill — instead use
@@ -215,9 +207,7 @@ def _git(cwd: Path, *args: str, timeout_s: float = 30.0) -> subprocess.Completed
     except FileNotFoundError as e:
         raise DelegateError(f"git not on PATH: {e}") from e
     except subprocess.TimeoutExpired as e:
-        raise DelegateError(
-            f"git {' '.join(args)} timed out after {timeout_s:.0f}s"
-        ) from e
+        raise DelegateError(f"git {' '.join(args)} timed out after {timeout_s:.0f}s") from e
 
 
 def _is_git_dir(p: Path) -> bool:
@@ -276,8 +266,7 @@ _NEXT_STEP_TEMPLATE = (
             "timeout_s": {
                 "type": "integer",
                 "description": (
-                    "Wall-clock timeout in seconds. Default "
-                    "cfg.cli_delegate_timeout_s (600)."
+                    "Wall-clock timeout in seconds. Default cfg.cli_delegate_timeout_s (600)."
                 ),
             },
         },
@@ -348,9 +337,7 @@ def delegate_to_cli(
         )
 
     effective_timeout = float(
-        timeout_s
-        if timeout_s is not None
-        else getattr(cfg, "cli_delegate_timeout_s", 600.0)
+        timeout_s if timeout_s is not None else getattr(cfg, "cli_delegate_timeout_s", 600.0)
     )
     worktree_root_cfg = getattr(cfg, "cli_delegate_worktree_root", None)
     worktree_root = Path(worktree_root_cfg) if worktree_root_cfg else None

@@ -22,7 +22,6 @@ from athena.recall import (
 from athena.sessions.store import SearchHit
 from athena.tools.recall_tools import _format_hits, _ranked_hits, _resolve_mode
 
-
 # ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------
@@ -118,9 +117,7 @@ def session_store():
 # ---------------------------------------------------------------------------
 
 
-def test_semantic_finds_paraphrase_keyword_misses(
-    vector_store, session_store, monkeypatch
-):
+def test_semantic_finds_paraphrase_keyword_misses(vector_store, session_store, monkeypatch):
     """A query phrased differently from the stored text gets
     no FTS5 hits (keyword path returns []), but the embedding
     matches and surfaces the right turn."""

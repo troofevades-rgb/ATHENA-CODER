@@ -170,8 +170,4 @@ def default_audit_path(cfg: Any, profile_dir: Path) -> Path:
 
 
 def _now_iso() -> str:
-    return (
-        datetime.datetime.now(datetime.timezone.utc)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")

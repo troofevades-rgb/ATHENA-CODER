@@ -19,7 +19,13 @@ from athena.headless.result import RunResult
 
 
 def _stub_run_fn(
-    *, task, cfg, workspace, model, run_id, timeout_s,
+    *,
+    task,
+    cfg,
+    workspace,
+    model,
+    run_id,
+    timeout_s,
     status: str = "ok",
     answer: str | None = None,
     error: str | None = None,
@@ -33,11 +39,13 @@ def _stub_run_fn(
         started_at="2026-05-21T00:00:00.000000Z",
         finished_at="2026-05-21T00:00:01.000000Z",
         duration_s=0.5,
-        task=task, workspace=str(workspace),
-        model=model or cfg.model, profile="default",
+        task=task,
+        workspace=str(workspace),
+        model=model or cfg.model,
+        profile="default",
         session_id="s-stub-1",
-        tool_calls=[], tokens={"prompt": 1, "completion": 1,
-                               "cache_read": 0, "cache_creation": 0},
+        tool_calls=[],
+        tokens={"prompt": 1, "completion": 1, "cache_read": 0, "cache_creation": 0},
         cost_est=0.0,
         assistant_text=(answer if answer is not None else f"answer for: {task}"),
         error=error,
@@ -84,8 +92,7 @@ def test_parse_cases_skips_blanks_and_comments(tmp_path: Path):
 def test_parse_cases_line_numbered_errors(tmp_path: Path):
     f = tmp_path / "cases.jsonl"
     f.write_text(
-        '{"task": "ok", "expected": "x"}\n'
-        'not json\n',
+        '{"task": "ok", "expected": "x"}\nnot json\n',
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="line 2.*not valid JSON"):
@@ -125,8 +132,11 @@ def test_run_eval_all_pass_with_exact(tmp_path: Path):
         return _stub_run_fn(task=task, answer=answers[task], **kw)
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.total == 3
@@ -152,8 +162,11 @@ def test_run_eval_mixed_results(tmp_path: Path):
         return _stub_run_fn(task=task, answer="bye", **kw)
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.passed == 1
@@ -177,13 +190,17 @@ def test_per_case_scorer_overrides_default(tmp_path: Path):
             scorer="contains",
         ),
     ]
+
     def _stub(*, task, **kw):
         # "the answer is 42" CONTAINS "answer" but isn't equal.
         return _stub_run_fn(task=task, answer="the answer is 42", **kw)
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.passed == 1
@@ -205,21 +222,23 @@ def test_errored_runs_counted_separately(tmp_path: Path):
     cases = [
         EvalCase(task="will-error", expected="x", case_id="e-err"),
     ]
+
     def _stub(*, task, **kw):
         return _stub_run_fn(task=task, status="error", error="boom", **kw)
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.passed == 0
     assert summary.failed == 0
     assert summary.errored == 1
     # Score row explains.
-    row = json.loads(
-        (tmp_path / "out" / "scores.jsonl").read_text().strip()
-    )
+    row = json.loads((tmp_path / "out" / "scores.jsonl").read_text().strip())
     assert "run did not complete" in row["details"]
     assert row["scorer"] == "exact"  # scorer name recorded even when not invoked
 
@@ -238,6 +257,7 @@ def test_json_path_scorer_end_to_end(tmp_path: Path):
             case_id="e-json",
         ),
     ]
+
     def _stub(*, task, **kw):
         return _stub_run_fn(
             task=task,
@@ -246,8 +266,11 @@ def test_json_path_scorer_end_to_end(tmp_path: Path):
         )
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.passed == 1
@@ -265,23 +288,33 @@ def test_by_scorer_histogram(tmp_path: Path):
         EvalCase(task="t2", expected="A", case_id="e-2", scorer="exact"),
         EvalCase(task="t3", expected="answer", case_id="e-3", scorer="contains"),
     ]
+
     def _stub(*, task, **kw):
         if task == "t1":
-            return _stub_run_fn(task=task, answer="A", **kw)        # pass
+            return _stub_run_fn(task=task, answer="A", **kw)  # pass
         if task == "t2":
-            return _stub_run_fn(task=task, answer="B", **kw)        # fail
+            return _stub_run_fn(task=task, answer="B", **kw)  # fail
         return _stub_run_fn(task=task, answer="the answer is", **kw)  # contains pass
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.by_scorer["exact"] == {
-        "total": 2, "passed": 1, "failed": 1, "errored": 0,
+        "total": 2,
+        "passed": 1,
+        "failed": 1,
+        "errored": 0,
     }
     assert summary.by_scorer["contains"] == {
-        "total": 1, "passed": 1, "failed": 0, "errored": 0,
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "errored": 0,
     }
 
 
@@ -296,11 +329,16 @@ def test_case_ids_minted_when_absent(tmp_path: Path):
     cases = [
         EvalCase(task="t", expected="x"),  # no case_id
     ]
+
     def _stub(*, task, **kw):
         return _stub_run_fn(task=task, answer="x", **kw)
+
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub,
     )
     assert summary.cases[0].case_id.startswith("e-")
@@ -322,24 +360,46 @@ def test_baseline_regression_detection(tmp_path: Path):
     baseline_dir.mkdir()
     # Baseline summary fixture written by hand (mimicking a
     # prior eval run that's now on disk).
-    (baseline_dir / "eval-summary.json").write_text(json.dumps({
-        "eval_id": "v-baseline",
-        "cases": [
-            {"case_id": "e-1", "passed": True,  "scorer": "exact",
-             "score": 1.0, "run_status": "ok",
-             "task_excerpt": "", "actual_excerpt": "",
-             "details": "", "envelope_path": "", "run_id": "r-x"},
-            {"case_id": "e-2", "passed": False, "scorer": "exact",
-             "score": 0.0, "run_status": "ok",
-             "task_excerpt": "", "actual_excerpt": "",
-             "details": "", "envelope_path": "", "run_id": "r-y"},
-        ],
-    }), encoding="utf-8")
+    (baseline_dir / "eval-summary.json").write_text(
+        json.dumps(
+            {
+                "eval_id": "v-baseline",
+                "cases": [
+                    {
+                        "case_id": "e-1",
+                        "passed": True,
+                        "scorer": "exact",
+                        "score": 1.0,
+                        "run_status": "ok",
+                        "task_excerpt": "",
+                        "actual_excerpt": "",
+                        "details": "",
+                        "envelope_path": "",
+                        "run_id": "r-x",
+                    },
+                    {
+                        "case_id": "e-2",
+                        "passed": False,
+                        "scorer": "exact",
+                        "score": 0.0,
+                        "run_status": "ok",
+                        "task_excerpt": "",
+                        "actual_excerpt": "",
+                        "details": "",
+                        "envelope_path": "",
+                        "run_id": "r-y",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     cases = [
         EvalCase(task="t1", expected="A", case_id="e-1"),  # baseline pass
         EvalCase(task="t2", expected="B", case_id="e-2"),  # baseline fail
     ]
+
     def _stub(*, task, **kw):
         # Current run: e-1 fails (regression), e-2 passes (improvement).
         if task == "t1":
@@ -347,8 +407,11 @@ def test_baseline_regression_detection(tmp_path: Path):
         return _stub_run_fn(task=task, answer="B", **kw)
 
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         baseline_dir=baseline_dir,
         _run_fn=_stub,
     )
@@ -364,11 +427,16 @@ def test_baseline_missing_summary_skips_diff(tmp_path: Path):
     empty_baseline = tmp_path / "empty-baseline"
     empty_baseline.mkdir()
     cases = [EvalCase(task="t", expected="x", case_id="e-1")]
+
     def _stub(*, task, **kw):
         return _stub_run_fn(task=task, answer="x", **kw)
+
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         baseline_dir=empty_baseline,
         _run_fn=_stub,
     )
@@ -382,24 +450,42 @@ def test_baseline_unmatched_case_ids_ignored(tmp_path: Path):
     vice versa, don't generate phantom regressions/improvements."""
     baseline_dir = tmp_path / "baseline"
     baseline_dir.mkdir()
-    (baseline_dir / "eval-summary.json").write_text(json.dumps({
-        "eval_id": "v-base",
-        "cases": [
-            {"case_id": "e-old", "passed": True, "scorer": "exact",
-             "score": 1.0, "run_status": "ok",
-             "task_excerpt": "", "actual_excerpt": "",
-             "details": "", "envelope_path": "", "run_id": ""},
-        ],
-    }), encoding="utf-8")
+    (baseline_dir / "eval-summary.json").write_text(
+        json.dumps(
+            {
+                "eval_id": "v-base",
+                "cases": [
+                    {
+                        "case_id": "e-old",
+                        "passed": True,
+                        "scorer": "exact",
+                        "score": 1.0,
+                        "run_status": "ok",
+                        "task_excerpt": "",
+                        "actual_excerpt": "",
+                        "details": "",
+                        "envelope_path": "",
+                        "run_id": "",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     cases = [
         EvalCase(task="new", expected="x", case_id="e-new"),
     ]
+
     def _stub(*, task, **kw):
         return _stub_run_fn(task=task, answer="x", **kw)
+
     summary = run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         baseline_dir=baseline_dir,
         _run_fn=_stub,
     )
@@ -417,17 +503,18 @@ def test_baseline_unmatched_case_ids_ignored(tmp_path: Path):
 
 
 def test_score_progress_fires_per_case(tmp_path: Path):
-    cases = [
-        EvalCase(task=f"t{i}", expected="x", case_id=f"e-{i:03d}")
-        for i in range(4)
-    ]
+    cases = [EvalCase(task=f"t{i}", expected="x", case_id=f"e-{i:03d}") for i in range(4)]
+
     def _stub(*, task, **kw):
         return _stub_run_fn(task=task, answer="x", **kw)
 
     log: list[tuple[bool, int, int]] = []
     run_eval(
-        cases, cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        cases,
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         score_progress=lambda es, done, total: log.append((es.passed, done, total)),
         _run_fn=_stub,
     )
@@ -441,8 +528,11 @@ def test_score_progress_fires_per_case(tmp_path: Path):
 
 def test_empty_cases_produces_empty_summary(tmp_path: Path):
     summary = run_eval(
-        [], cfg=_cfg(), workspace_default=tmp_path,
-        output_dir=tmp_path / "out", default_scorer="exact",
+        [],
+        cfg=_cfg(),
+        workspace_default=tmp_path,
+        output_dir=tmp_path / "out",
+        default_scorer="exact",
         _run_fn=_stub_run_fn,
     )
     assert summary.total == 0
@@ -464,7 +554,9 @@ def test_unknown_default_scorer_rejected(tmp_path: Path):
     cases = [EvalCase(task="t", expected="x")]
     with pytest.raises(KeyError, match="unknown scorer"):
         run_eval(
-            cases, cfg=_cfg(), workspace_default=tmp_path,
+            cases,
+            cfg=_cfg(),
+            workspace_default=tmp_path,
             output_dir=tmp_path / "out",
             default_scorer="nonexistent",
             _run_fn=_stub_run_fn,

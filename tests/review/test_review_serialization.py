@@ -115,9 +115,7 @@ def test_wait_returns_after_timeout_if_review_hangs(tmp_path: Path) -> None:
     elapsed = time.monotonic() - start
     # Should have returned at ~0.3s (the timeout), not earlier
     # (the review never finishes) and not much later.
-    assert 0.25 < elapsed < 0.8, (
-        f"wait took {elapsed:.3f}s; expected ~0.3s timeout."
-    )
+    assert 0.25 < elapsed < 0.8, f"wait took {elapsed:.3f}s; expected ~0.3s timeout."
     # The thread is STILL ALIVE — we just stopped waiting on it
     assert review.is_alive()
     # Clean up so pytest doesn't complain
@@ -134,8 +132,8 @@ def test_maybe_fire_review_records_thread_on_parent(tmp_path: Path) -> None:
     """After maybe_fire_review fires (counter trips), the thread it
     spawned must be stored on parent_agent._active_review_thread so
     the next run_turn can wait for it."""
-    from athena.review import nudge, orchestrator
     from athena.config import Config
+    from athena.review import nudge, orchestrator
 
     nudge.reset_all()
     parent = SimpleNamespace(
@@ -154,6 +152,7 @@ def test_maybe_fire_review_records_thread_on_parent(tmp_path: Path) -> None:
     # Patch fork so we don't actually run a child agent — just
     # block long enough that the test can observe the thread.
     finish = threading.Event()
+
     def _stub_fork(*args, **kwargs):
         finish.wait(timeout=2.0)
         return SimpleNamespace(actions=[], error=None)

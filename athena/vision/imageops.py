@@ -74,8 +74,7 @@ def _open_safely(path: Path | str) -> Image.Image:
     w, h = img.size
     if w * h > MAX_INPUT_PIXELS:
         raise ValueError(
-            f"image too large: {w}x{h} = {w * h:,} px exceeds "
-            f"MAX_INPUT_PIXELS={MAX_INPUT_PIXELS:,}"
+            f"image too large: {w}x{h} = {w * h:,} px exceeds MAX_INPUT_PIXELS={MAX_INPUT_PIXELS:,}"
         )
     return img
 
@@ -249,11 +248,13 @@ def error_level_analysis(
             t_hist = tile.histogram()
             t_total = (x1 - x0) * (y1 - y0)
             tile_mean = sum(i * c for i, c in enumerate(t_hist)) / max(1, t_total)
-            patches.append({
-                "box": [x0, y0, x1, y1],
-                "max_diff": tile_max,
-                "mean_diff": round(tile_mean, 3),
-            })
+            patches.append(
+                {
+                    "box": [x0, y0, x1, y1],
+                    "max_diff": tile_max,
+                    "mean_diff": round(tile_mean, 3),
+                }
+            )
     return {
         "quality": quality,
         "threshold": threshold,
@@ -299,9 +300,7 @@ def crop_region(
     w, h = img.size
     x0, y0, x1, y1 = box
     if not (0 <= x0 < x1 <= w and 0 <= y0 < y1 <= h):
-        raise ValueError(
-            f"box {box} out of bounds for image of size {w}x{h}"
-        )
+        raise ValueError(f"box {box} out of bounds for image of size {w}x{h}")
     cropped = img.crop((x0, y0, x1, y1))
 
     out_dir_p = Path(out_dir)
@@ -312,6 +311,7 @@ def crop_region(
 
     # Compute sha256 of the OUTPUT (the cropped artifact).
     import hashlib
+
     sha = hashlib.sha256(out_path.read_bytes()).hexdigest()
 
     result: dict[str, Any] = {
@@ -323,6 +323,7 @@ def crop_region(
     }
     if return_b64:
         import base64
+
         result["image_b64"] = base64.b64encode(out_path.read_bytes()).decode("ascii")
     return result
 
@@ -361,7 +362,7 @@ def histogram(path: Path | str, *, bins: int = 16) -> dict[str, Any]:
         offset = ch_idx * 256
         for b in range(bins):
             start = offset + b * width
-            data[ch].append(sum(raw[start:start + width]))
+            data[ch].append(sum(raw[start : start + width]))
     return {
         "bins": bins,
         "channels": ["R", "G", "B"],
@@ -393,10 +394,7 @@ def perceptual_hash(
     (the imagehash library's default — 64-bit fingerprint).
     """
     if algorithm not in _HASH_ALGOS:
-        raise ValueError(
-            f"unknown algorithm {algorithm!r}; "
-            f"choose from {sorted(_HASH_ALGOS)}"
-        )
+        raise ValueError(f"unknown algorithm {algorithm!r}; choose from {sorted(_HASH_ALGOS)}")
     fn = _HASH_ALGOS[algorithm]
     img = _open_safely(path)
     h = fn(img, hash_size=hash_size)

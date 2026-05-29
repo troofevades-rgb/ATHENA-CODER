@@ -67,7 +67,10 @@ def list_hooks() -> list[Hook]:
 
 
 def fire(
-    event: str, *, tool_name: str = "", payload: dict[str, Any] | None = None,
+    event: str,
+    *,
+    tool_name: str = "",
+    payload: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
     """Compat shim: dispatch through a fresh ShellHookPlugin run.
 
@@ -78,6 +81,8 @@ def fire(
     """
     from .plugins.bundled.shell_hook.plugin import (
         _load_hooks as _plugin_load,
+    )
+    from .plugins.bundled.shell_hook.plugin import (
         _run_shell_hooks as _plugin_run,
     )
 

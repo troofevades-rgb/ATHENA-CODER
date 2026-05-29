@@ -136,6 +136,7 @@ def strip_cache_markers(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     message carries a marker, return a shallow list copy and skip the
     deepcopy entirely — the common case on the persist path.
     """
+
     def _has_marker(msg: dict[str, Any]) -> bool:
         if "cache_control" in msg:
             return True

@@ -24,7 +24,6 @@ import pytest
 from athena.video.analyze import _run as video_run
 from tests.video.fixtures import FIXTURES_DIR, have_ffmpeg
 
-
 _NEED_FFMPEG = pytest.mark.skipif(
     not have_ffmpeg(),
     reason="ffmpeg not on PATH",
@@ -112,13 +111,15 @@ def test_analyze_mode_includes_transcript_when_audio_fn_available(
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return f"frame {Path(frame_path).name}"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path),
-        _provider_fn=_vision_stub,
-        _audio_fn=_audio_stub,
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path),
+            _provider_fn=_vision_stub,
+            _audio_fn=_audio_stub,
+        )
+    )
 
     assert out["mode"] == "analyze"
     assert "transcript" in out
@@ -140,13 +141,15 @@ def test_analyze_mode_omits_transcript_when_audio_fn_returns_none(
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return "described"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path),
-        _provider_fn=_vision_stub,
-        _audio_fn=lambda _path: None,
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path),
+            _provider_fn=_vision_stub,
+            _audio_fn=lambda _path: None,
+        )
+    )
 
     assert "transcript" not in out
     assert "analyses" in out  # frames-side still ran
@@ -164,13 +167,15 @@ def test_analyze_mode_handles_audio_fn_exception(tmp_path: Path):
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return "described"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path),
-        _provider_fn=_vision_stub,
-        _audio_fn=_audio_raises,
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path),
+            _provider_fn=_vision_stub,
+            _audio_fn=_audio_raises,
+        )
+    )
 
     # No transcript field, but no crash + frame analysis intact.
     assert "transcript" not in out
@@ -188,13 +193,15 @@ def test_analyze_mode_no_audio_fn_no_transcript(tmp_path: Path, monkeypatch):
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return "described"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path, audio_analyze_enabled=False),
-        _provider_fn=_vision_stub,
-        # _audio_fn left None — the default factory will
-        # short-circuit because audio_analyze_enabled=False.
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path, audio_analyze_enabled=False),
+            _provider_fn=_vision_stub,
+            # _audio_fn left None — the default factory will
+            # short-circuit because audio_analyze_enabled=False.
+        )
+    )
 
     assert "transcript" not in out

@@ -67,9 +67,7 @@ def test_boundary_exact_threshold_does_not_confirm():
     document the boundary explicitly than to argue about
     "should 60.0 seconds confirm or not"."""
     cfg = _cfg(sec=60.0, cost=1.0)
-    assert (
-        CostEstimate(seconds_est=60.0, cost_est=1.0).needs_confirm(cfg) is False
-    )
+    assert CostEstimate(seconds_est=60.0, cost_est=1.0).needs_confirm(cfg) is False
 
 
 def test_partial_thresholds():

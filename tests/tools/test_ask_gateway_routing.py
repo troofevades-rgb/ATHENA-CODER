@@ -67,13 +67,15 @@ def test_ask_routes_through_gateway_when_active(gateway: _StubGateway) -> None:
     event and replying via the test's deliver helper."""
     from athena.tools.ask import AskUserQuestion
 
-    questions = [{
-        "question": "Pick one",
-        "options": [
-            {"label": "Alpha", "description": "first"},
-            {"label": "Beta", "description": "second"},
-        ],
-    }]
+    questions = [
+        {
+            "question": "Pick one",
+            "options": [
+                {"label": "Alpha", "description": "first"},
+                {"label": "Beta", "description": "second"},
+            ],
+        }
+    ]
 
     # Drive the tool on a thread because it blocks on the queue.
     result_box: list[str] = []
@@ -87,6 +89,7 @@ def test_ask_routes_through_gateway_when_active(gateway: _StubGateway) -> None:
     # Wait for the event to be shipped
     deadline = 5.0
     import time
+
     t0 = time.time()
     while not gateway.events and time.time() - t0 < deadline:
         time.sleep(0.01)
@@ -114,14 +117,20 @@ def test_ask_cancelled_returns_sentinel(gateway: _StubGateway) -> None:
     from athena.tools.ask import AskUserQuestion
 
     questions = [
-        {"question": "A?", "options": [
-            {"label": "yes", "description": "y"},
-            {"label": "no", "description": "n"},
-        ]},
-        {"question": "B?", "options": [
-            {"label": "go", "description": "g"},
-            {"label": "stop", "description": "s"},
-        ]},
+        {
+            "question": "A?",
+            "options": [
+                {"label": "yes", "description": "y"},
+                {"label": "no", "description": "n"},
+            ],
+        },
+        {
+            "question": "B?",
+            "options": [
+                {"label": "go", "description": "g"},
+                {"label": "stop", "description": "s"},
+            ],
+        },
     ]
 
     result_box: list[str] = []
@@ -133,12 +142,15 @@ def test_ask_cancelled_returns_sentinel(gateway: _StubGateway) -> None:
     t.start()
 
     import time
+
     t0 = time.time()
     while not gateway.events and time.time() - t0 < 5.0:
         time.sleep(0.01)
 
     ask_mod._deliver_question_reply(
-        gateway.events[0].request_id, [], cancelled=True,
+        gateway.events[0].request_id,
+        [],
+        cancelled=True,
     )
     t.join(timeout=2.0)
     assert not t.is_alive()
@@ -149,31 +161,39 @@ def test_ask_cancelled_returns_sentinel(gateway: _StubGateway) -> None:
 
 
 def test_ask_timeout_returns_sentinel_does_not_hang(
-    gateway: _StubGateway, monkeypatch: pytest.MonkeyPatch,
+    gateway: _StubGateway,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """If the user never answers, the tool returns a timeout
     sentinel WITHIN the timeout window — not forever. This is the
     bug that bit production (136-minute hang)."""
     from athena.tools import ask as _ask
+
     # Patch the default timeout to something fast
     real_ask_via_gateway = _ask._ask_via_gateway
 
     def _fast_timeout(*args, **kwargs):
         kwargs["timeout_s"] = 0.5
         return real_ask_via_gateway(*args, **kwargs)
+
     monkeypatch.setattr(_ask, "_ask_via_gateway", _fast_timeout)
+
+    import time
 
     from athena.tools.ask import AskUserQuestion
 
-    import time
     t0 = time.time()
-    result = AskUserQuestion(questions=[{
-        "question": "Will anyone answer?",
-        "options": [
-            {"label": "yes", "description": "y"},
-            {"label": "no", "description": "n"},
-        ],
-    }])
+    result = AskUserQuestion(
+        questions=[
+            {
+                "question": "Will anyone answer?",
+                "options": [
+                    {"label": "yes", "description": "y"},
+                    {"label": "no", "description": "n"},
+                ],
+            }
+        ]
+    )
     elapsed = time.time() - t0
     assert elapsed < 2.0, f"timeout took {elapsed:.2f}s — should be near 0.5s"
     assert "timed out" in result
@@ -190,19 +210,24 @@ def test_ask_delivers_to_correct_request_id_only(
     results: dict[str, str] = {}
 
     def _run(key: str):
-        results[key] = AskUserQuestion(questions=[{
-            "question": f"q-{key}",
-            "options": [
-                {"label": "x", "description": "d"},
-                {"label": "y", "description": "d"},
-            ],
-        }])
+        results[key] = AskUserQuestion(
+            questions=[
+                {
+                    "question": f"q-{key}",
+                    "options": [
+                        {"label": "x", "description": "d"},
+                        {"label": "y", "description": "d"},
+                    ],
+                }
+            ]
+        )
 
     t1 = threading.Thread(target=_run, args=("first",))
     t2 = threading.Thread(target=_run, args=("second",))
     t1.start()
     t2.start()
     import time
+
     t0 = time.time()
     while len(gateway.events) < 2 and time.time() - t0 < 5.0:
         time.sleep(0.01)
@@ -215,7 +240,9 @@ def test_ask_delivers_to_correct_request_id_only(
 
     # Reply to second first — should unblock the second thread only
     ask_mod._deliver_question_reply(
-        rid2, [{"question": "q-second", "answer": "x"}], cancelled=False,
+        rid2,
+        [{"question": "q-second", "answer": "x"}],
+        cancelled=False,
     )
     t2.join(timeout=2.0)
     assert not t2.is_alive()
@@ -224,7 +251,9 @@ def test_ask_delivers_to_correct_request_id_only(
 
     # Now reply to first
     ask_mod._deliver_question_reply(
-        rid1, [{"question": "q-first", "answer": "y"}], cancelled=False,
+        rid1,
+        [{"question": "q-first", "answer": "y"}],
+        cancelled=False,
     )
     t1.join(timeout=2.0)
     assert not t1.is_alive()
@@ -253,11 +282,16 @@ def test_headless_falls_back_to_stdin_path(
     monkeypatch.setattr("builtins.input", lambda *a, **kw: "1")
 
     from athena.tools.ask import AskUserQuestion
-    result = AskUserQuestion(questions=[{
-        "question": "Pick",
-        "options": [
-            {"label": "Choice", "description": "d"},
-            {"label": "Other", "description": "d"},
-        ],
-    }])
+
+    result = AskUserQuestion(
+        questions=[
+            {
+                "question": "Pick",
+                "options": [
+                    {"label": "Choice", "description": "d"},
+                    {"label": "Other", "description": "d"},
+                ],
+            }
+        ]
+    )
     assert "A: Choice" in result

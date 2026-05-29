@@ -10,9 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..safety.path_security import normalize_msys_path
+from ..safety.path_security import normalize_msys_path, validate_path
 from ..safety.path_security import set_workspace as _set_path_security_workspace
-from ..safety.path_security import validate_path
 from .delta_lint import lint_after_write
 from .registry import tool
 
@@ -53,9 +52,7 @@ def _verify_after_write(p: Path) -> str:
     except Exception:  # noqa: BLE001
         import logging as _logging
 
-        _logging.getLogger(__name__).debug(
-            "post-write verify failed for %s", p, exc_info=True
-        )
+        _logging.getLogger(__name__).debug("post-write verify failed for %s", p, exc_info=True)
         return ""
     # passed → quiet (no noise on the green path), failure / skipped
     # → surface the full report so the rollback hint reaches the
@@ -228,10 +225,7 @@ def Write(file_path: str = "", content: str = "", **legacy) -> str:
             "Fix the syntax and re-call Write."
         )
     verify_tail = _verify_after_write(p)
-    return (
-        f"{'overwrote' if existed else 'created'} {p} ({len(content)} bytes)"
-        + verify_tail
-    )
+    return f"{'overwrote' if existed else 'created'} {p} ({len(content)} bytes)" + verify_tail
 
 
 # ---- Edit (str_replace) -------------------------------------------------
@@ -339,8 +333,7 @@ def Edit(
         verify_tail = _verify_after_write(p)
         return (
             f"edited {p}: replaced 1 occurrence{suffix} "
-            f"({len(old_string)} -> {len(new_string)} chars)"
-            + verify_tail
+            f"({len(old_string)} -> {len(new_string)} chars)" + verify_tail
         )
     if count > 1 and not replace_all:
         return (
@@ -367,8 +360,7 @@ def Edit(
     verify_tail = _verify_after_write(p)
     return (
         f"edited {p}: replaced {replacements} occurrence(s) "
-        f"({len(old_string)} -> {len(new_string)} chars each)"
-        + verify_tail
+        f"({len(old_string)} -> {len(new_string)} chars each)" + verify_tail
     )
 
 

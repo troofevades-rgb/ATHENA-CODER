@@ -59,9 +59,7 @@ def test_never_used_appears_in_prompt_section(monkeypatch, tmp_path: Path) -> No
     monkeypatch.setattr("athena.config.profile_dir", lambda _p: profile)
     monkeypatch.setattr(
         "athena.skills.discovery.discover_skills",
-        lambda ws=None, **_: {
-            n: (None, None) for n in ("used-skill", "never-touched")
-        },
+        lambda ws=None, **_: {n: (None, None) for n in ("used-skill", "never-touched")},
     )
 
     from athena.curator.orchestrator import _build_usage_section_for_prompt

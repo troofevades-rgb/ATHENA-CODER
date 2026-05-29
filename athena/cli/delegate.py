@@ -67,11 +67,14 @@ def _verify_command(template: str | None) -> dict:
     # Best-effort version capture (some binaries don't have
     # --version; we don't fail if it doesn't respond).
     import subprocess
+
     version = None
     try:
         out = subprocess.run(
-            [location, "--version"], capture_output=True,
-            text=True, timeout=10,
+            [location, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if out.returncode == 0 and out.stdout.strip():
             version = out.stdout.strip().splitlines()[0]
@@ -113,8 +116,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
             )
             if not enabled:
                 sys.stdout.write(
-                    "    (note: cli_delegate_enabled=false — "
-                    "set it to true to actually delegate)\n"
+                    "    (note: cli_delegate_enabled=false — set it to true to actually delegate)\n"
                 )
         else:
             sys.stdout.write(f"FAIL  {verdict['reason']}\n")
@@ -135,21 +137,31 @@ def cmd_setup_codex(args: argparse.Namespace) -> int:
 
     if not detection.found:
         if args.json:
-            sys.stdout.write(json.dumps({
-                "found": False,
-                "error": detection.error,
-            }) + "\n")
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "found": False,
+                        "error": detection.error,
+                    }
+                )
+                + "\n"
+            )
         else:
             sys.stdout.write(f"codex NOT found on PATH.\n\n{detection.error}\n")
         return 1
 
     if args.detect_only:
         if args.json:
-            sys.stdout.write(json.dumps({
-                "found": True,
-                "path": detection.path,
-                "version": detection.version,
-            }) + "\n")
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "found": True,
+                        "path": detection.path,
+                        "version": detection.version,
+                    }
+                )
+                + "\n"
+            )
         else:
             sys.stdout.write(
                 f"codex found\n"
@@ -163,11 +175,17 @@ def cmd_setup_codex(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         if args.json:
-            sys.stdout.write(json.dumps({
-                "found": True, "path": detection.path,
-                "version": detection.version,
-                "would_write": snippet,
-            }) + "\n")
+            sys.stdout.write(
+                json.dumps(
+                    {
+                        "found": True,
+                        "path": detection.path,
+                        "version": detection.version,
+                        "would_write": snippet,
+                    }
+                )
+                + "\n"
+            )
         else:
             sys.stdout.write(
                 f"codex found at {detection.path}\n"
@@ -208,11 +226,17 @@ def cmd_setup_codex(args: argparse.Namespace) -> int:
         return 2
 
     if args.json:
-        sys.stdout.write(json.dumps({
-            "found": True, "path": detection.path,
-            "version": detection.version,
-            "wrote": str(written),
-        }) + "\n")
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "found": True,
+                    "path": detection.path,
+                    "version": detection.version,
+                    "wrote": str(written),
+                }
+            )
+            + "\n"
+        )
     else:
         sys.stdout.write(
             f"OK  config updated at {written}\n"
@@ -233,8 +257,7 @@ def main(argv: list[str]) -> int:
         "verify",
         help="Sanity-check the current cli_delegate_command config.",
     )
-    pv.add_argument("--json", action="store_true",
-                    help="Machine-readable output.")
+    pv.add_argument("--json", action="store_true", help="Machine-readable output.")
     pv.set_defaults(func=cmd_verify)
 
     ps = sub.add_parser(
@@ -274,12 +297,14 @@ def main(argv: list[str]) -> int:
         ),
     )
     ps.add_argument(
-        "--yes", "-y",
+        "--yes",
+        "-y",
         action="store_true",
         help="Skip the confirmation prompt.",
     )
     ps.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="Machine-readable output.",
     )
     ps.set_defaults(func=cmd_setup_codex)

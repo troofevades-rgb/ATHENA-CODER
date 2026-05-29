@@ -19,7 +19,8 @@ from pathlib import Path
 import pytest
 
 import athena.cli.train as train_cli
-from athena.transform.run_state import STATE_FILE_NAME, load as load_run_state
+from athena.transform.run_state import STATE_FILE_NAME
+from athena.transform.run_state import load as load_run_state
 
 
 def _run(argv: list[str]) -> tuple[int, str, str]:
@@ -55,9 +56,7 @@ def _write_sft(tmp_path: Path) -> Path:
 
 def _write_dpo(tmp_path: Path) -> Path:
     dpo = tmp_path / "dpo.jsonl"
-    dpo.write_text(
-        '{"prompt": "p", "chosen": "c", "rejected": "r"}\n', encoding="utf-8"
-    )
+    dpo.write_text('{"prompt": "p", "chosen": "c", "rejected": "r"}\n', encoding="utf-8")
     return dpo
 
 
@@ -100,8 +99,17 @@ def test_run_writes_state_file_after_each_phase(
     _stub_phases(monkeypatch)
 
     rc, _, _ = _run(
-        ["run", "--base-model", "qwen2.5:14b", "--sft-dataset", str(sft),
-         "--dpo-dataset", str(dpo), "--output-dir", str(out_dir)],
+        [
+            "run",
+            "--base-model",
+            "qwen2.5:14b",
+            "--sft-dataset",
+            str(sft),
+            "--dpo-dataset",
+            str(dpo),
+            "--output-dir",
+            str(out_dir),
+        ],
     )
     assert rc == 0
     state_file = out_dir / STATE_FILE_NAME
@@ -122,8 +130,19 @@ def test_run_state_records_args_for_resume(
     out_dir = tmp_path / "run-out"
     _stub_phases(monkeypatch)
     _run(
-        ["run", "--base-model", "qwen2.5:14b", "--sft-dataset", str(sft),
-         "--epochs", "5", "--lr", "1e-4", "--output-dir", str(out_dir)],
+        [
+            "run",
+            "--base-model",
+            "qwen2.5:14b",
+            "--sft-dataset",
+            str(sft),
+            "--epochs",
+            "5",
+            "--lr",
+            "1e-4",
+            "--output-dir",
+            str(out_dir),
+        ],
     )
     state = load_run_state(out_dir)
     assert state is not None
@@ -198,8 +217,17 @@ def test_run_dpo_failure_is_soft_continues_to_export(
     out_dir = tmp_path / "run-out"
     calls = _stub_phases(monkeypatch, dpo_rc=1)
     rc, _, err = _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--dpo-dataset", str(dpo), "--output-dir", str(out_dir)],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--dpo-dataset",
+            str(dpo),
+            "--output-dir",
+            str(out_dir),
+        ],
     )
     assert rc == 0
     assert calls == ["lora", "dpo", "export"]
@@ -249,8 +277,16 @@ def test_resume_skips_completed_phases(
     # Second invocation: --resume; only export should re-run.
     calls = _stub_phases(monkeypatch)  # all succeed now (fresh calls list)
     rc, _, _ = _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--output-dir", str(out_dir), "--resume"],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--output-dir",
+            str(out_dir),
+            "--resume",
+        ],
     )
     assert rc == 0
     assert calls == ["export"]
@@ -280,8 +316,7 @@ def test_resume_passes_checkpoint_to_sft(
     (ckpt_dir / "trainer_state.json").write_text("{}", encoding="utf-8")
 
     _stub_phases(monkeypatch, sft_rc=1, create_adapter=False)
-    _run(["run", "--base-model", "x", "--sft-dataset", str(sft),
-          "--output-dir", str(out_dir)])
+    _run(["run", "--base-model", "x", "--sft-dataset", str(sft), "--output-dir", str(out_dir)])
 
     # Second invocation: capture the resume_from_checkpoint passed in.
     observed: dict = {}
@@ -298,8 +333,16 @@ def test_resume_passes_checkpoint_to_sft(
     monkeypatch.setattr(train_cli, "ensure_ollama_on_path", lambda: True)
 
     rc, _, _ = _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--output-dir", str(out_dir), "--resume"],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--output-dir",
+            str(out_dir),
+            "--resume",
+        ],
     )
     assert rc == 0
     assert observed["resume_from_checkpoint"] is not None
@@ -318,8 +361,17 @@ def test_resume_invalidates_downstream_on_late_dpo_success(
     # First run: DPO fails, export succeeds.
     _stub_phases(monkeypatch, dpo_rc=1)
     _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--dpo-dataset", str(dpo), "--output-dir", str(out_dir)],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--dpo-dataset",
+            str(dpo),
+            "--output-dir",
+            str(out_dir),
+        ],
     )
     state = load_run_state(out_dir)
     assert state is not None
@@ -329,8 +381,18 @@ def test_resume_invalidates_downstream_on_late_dpo_success(
     # Resume: all succeed now.
     calls = _stub_phases(monkeypatch)
     rc, stdout, _ = _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--dpo-dataset", str(dpo), "--output-dir", str(out_dir), "--resume"],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--dpo-dataset",
+            str(dpo),
+            "--output-dir",
+            str(out_dir),
+            "--resume",
+        ],
     )
     assert rc == 0
     # DPO retried; export re-ran because DPO succeeded.
@@ -344,13 +406,20 @@ def test_resume_already_complete_is_noop(
     sft = _write_sft(tmp_path)
     out_dir = tmp_path / "run-out"
     _stub_phases(monkeypatch)
-    _run(["run", "--base-model", "x", "--sft-dataset", str(sft),
-          "--output-dir", str(out_dir)])
+    _run(["run", "--base-model", "x", "--sft-dataset", str(sft), "--output-dir", str(out_dir)])
 
     calls = _stub_phases(monkeypatch)
     rc, stdout, _ = _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--output-dir", str(out_dir), "--resume"],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--output-dir",
+            str(out_dir),
+            "--resume",
+        ],
     )
     assert rc == 0
     assert calls == []  # nothing re-ran
@@ -364,8 +433,16 @@ def test_resume_without_state_file_errors(
     out_dir = tmp_path / "no-such-run"
     _stub_phases(monkeypatch)
     rc, _, err = _run(
-        ["run", "--base-model", "x", "--sft-dataset", str(sft),
-         "--output-dir", str(out_dir), "--resume"],
+        [
+            "run",
+            "--base-model",
+            "x",
+            "--sft-dataset",
+            str(sft),
+            "--output-dir",
+            str(out_dir),
+            "--resume",
+        ],
     )
     assert rc == 2
     assert "no state file" in err
@@ -382,8 +459,17 @@ def test_resume_sugar_command_rehydrates_args(
     sft = _write_sft(tmp_path)
     out_dir = tmp_path / "the-run"
     _stub_phases(monkeypatch, export_rc=1)
-    _run(["run", "--base-model", "qwen2.5:14b", "--sft-dataset", str(sft),
-          "--output-dir", str(out_dir)])
+    _run(
+        [
+            "run",
+            "--base-model",
+            "qwen2.5:14b",
+            "--sft-dataset",
+            str(sft),
+            "--output-dir",
+            str(out_dir),
+        ]
+    )
 
     calls = _stub_phases(monkeypatch)
     # Note: no --base-model, no --sft-dataset on the resume invocation.
@@ -400,8 +486,7 @@ def test_resume_sugar_command_can_override_args(
     sft = _write_sft(tmp_path)
     out_dir = tmp_path / "the-run"
     _stub_phases(monkeypatch)  # first run completes with no DPO
-    _run(["run", "--base-model", "x", "--sft-dataset", str(sft),
-          "--output-dir", str(out_dir)])
+    _run(["run", "--base-model", "x", "--sft-dataset", str(sft), "--output-dir", str(out_dir)])
     state = load_run_state(out_dir)
     assert state is not None
     assert state.status_of("dpo") == "skipped"
@@ -412,8 +497,7 @@ def test_resume_sugar_command_can_override_args(
     dpo = _write_dpo(tmp_path)
     calls = _stub_phases(monkeypatch)
     rc, _, _ = _run(
-        ["resume", "the-run", "--output-dir", str(out_dir),
-         "--dpo-dataset", str(dpo)],
+        ["resume", "the-run", "--output-dir", str(out_dir), "--dpo-dataset", str(dpo)],
     )
     assert rc == 0
     assert "dpo" in calls

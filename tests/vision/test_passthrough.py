@@ -29,7 +29,6 @@ from athena.vision.passthrough import (
 )
 from tests.vision.fixtures import FIXTURES_DIR, ensure_fixtures
 
-
 # ---------------------------------------------------------------
 # happy paths per provider
 # ---------------------------------------------------------------

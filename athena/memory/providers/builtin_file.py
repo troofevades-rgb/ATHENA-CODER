@@ -104,9 +104,7 @@ class BuiltinFileProvider(MemoryProvider):
         on the inline -- existing legacy data continues to map.
         """
         s = str(workspace.resolve())
-        base = re.sub(
-            r"[^a-zA-Z0-9._-]", "_", s.strip("/").replace("/", "-")
-        ) or "root"
+        base = re.sub(r"[^a-zA-Z0-9._-]", "_", s.strip("/").replace("/", "-")) or "root"
         h = hashlib.sha1(s.encode("utf-8")).hexdigest()[:8]
         return f"{base}_{h}"
 
@@ -136,9 +134,7 @@ class BuiltinFileProvider(MemoryProvider):
 
     # ---- SQLite mirror --------------------------------------------------
 
-    def _connect(
-        self, profile: str, workspace: Path | None = None
-    ) -> sqlite3.Connection:
+    def _connect(self, profile: str, workspace: Path | None = None) -> sqlite3.Connection:
         self._ensure_dir(profile, workspace=workspace)
         conn = sqlite3.connect(self._db_path(profile, workspace=workspace))
         conn.row_factory = sqlite3.Row
@@ -252,7 +248,11 @@ class BuiltinFileProvider(MemoryProvider):
             raise ValueError(f"cannot use {_MEMORY_FILE_INDEX!r} as a memory filename")
         # Guard against prompt-injected ``filename="../../../passwd"`` —
         # the model can pass arbitrary strings here through memory_tools.
-        if "/" in filename or "\\" in filename or ".." in filename.split("/") + filename.split("\\"):
+        if (
+            "/" in filename
+            or "\\" in filename
+            or ".." in filename.split("/") + filename.split("\\")
+        ):
             raise ValueError(
                 f"memory filename must be a bare filename without path separators: {filename!r}"
             )
@@ -269,16 +269,12 @@ class BuiltinFileProvider(MemoryProvider):
             ("write_origin", write_origin),
         ):
             if "\n" in value or "\r" in value:
-                raise ValueError(
-                    f"memory {field_name} must not contain newlines: {value!r}"
-                )
+                raise ValueError(f"memory {field_name} must not contain newlines: {value!r}")
 
         d = self._ensure_dir(profile, workspace=workspace)
         target = d / filename
         if d.resolve() != target.resolve().parent:
-            raise ValueError(
-                f"resolved memory path {target} escapes memory dir {d}"
-            )
+            raise ValueError(f"resolved memory path {target} escapes memory dir {d}")
         existing_created: datetime | None = None
         if target.exists():
             parsed = _parse_file(target)
@@ -323,9 +319,7 @@ class BuiltinFileProvider(MemoryProvider):
         self._refresh_markdown_index(profile, workspace=workspace)
         return target
 
-    def list_entries(
-        self, profile: str, *, workspace: Path | None = None
-    ) -> list[MemoryEntry]:
+    def list_entries(self, profile: str, *, workspace: Path | None = None) -> list[MemoryEntry]:
         d = self._memory_dir(profile, workspace=workspace)
         if not d.exists():
             return []
@@ -353,9 +347,7 @@ class BuiltinFileProvider(MemoryProvider):
             )
         return self._row_to_entry(row, d)
 
-    def delete_entry(
-        self, profile: str, name: str, *, workspace: Path | None = None
-    ) -> bool:
+    def delete_entry(self, profile: str, name: str, *, workspace: Path | None = None) -> bool:
         d = self._memory_dir(profile, workspace=workspace)
         if not d.exists():
             return False
@@ -400,9 +392,7 @@ class BuiltinFileProvider(MemoryProvider):
 
     # ---- Maintenance ---------------------------------------------------
 
-    def _refresh_markdown_index(
-        self, profile: str, workspace: Path | None = None
-    ) -> None:
+    def _refresh_markdown_index(self, profile: str, workspace: Path | None = None) -> None:
         d = self._memory_dir(profile, workspace=workspace)
         if not d.exists():
             return
@@ -423,9 +413,7 @@ class BuiltinFileProvider(MemoryProvider):
             lines.append(line)
         (d / _MEMORY_FILE_INDEX).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    def _reconcile_from_disk(
-        self, profile: str, workspace: Path | None = None
-    ) -> None:
+    def _reconcile_from_disk(self, profile: str, workspace: Path | None = None) -> None:
         """Rebuild SQLite rows from the on-disk Markdown files.
 
         Cheap idempotent operation: every list/read pass through here so

@@ -106,9 +106,7 @@ def rasterize_page(
     doc = fitz.open(str(path))
     try:
         if page < 1 or page > doc.page_count:
-            raise ValueError(
-                f"page {page} out of range (1..{doc.page_count})"
-            )
+            raise ValueError(f"page {page} out of range (1..{doc.page_count})")
         p = doc.load_page(page - 1)
         # alpha=False keeps the PNG mono-channel-suitable;
         # the matrix scales the 72-DPI base to the requested DPI.
@@ -137,11 +135,13 @@ def _extract_outline(doc: Any) -> list[OutlineEntry]:
         if not isinstance(entry, (list, tuple)) or len(entry) < 3:
             continue
         try:
-            out.append(OutlineEntry(
-                level=int(entry[0]),
-                title=str(entry[1]).strip(),
-                page=int(entry[2]),
-            ))
+            out.append(
+                OutlineEntry(
+                    level=int(entry[0]),
+                    title=str(entry[1]).strip(),
+                    page=int(entry[2]),
+                )
+            )
         except (TypeError, ValueError):
             continue
     return out
@@ -160,11 +160,12 @@ def _extract_tables(doc: Any) -> list[TableData]:
             finder = page.find_tables()
         except Exception:  # noqa: BLE001
             logger.debug(
-                "PDF table extraction failed on page %d", page_idx + 1,
+                "PDF table extraction failed on page %d",
+                page_idx + 1,
                 exc_info=True,
             )
             continue
-        for tbl in (finder.tables if hasattr(finder, "tables") else []):
+        for tbl in finder.tables if hasattr(finder, "tables") else []:
             try:
                 rows = tbl.extract() or []
             except Exception:  # noqa: BLE001
@@ -173,14 +174,14 @@ def _extract_tables(doc: Any) -> list[TableData]:
             for r in rows:
                 if not isinstance(r, (list, tuple)):
                     continue
-                normalised_rows.append([
-                    "" if c is None else str(c) for c in r
-                ])
+                normalised_rows.append(["" if c is None else str(c) for c in r])
             if normalised_rows:
-                tables.append(TableData(
-                    page=page_idx + 1,
-                    rows=normalised_rows,
-                ))
+                tables.append(
+                    TableData(
+                        page=page_idx + 1,
+                        rows=normalised_rows,
+                    )
+                )
     return tables
 
 
@@ -209,13 +210,17 @@ def _extract_figures(doc: Any) -> list[FigureRef]:
                 figures.append(FigureRef(page=page_idx + 1, bbox=None))
                 continue
             for rect in rects:
-                figures.append(FigureRef(
-                    page=page_idx + 1,
-                    bbox=(
-                        float(rect.x0), float(rect.y0),
-                        float(rect.x1), float(rect.y1),
-                    ),
-                ))
+                figures.append(
+                    FigureRef(
+                        page=page_idx + 1,
+                        bbox=(
+                            float(rect.x0),
+                            float(rect.y0),
+                            float(rect.x1),
+                            float(rect.y1),
+                        ),
+                    )
+                )
     return figures
 
 

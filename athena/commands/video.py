@@ -66,11 +66,13 @@ def _auth_status(name: str) -> str:
         candidates.extend(str(k) for k in declared)
     else:
         canonical = name.upper().replace("-", "_")
-        candidates.extend([
-            f"ATHENA_{canonical}_API_KEY",
-            f"ATHENA_{canonical}_TOKEN",
-            f"{canonical}_API_KEY",
-        ])
+        candidates.extend(
+            [
+                f"ATHENA_{canonical}_API_KEY",
+                f"ATHENA_{canonical}_TOKEN",
+                f"{canonical}_API_KEY",
+            ]
+        )
 
     for key in candidates:
         if get_credential(key):
@@ -83,9 +85,7 @@ def _show(agent) -> None:
     vg = getattr(cfg, "video_generation", None) if cfg else None
     selector = vg.backend if vg is not None else None
 
-    ui.console.print(
-        f"[bold]video selector:[/] {selector or '[dim](auto — broker picks)[/]'}"
-    )
+    ui.console.print(f"[bold]video selector:[/] {selector or '[dim](auto — broker picks)[/]'}")
 
     backends = _video_backends()
     if not backends:
@@ -120,10 +120,7 @@ def _set(agent, name: str) -> None:
         ui.error("agent has no cfg attribute — cannot set selector")
         return
     cfg.video_generation.backend = name
-    ui.info(
-        f"video backend → {name} (session-scoped; edit "
-        "~/.athena/config.toml to persist)"
-    )
+    ui.info(f"video backend → {name} (session-scoped; edit ~/.athena/config.toml to persist)")
 
 
 def _clear(agent) -> None:

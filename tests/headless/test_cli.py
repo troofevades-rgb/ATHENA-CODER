@@ -18,7 +18,6 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------
 # In-process tests — call main() directly with a stub Agent
 # injected into run_headless via monkeypatch
@@ -40,7 +39,9 @@ class _StubAgent:
     + run_turn + close."""
 
     def __init__(
-        self, cfg: Any, workspace: Path,
+        self,
+        cfg: Any,
+        workspace: Path,
         model: str | None = None,
         *,
         assistant_text: str = "answer from stub",
@@ -109,6 +110,7 @@ def stub_main_env(monkeypatch, tmp_path: Path):
     # Reroute ui.error/warn/info/banner to capture lists so the
     # test can assert what was emitted where.
     import athena.ui as ui_mod
+
     monkeypatch.setattr(ui_mod, "error", _capture_stderr)
     monkeypatch.setattr(ui_mod, "warn", _capture_stderr)
     monkeypatch.setattr(ui_mod, "info", _capture_stderr)
@@ -130,6 +132,7 @@ def _run_main(argv: list[str], env: Any, capsys) -> tuple[int, str, str]:
     """Set sys.argv to argv, call main(), capture stdout+stderr.
     Returns (exit_code, stdout, stderr)."""
     import sys as _sys
+
     saved = _sys.argv
     _sys.argv = ["athena", *argv]
     try:
@@ -147,7 +150,9 @@ def _run_main(argv: list[str], env: Any, capsys) -> tuple[int, str, str]:
 
 def test_argparse_accepts_json_flag(stub_main_env, capsys):
     code, out, _err = _run_main(
-        ["-p", "hello", "--json"], stub_main_env, capsys,
+        ["-p", "hello", "--json"],
+        stub_main_env,
+        capsys,
     )
     # JSON mode → envelope on stdout, exit 0 on success.
     assert code == 0
@@ -159,7 +164,8 @@ def test_argparse_accepts_json_flag(stub_main_env, capsys):
 def test_argparse_accepts_run_id(stub_main_env, capsys):
     code, out, _err = _run_main(
         ["-p", "hello", "--json", "--run-id", "r-batch-42"],
-        stub_main_env, capsys,
+        stub_main_env,
+        capsys,
     )
     assert code == 0
     payload = json.loads(out.strip())
@@ -171,7 +177,8 @@ def test_argparse_accepts_timeout(stub_main_env, capsys):
     completes (the stub agent doesn't actually wait)."""
     code, _out, _err = _run_main(
         ["-p", "hello", "--timeout", "30.0"],
-        stub_main_env, capsys,
+        stub_main_env,
+        capsys,
     )
     assert code == 0
 
@@ -183,7 +190,9 @@ def test_argparse_accepts_timeout(stub_main_env, capsys):
 
 def test_json_envelope_is_single_line(stub_main_env, capsys):
     code, out, _err = _run_main(
-        ["-p", "hello", "--json"], stub_main_env, capsys,
+        ["-p", "hello", "--json"],
+        stub_main_env,
+        capsys,
     )
     assert code == 0
     # Strip trailing newline, count internal newlines.
@@ -193,16 +202,29 @@ def test_json_envelope_is_single_line(stub_main_env, capsys):
 
 def test_json_envelope_parsable(stub_main_env, capsys):
     code, out, _err = _run_main(
-        ["-p", "hello", "--json"], stub_main_env, capsys,
+        ["-p", "hello", "--json"],
+        stub_main_env,
+        capsys,
     )
     assert code == 0
     payload = json.loads(out.strip())
     assert set(payload.keys()) >= {
-        "run_id", "status", "exit_code",
-        "started_at", "finished_at", "duration_s",
-        "task", "workspace", "model", "profile",
-        "session_id", "tool_calls", "tokens",
-        "cost_est", "assistant_text", "error",
+        "run_id",
+        "status",
+        "exit_code",
+        "started_at",
+        "finished_at",
+        "duration_s",
+        "task",
+        "workspace",
+        "model",
+        "profile",
+        "session_id",
+        "tool_calls",
+        "tokens",
+        "cost_est",
+        "assistant_text",
+        "error",
     }
 
 
@@ -212,7 +234,9 @@ def test_json_mode_no_envelope_chatter_on_stdout(stub_main_env, capsys):
     to stderr (or to wherever the agent's own run_turn writes
     them, but specifically NOT to stdout)."""
     code, out, _err = _run_main(
-        ["-p", "hello", "--json"], stub_main_env, capsys,
+        ["-p", "hello", "--json"],
+        stub_main_env,
+        capsys,
     )
     assert code == 0
     # First non-empty line on stdout should be valid JSON.
@@ -234,7 +258,8 @@ def test_task_from_file(stub_main_env, capsys, tmp_path: Path):
     )
     code, out, _err = _run_main(
         ["--task", str(task_file), "--json"],
-        stub_main_env, capsys,
+        stub_main_env,
+        capsys,
     )
     assert code == 0
     payload = json.loads(out.strip())
@@ -246,7 +271,8 @@ def test_task_from_file(stub_main_env, capsys, tmp_path: Path):
 def test_task_file_missing_invalid(stub_main_env, capsys, tmp_path: Path):
     code, out, _err = _run_main(
         ["--task", str(tmp_path / "nonexistent.txt"), "--json"],
-        stub_main_env, capsys,
+        stub_main_env,
+        capsys,
     )
     assert code == 2
     payload = json.loads(out.strip())
@@ -259,7 +285,8 @@ def test_task_file_wins_over_prompt(stub_main_env, capsys, tmp_path: Path):
     task_file.write_text("from-file task", encoding="utf-8")
     code, out, _err = _run_main(
         ["-p", "from-inline-prompt", "--task", str(task_file), "--json"],
-        stub_main_env, capsys,
+        stub_main_env,
+        capsys,
     )
     assert code == 0
     payload = json.loads(out.strip())
@@ -274,7 +301,9 @@ def test_task_file_wins_over_prompt(stub_main_env, capsys, tmp_path: Path):
 
 def test_json_without_task_invalid(stub_main_env, capsys):
     code, out, _err = _run_main(
-        ["--json"], stub_main_env, capsys,
+        ["--json"],
+        stub_main_env,
+        capsys,
     )
     assert code == 2
     payload = json.loads(out.strip())
@@ -290,13 +319,17 @@ def test_json_without_task_invalid(stub_main_env, capsys):
 def test_error_in_run_turn_exits_with_1(stub_main_env, capsys, monkeypatch):
     """When the agent's run_turn raises, the envelope reports
     status=error and the dispatcher exits 1."""
+
     # Re-patch Agent to one that raises.
     def _failing_agent(*a, **kw):
         return _StubAgent(*a, raise_on_run_turn=RuntimeError("model dead"), **kw)
+
     monkeypatch.setattr(stub_main_env.cli, "Agent", _failing_agent)
 
     code, out, _err = _run_main(
-        ["-p", "hello", "--json"], stub_main_env, capsys,
+        ["-p", "hello", "--json"],
+        stub_main_env,
+        capsys,
     )
     assert code == 1
     payload = json.loads(out.strip())

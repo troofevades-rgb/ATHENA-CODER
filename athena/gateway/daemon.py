@@ -87,15 +87,13 @@ def _make_default_dispatcher(daemon: GatewayDaemon) -> CommandDispatcher:
             model = getattr(meta, "model", "?")
             provider = getattr(meta, "provider", "?")
             profile = getattr(meta, "profile", "?")
-            return (
-                f"session {session_id[:8]}: model={model} provider={provider} "
-                f"profile={profile}"
-            )
+            return f"session {session_id[:8]}: model={model} provider={provider} profile={profile}"
         if verb == "session":
             return f"session id: {session_id}"
         logger.warning(
             "gateway command /%s requested but not bridged to CLI table; "
-            "returning unsupported notice", verb,
+            "returning unsupported notice",
+            verb,
         )
         return (
             f"(command /{verb} is not supported in the gateway transport. "

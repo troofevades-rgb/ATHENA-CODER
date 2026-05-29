@@ -54,8 +54,11 @@ _CTOR_FACTORIES: dict[str, callable] = {
 # Chat backends — the parity tests below skip non-chat providers.
 _NON_CHAT_PROVIDERS: frozenset[str] = frozenset(
     {
-        "social", "stub_video_local", "xai_video",
-        "audio_whisper_local", "ocr_tesseract_local",
+        "social",
+        "stub_video_local",
+        "xai_video",
+        "audio_whisper_local",
+        "ocr_tesseract_local",
     }
 )
 

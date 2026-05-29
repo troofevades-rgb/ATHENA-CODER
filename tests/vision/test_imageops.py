@@ -24,7 +24,6 @@ from athena.vision.imageops import (
 )
 from tests.vision.fixtures import FIXTURES_DIR, ensure_fixtures
 
-
 # ---------------------------------------------------------------
 # EXIF
 # ---------------------------------------------------------------
@@ -47,6 +46,7 @@ def test_exif_empty_on_stripped():
 def test_exif_normalises_to_json_safe():
     """Every value in the returned dict must be JSON-serialisable."""
     import json
+
     ensure_fixtures()
     ex = extract_exif(FIXTURES_DIR / "original.jpg")
     json.dumps(ex)  # would raise TypeError if not
@@ -55,6 +55,7 @@ def test_exif_normalises_to_json_safe():
 def test_open_safely_rejects_too_large(tmp_path: Path, monkeypatch):
     """Bomb-shaped input → ValueError before decode."""
     from PIL import Image
+
     monkeypatch.setattr("athena.vision.imageops.MAX_INPUT_PIXELS", 100)
     img = Image.new("RGB", (50, 50), "white")
     p = tmp_path / "biggie.png"
@@ -72,7 +73,11 @@ def test_ela_returns_documented_shape():
     ensure_fixtures()
     out = error_level_analysis(FIXTURES_DIR / "original.jpg")
     assert set(out.keys()) >= {
-        "quality", "threshold", "max_diff", "mean_diff", "patches",
+        "quality",
+        "threshold",
+        "max_diff",
+        "mean_diff",
+        "patches",
     }
     assert out["quality"] == 80
     assert out["threshold"] == 15

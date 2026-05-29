@@ -48,33 +48,32 @@ serializes to ~1,150 tuples ≈ 18 KB JSON.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Final, Sequence
+from typing import Any, Final
 
-_IMAGE_PATH: Final[Path] = (
-    Path(__file__).resolve().parent.parent / "_owl_image.jpg"
-)
+_IMAGE_PATH: Final[Path] = Path(__file__).resolve().parent.parent / "_owl_image.jpg"
 
 # Lookup table mapping a 4-bit (TL,TR,BL,BR) pattern to its
 # corresponding Unicode quadrant glyph. Indexed: bit 3=TL,
 # bit 2=TR, bit 1=BL, bit 0=BR.
 _QUADRANT_GLYPHS: Final[tuple[str, ...]] = (
-    " ",   # 0000
-    "▗",   # 0001
-    "▖",   # 0010
-    "▄",   # 0011
-    "▝",   # 0100
-    "▐",   # 0101
-    "▞",   # 0110
-    "▟",   # 0111
-    "▘",   # 1000
-    "▚",   # 1001
-    "▌",   # 1010
-    "▙",   # 1011
-    "▀",   # 1100
-    "▜",   # 1101
-    "▛",   # 1110
-    "█",   # 1111
+    " ",  # 0000
+    "▗",  # 0001
+    "▖",  # 0010
+    "▄",  # 0011
+    "▝",  # 0100
+    "▐",  # 0101
+    "▞",  # 0110
+    "▟",  # 0111
+    "▘",  # 1000
+    "▚",  # 1001
+    "▌",  # 1010
+    "▙",  # 1011
+    "▀",  # 1100
+    "▜",  # 1101
+    "▛",  # 1110
+    "█",  # 1111
 )
 
 # Below this luminance spread we treat the 2×2 region as flat
@@ -122,9 +121,7 @@ def render_owl_pixels(
 
         img = ImageEnhance.Contrast(img).enhance(1.35)
         img = ImageEnhance.Color(img).enhance(1.25)
-        img = img.filter(
-            ImageFilter.UnsharpMask(radius=2.2, percent=140, threshold=1)
-        )
+        img = img.filter(ImageFilter.UnsharpMask(radius=2.2, percent=140, threshold=1))
         img = img.filter(ImageFilter.SHARPEN)
     except ImportError:
         pass
@@ -184,9 +181,7 @@ def render_owl_pixels(
 Pixel = Sequence[int]
 
 
-def _quadrant_cell(
-    tl: Pixel, tr: Pixel, bl: Pixel, br: Pixel
-) -> list[str]:
+def _quadrant_cell(tl: Pixel, tr: Pixel, bl: Pixel, br: Pixel) -> list[str]:
     """Compute ``[glyph, fg_hex, bg_hex]`` for one 2×2 source
     region. Split the 4 pixels by median luminance into two
     clusters; brighter two become FG, darker two become BG.

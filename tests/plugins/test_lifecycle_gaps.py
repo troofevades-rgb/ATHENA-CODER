@@ -39,14 +39,16 @@ from athena.plugins.hooks import HookDispatcher
 from athena.plugins.loader import _mark_installed, load_plugins
 from athena.plugins.manifest import PluginManifest, parse_manifest
 
-
 # ---------------------------------------------------------------------------
 # Helpers — make tiny on-disk plugins
 # ---------------------------------------------------------------------------
 
 
 def _make_plugin_dir(
-    root: Path, name: str, *, plugin_body: str,
+    root: Path,
+    name: str,
+    *,
+    plugin_body: str,
     depends_on: list[str] | None = None,
     enabled_by_default: bool = True,
 ) -> Path:
@@ -58,7 +60,9 @@ def _make_plugin_dir(
     deps_line = ""
     if depends_on:
         deps_line = "depends_on = [" + ", ".join(f'"{d}"' for d in depends_on) + "]\n"
-    enabled_line = "enabled_by_default = true" if enabled_by_default else "enabled_by_default = false"
+    enabled_line = (
+        "enabled_by_default = true" if enabled_by_default else "enabled_by_default = false"
+    )
     (pdir / "plugin.toml").write_text(
         f'[plugin]\nname = "{name}"\nversion = "0.1.0"\n{enabled_line}\n{deps_line}',
         encoding="utf-8",
@@ -77,7 +81,8 @@ def _load_manifest(pdir: Path) -> PluginManifest:
 
 
 def test_syntax_error_in_one_plugin_does_not_stop_others(
-    tmp_path: Path, caplog,
+    tmp_path: Path,
+    caplog,
 ) -> None:
     """One plugin with a syntax error must not prevent OTHER plugins
     from loading. The error is logged, the bad one is skipped."""
@@ -100,14 +105,14 @@ this is not valid python !!!
 
     names = [p.name for p in plugins]
     assert "good_one" in names, (
-        "the bad plugin took down the good one — loader is not isolating "
-        "per-plugin failures"
+        "the bad plugin took down the good one — loader is not isolating per-plugin failures"
     )
     assert "bad_one" not in names
 
 
 def test_import_error_in_plugin_does_not_crash_loader(
-    tmp_path: Path, caplog,
+    tmp_path: Path,
+    caplog,
 ) -> None:
     """Plugin that imports a nonexistent module must be skipped, not
     propagate. Third-party plugins commonly have optional deps."""
@@ -119,13 +124,15 @@ class Bad(Plugin):
 """
     pdir = _make_plugin_dir(tmp_path, "imports_ghost", plugin_body=body)
     good_dir = _make_plugin_dir(
-        tmp_path, "still_good",
+        tmp_path,
+        "still_good",
         plugin_body="from athena.plugins.base import Plugin\nclass G(Plugin): pass\n",
     )
 
     plugins = load_plugins(
         [_load_manifest(pdir), _load_manifest(good_dir)],
-        config={}, installed_marker=tmp_path / "marker",
+        config={},
+        installed_marker=tmp_path / "marker",
     )
 
     assert [p.name for p in plugins] == ["still_good"]
@@ -144,13 +151,15 @@ class Bad(Plugin): pass
 """
     pdir = _make_plugin_dir(tmp_path, "boom_at_import", plugin_body=body)
     good = _make_plugin_dir(
-        tmp_path, "ok",
+        tmp_path,
+        "ok",
         plugin_body="from athena.plugins.base import Plugin\nclass G(Plugin): pass\n",
     )
 
     plugins = load_plugins(
         [_load_manifest(pdir), _load_manifest(good)],
-        config={}, installed_marker=tmp_path / "marker",
+        config={},
+        installed_marker=tmp_path / "marker",
     )
 
     assert [p.name for p in plugins] == ["ok"]
@@ -236,6 +245,7 @@ class CountInstalls(Plugin):
 def _install_call_count(plugin) -> int:
     """Read the module-level counter from a loaded CountInstalls plugin."""
     import sys
+
     mod = sys.modules.get(f"athena_plugin__{plugin.name}")
     return len(getattr(mod, "INSTALL_CALLS", []))
 
@@ -250,13 +260,17 @@ def test_on_install_fires_once_across_separate_load_plugins_calls(
     marker = tmp_path / "marker"
 
     plugins_a = load_plugins(
-        [_load_manifest(pdir)], config={}, installed_marker=marker,
+        [_load_manifest(pdir)],
+        config={},
+        installed_marker=marker,
     )
     assert len(plugins_a) == 1
     assert _install_call_count(plugins_a[0]) == 1
 
     plugins_b = load_plugins(
-        [_load_manifest(pdir)], config={}, installed_marker=marker,
+        [_load_manifest(pdir)],
+        config={},
+        installed_marker=marker,
     )
     # Second load: still loads, but on_install does NOT fire again
     assert len(plugins_b) == 1
@@ -324,7 +338,9 @@ class Risky(Plugin):
 """
     pdir = _make_plugin_dir(tmp_path, "risky", plugin_body=body)
     plugins = load_plugins(
-        [_load_manifest(pdir)], config={}, installed_marker=tmp_path / "m",
+        [_load_manifest(pdir)],
+        config={},
+        installed_marker=tmp_path / "m",
     )
     assert len(plugins) == 1
     assert plugins[0].name == "risky"
@@ -353,7 +369,8 @@ class Good(Plugin):
 
     plugins = load_plugins(
         [_load_manifest(bad_dir), _load_manifest(good_dir)],
-        config={}, installed_marker=tmp_path / "m",
+        config={},
+        installed_marker=tmp_path / "m",
     )
     names = [p.name for p in plugins]
     assert "good" in names
@@ -375,16 +392,19 @@ def test_hook_dispatcher_fires_in_plugin_list_order() -> None:
 
     class A(Plugin):
         name = "A"
+
         def on_session_start(self, sid, prof):
             call_order.append("A")
 
     class B(Plugin):
         name = "B"
+
         def on_session_start(self, sid, prof):
             call_order.append("B")
 
     class C(Plugin):
         name = "C"
+
         def on_session_start(self, sid, prof):
             call_order.append("C")
 
@@ -402,18 +422,21 @@ def test_pre_tool_call_fans_out_in_order_even_when_first_blocks() -> None:
 
     class P1(Plugin):
         name = "p1"
+
         def pre_tool_call(self, tool_name, tool_args):
             seen.append("p1")
             return False  # veto
 
     class P2(Plugin):
         name = "p2"
+
         def pre_tool_call(self, tool_name, tool_args):
             seen.append("p2")
             return None
 
     class P3(Plugin):
         name = "p3"
+
         def pre_tool_call(self, tool_name, tool_args):
             seen.append("p3")
             return None
@@ -422,9 +445,7 @@ def test_pre_tool_call_fans_out_in_order_even_when_first_blocks() -> None:
     allow, blocker = disp.pre_tool_call("Bash", {"command": "ls"})
     assert allow is False
     assert blocker == "p1"
-    assert seen == ["p1", "p2", "p3"], (
-        "fan-out broke after veto — later plugins lost observability"
-    )
+    assert seen == ["p1", "p2", "p3"], "fan-out broke after veto — later plugins lost observability"
 
 
 # ---------------------------------------------------------------------------
@@ -446,10 +467,7 @@ def test_concurrent_mark_installed_does_not_corrupt_file(
         barrier.wait()
         _mark_installed(name, marker)
 
-    threads = [
-        threading.Thread(target=_worker, args=(f"p{i}",))
-        for i in range(8)
-    ]
+    threads = [threading.Thread(target=_worker, args=(f"p{i}",)) for i in range(8)]
     for t in threads:
         t.start()
     for t in threads:

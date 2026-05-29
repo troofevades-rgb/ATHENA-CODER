@@ -18,7 +18,6 @@ from ..ui import console
 from . import file_ops  # for workspace
 from .registry import tool
 
-
 # Windows drive-letter paths with backslash separators get mangled by
 # Bash (Git Bash / MSYS) which treats backslash as an escape character.
 # ``python C:\Users\foo\bar.py`` becomes ``python C:Usersfoobar.py``

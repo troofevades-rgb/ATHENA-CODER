@@ -144,8 +144,7 @@ def test_long_session_triggers_compression_and_completes(
     # final message list.
     user_count = sum(1 for m in agent.messages if m.get("role") == "user")
     assert user_count >= 1 or summary_msgs, (
-        "neither user messages NOR a compressed summary survived — "
-        "the agent's history is empty"
+        "neither user messages NOR a compressed summary survived — the agent's history is empty"
     )
 
 

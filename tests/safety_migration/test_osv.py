@@ -54,8 +54,7 @@ class _FakeResponse:
 
 
 def test_query_disabled_returns_error():
-    vulns, err = query("requests", "2.31.0", ecosystem="PyPI",
-                       cfg=_cfg(osv_enabled=False))
+    vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg(osv_enabled=False))
     assert vulns == []
     assert "disabled" in err.lower() or "False" in err
 
@@ -78,7 +77,8 @@ def test_query_requires_all_three_args():
 def test_query_happy_path_no_vulns(monkeypatch):
     """Endpoint returns {"vulns": []} — no CVEs for this version."""
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
+        osv_mod.urllib.request,
+        "urlopen",
         lambda req, timeout=None: _FakeResponse(
             body=json.dumps({}),
         ),
@@ -99,16 +99,18 @@ def test_query_parses_vuln_records(monkeypatch):
                 "aliases": ["CVE-2024-12345"],
                 "database_specific": {"severity": "HIGH"},
                 "references": [
-                    {"type": "ADVISORY",
-                     "url": "https://github.com/x/y/security/advisories/GHSA-..."},
-                    {"type": "FIX",
-                     "url": "https://github.com/x/y/commit/abc"},
+                    {
+                        "type": "ADVISORY",
+                        "url": "https://github.com/x/y/security/advisories/GHSA-...",
+                    },
+                    {"type": "FIX", "url": "https://github.com/x/y/commit/abc"},
                 ],
             },
         ],
     }
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
+        osv_mod.urllib.request,
+        "urlopen",
         lambda req, timeout=None: _FakeResponse(body=json.dumps(payload)),
     )
     vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
@@ -157,11 +159,16 @@ def test_query_request_argv_shape(monkeypatch):
 
 def test_query_http_error_returns_structured_error(monkeypatch):
     """OSV returned 4xx/5xx → error string includes the code."""
+
     def _raise_http(req, timeout=None):
         raise urllib.error.HTTPError(
-            url=req.full_url, code=429, msg="rate limited",
-            hdrs={}, fp=io.BytesIO(b'{"message": "too many requests"}'),
+            url=req.full_url,
+            code=429,
+            msg="rate limited",
+            hdrs={},
+            fp=io.BytesIO(b'{"message": "too many requests"}'),
         )
+
     monkeypatch.setattr(osv_mod.urllib.request, "urlopen", _raise_http)
     vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
     assert vulns == []
@@ -171,8 +178,10 @@ def test_query_http_error_returns_structured_error(monkeypatch):
 def test_query_network_error_returns_structured_error(monkeypatch):
     """Connection refused / DNS failure / etc. → error string
     names the underlying exception."""
+
     def _raise_net(req, timeout=None):
         raise urllib.error.URLError("Name resolution failed")
+
     monkeypatch.setattr(osv_mod.urllib.request, "urlopen", _raise_net)
     vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
     assert vulns == []
@@ -182,6 +191,7 @@ def test_query_network_error_returns_structured_error(monkeypatch):
 def test_query_timeout_returns_structured_error(monkeypatch):
     def _raise_timeout(req, timeout=None):
         raise TimeoutError("read timeout")
+
     monkeypatch.setattr(osv_mod.urllib.request, "urlopen", _raise_timeout)
     vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
     assert vulns == []
@@ -190,7 +200,8 @@ def test_query_timeout_returns_structured_error(monkeypatch):
 
 def test_query_non_json_response_returns_error(monkeypatch):
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
+        osv_mod.urllib.request,
+        "urlopen",
         lambda req, timeout=None: _FakeResponse(body="not json"),
     )
     vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
@@ -202,7 +213,8 @@ def test_query_malformed_vulns_field(monkeypatch):
     """OSV returns {"vulns": "string instead of list"} — parser
     rejects cleanly."""
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
+        osv_mod.urllib.request,
+        "urlopen",
         lambda req, timeout=None: _FakeResponse(
             body='{"vulns": "not a list"}',
         ),
@@ -216,15 +228,20 @@ def test_query_skips_non_dict_vuln_entries(monkeypatch):
     """A vulns list with mixed shapes (some dicts, some not):
     we skip the non-dicts cleanly."""
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
-        lambda req, timeout=None: _FakeResponse(body=json.dumps({
-            "vulns": [
-                {"id": "PYSEC-1", "summary": "ok"},
-                "string instead of dict",
-                None,
-                {"id": "PYSEC-2", "summary": "also ok"},
-            ],
-        })),
+        osv_mod.urllib.request,
+        "urlopen",
+        lambda req, timeout=None: _FakeResponse(
+            body=json.dumps(
+                {
+                    "vulns": [
+                        {"id": "PYSEC-1", "summary": "ok"},
+                        "string instead of dict",
+                        None,
+                        {"id": "PYSEC-2", "summary": "also ok"},
+                    ],
+                }
+            )
+        ),
     )
     vulns, err = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
     assert err is None
@@ -238,13 +255,20 @@ def test_query_skips_non_dict_vuln_entries(monkeypatch):
 
 def test_severity_picks_up_database_specific_label(monkeypatch):
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
-        lambda req, timeout=None: _FakeResponse(body=json.dumps({
-            "vulns": [{
-                "id": "X-1",
-                "database_specific": {"severity": "critical"},
-            }],
-        })),
+        osv_mod.urllib.request,
+        "urlopen",
+        lambda req, timeout=None: _FakeResponse(
+            body=json.dumps(
+                {
+                    "vulns": [
+                        {
+                            "id": "X-1",
+                            "database_specific": {"severity": "critical"},
+                        }
+                    ],
+                }
+            )
+        ),
     )
     vulns, _ = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
     # Upper-cased at normalization.
@@ -253,10 +277,15 @@ def test_severity_picks_up_database_specific_label(monkeypatch):
 
 def test_severity_defaults_to_unknown(monkeypatch):
     monkeypatch.setattr(
-        osv_mod.urllib.request, "urlopen",
-        lambda req, timeout=None: _FakeResponse(body=json.dumps({
-            "vulns": [{"id": "X-1"}],
-        })),
+        osv_mod.urllib.request,
+        "urlopen",
+        lambda req, timeout=None: _FakeResponse(
+            body=json.dumps(
+                {
+                    "vulns": [{"id": "X-1"}],
+                }
+            )
+        ),
     )
     vulns, _ = query("requests", "2.31.0", ecosystem="PyPI", cfg=_cfg())
     assert vulns[0].severity == "UNKNOWN"
@@ -270,6 +299,7 @@ def test_severity_defaults_to_unknown(monkeypatch):
 def test_osv_check_tool_registered():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("osv_check")
     assert t is not None
     assert t.toolset == "safety"
@@ -277,9 +307,11 @@ def test_osv_check_tool_registered():
 
 def test_osv_check_tool_missing_args(monkeypatch):
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
     from athena.tools.security import osv_check
+
     out = json.loads(osv_check())
     assert out["available"] is False
     assert "required" in out["error"]
@@ -289,7 +321,8 @@ def test_osv_check_tool_returns_structured_json(monkeypatch):
     """End-to-end through the tool: stub query, verify the
     tool packages the verdict + the underlying error key."""
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
 
     def _stub_query(name, version, *, ecosystem, cfg):
@@ -303,12 +336,18 @@ def test_osv_check_tool_returns_structured_json(monkeypatch):
                 raw={},
             ),
         ], None
+
     monkeypatch.setattr("athena.safety.osv.query", _stub_query)
 
     from athena.tools.security import osv_check
-    out = json.loads(osv_check(
-        package="requests", version="2.31.0", ecosystem="PyPI",
-    ))
+
+    out = json.loads(
+        osv_check(
+            package="requests",
+            version="2.31.0",
+            ecosystem="PyPI",
+        )
+    )
     assert out["available"] is True
     assert out["package"] == "requests"
     assert out["version"] == "2.31.0"
@@ -324,7 +363,8 @@ def test_osv_check_tool_surfaces_query_error(monkeypatch):
     """When query() returns (vulns, error) with error set,
     the tool surfaces available=False + the error message."""
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
     monkeypatch.setattr(
         "athena.safety.osv.query",
@@ -332,9 +372,14 @@ def test_osv_check_tool_surfaces_query_error(monkeypatch):
     )
 
     from athena.tools.security import osv_check
-    out = json.loads(osv_check(
-        package="x", version="1", ecosystem="PyPI",
-    ))
+
+    out = json.loads(
+        osv_check(
+            package="x",
+            version="1",
+            ecosystem="PyPI",
+        )
+    )
     assert out["available"] is False
     assert "429" in out["error"]
     assert out["vulns"] == []

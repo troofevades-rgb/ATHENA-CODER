@@ -62,7 +62,10 @@ def _require_ffmpeg(ffmpeg: str) -> None:
 def _run(args: list[str], *, timeout: float) -> int:
     try:
         proc = subprocess.run(
-            args, capture_output=True, timeout=timeout, check=False,
+            args,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
         )
     except subprocess.TimeoutExpired:
         logger.warning("ffmpeg timed out: %s", args[:4])
@@ -70,7 +73,8 @@ def _run(args: list[str], *, timeout: float) -> int:
     if proc.returncode != 0:
         logger.warning(
             "ffmpeg exited %d for %s — stderr: %s",
-            proc.returncode, args[:4],
+            proc.returncode,
+            args[:4],
             proc.stderr.decode("utf-8", errors="replace")[:400],
         )
     return proc.returncode
@@ -91,12 +95,18 @@ def extract_keyframes(
     pattern = str(out_dir_p / "kf_%05d.png")
     _run(
         [
-            ffmpeg, "-y",
-            "-skip_frame", "nokey",
-            "-i", str(path),
-            "-vsync", "vfr",
-            "-frame_pts", "true",
-            "-frames:v", str(max_frames),
+            ffmpeg,
+            "-y",
+            "-skip_frame",
+            "nokey",
+            "-i",
+            str(path),
+            "-vsync",
+            "vfr",
+            "-frame_pts",
+            "true",
+            "-frames:v",
+            str(max_frames),
             pattern,
         ],
         timeout=timeout,
@@ -122,10 +132,14 @@ def extract_sampled(
     pattern = str(out_dir_p / "s_%05d.png")
     _run(
         [
-            ffmpeg, "-y",
-            "-i", str(path),
-            "-vf", f"fps=1/{interval_s}",
-            "-frames:v", str(max_frames),
+            ffmpeg,
+            "-y",
+            "-i",
+            str(path),
+            "-vf",
+            f"fps=1/{interval_s}",
+            "-frames:v",
+            str(max_frames),
             pattern,
         ],
         timeout=timeout,
@@ -151,10 +165,16 @@ def extract_range(
     pattern = str(out_dir_p / "r_%05d.png")
     _run(
         [
-            ffmpeg, "-y",
-            "-ss", str(start), "-to", str(end),
-            "-i", str(path),
-            "-frames:v", str(max_frames),
+            ffmpeg,
+            "-y",
+            "-ss",
+            str(start),
+            "-to",
+            str(end),
+            "-i",
+            str(path),
+            "-frames:v",
+            str(max_frames),
             pattern,
         ],
         timeout=timeout,

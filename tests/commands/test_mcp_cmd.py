@@ -17,15 +17,13 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.mcp.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             "athena.commands.mcp.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -73,10 +71,14 @@ def test_no_servers_shows_help_message() -> None:
 
 
 def test_lists_alive_server_with_version_and_tool_count() -> None:
-    clients = [_fake_client(
-        "github", alive=True, version="2.1.0",
-        tools=[{"name": "create_issue"}, {"name": "list_repos"}],
-    )]
+    clients = [
+        _fake_client(
+            "github",
+            alive=True,
+            version="2.1.0",
+            tools=[{"name": "create_issue"}, {"name": "list_repos"}],
+        )
+    ]
     out = _run("", clients)
     assert "github" in out
     assert "alive" in out

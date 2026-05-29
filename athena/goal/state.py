@@ -36,9 +36,7 @@ logger = logging.getLogger(__name__)
 GOAL_STATE_FILENAME = "goal_state.json"
 
 Status = Literal["active", "paused", "achieved", "exhausted"]
-_VALID_STATUSES: frozenset[str] = frozenset(
-    ("active", "paused", "achieved", "exhausted")
-)
+_VALID_STATUSES: frozenset[str] = frozenset(("active", "paused", "achieved", "exhausted"))
 
 
 @dataclasses.dataclass
@@ -202,6 +200,7 @@ def save_state(profile_dir: Path, state: GoalState) -> Path:
     still claimed an active goal. Mirrors the pattern already used by
     ``curator/state.py`` and ``transform/run_state.py``."""
     import os
+
     state.updated_at = time.time()
     p = state_path(profile_dir)
     p.parent.mkdir(parents=True, exist_ok=True)

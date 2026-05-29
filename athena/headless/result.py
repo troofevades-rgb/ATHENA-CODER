@@ -27,7 +27,6 @@ import dataclasses
 import json
 from typing import Any, Literal
 
-
 Status = Literal["ok", "error", "timeout", "interrupted", "invalid"]
 
 
@@ -64,7 +63,7 @@ class RunResult:
 
     run_id: str
     status: Status
-    started_at: str        # ISO-8601 UTC with 'Z' suffix
+    started_at: str  # ISO-8601 UTC with 'Z' suffix
     finished_at: str
     duration_s: float
     task: str
@@ -128,4 +127,5 @@ def mint_run_id() -> str:
     Same shape as the task store's ``t-<uuid12>`` convention
     so an operator can tell them apart at a glance."""
     import uuid
+
     return f"r-{uuid.uuid4().hex[:12]}"

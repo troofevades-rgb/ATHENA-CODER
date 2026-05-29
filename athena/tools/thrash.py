@@ -56,10 +56,23 @@ _HISTORY: deque[_CallRecord] = deque(maxlen=BUFFER_MAX)
 # hash to the same key and a third identical call trips the warning.
 # Non-path keys (e.g. "description", "query") are hashed raw — paths
 # inside prose shouldn't collapse.
-_PATH_ARG_KEYS: frozenset[str] = frozenset({
-    "path", "file_path", "dir", "directory", "filename", "file",
-    "target", "from_path", "to_path", "src", "dst", "source", "dest",
-})
+_PATH_ARG_KEYS: frozenset[str] = frozenset(
+    {
+        "path",
+        "file_path",
+        "dir",
+        "directory",
+        "filename",
+        "file",
+        "target",
+        "from_path",
+        "to_path",
+        "src",
+        "dst",
+        "source",
+        "dest",
+    }
+)
 
 
 def _normalize_path_value(v: str) -> str:

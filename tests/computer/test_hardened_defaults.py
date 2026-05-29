@@ -254,14 +254,11 @@ def test_denylisted_app_refused_no_prompt(monkeypatch, tmp_path: Path):
 
     # Build the gate manually so we can plant the confirm spy.
     from athena.safety.approval_callback import set_approval_callback
-    set_approval_callback(
-        lambda _tool, args: (confirmed.append(args.get("tier")) or "allow")
-    )
+
+    set_approval_callback(lambda _tool, args: confirmed.append(args.get("tier")) or "allow")
     cfg.computer_deny_during_goal_loop = False
     gate = PermissionGate(cfg=cfg)
-    allowed = gate.check(
-        Action(type="click", target_desc="OK", app="1Password 7")
-    )
+    allowed = gate.check(Action(type="click", target_desc="OK", app="1Password 7"))
     assert allowed is False
     assert confirmed == []  # no prompt — denylist short-circuits
 
@@ -282,10 +279,9 @@ def test_per_action_destructive_always_prompts():
         app_denylist=[],
     )
     from athena.safety.approval_callback import set_approval_callback
+
     set_approval_callback(
-        lambda _tool, args: (
-            prompts.append((args.get("target_desc"), args.get("tier"))) or "allow"
-        )
+        lambda _tool, args: prompts.append((args.get("target_desc"), args.get("tier"))) or "allow"
     )
     cfg.computer_deny_during_goal_loop = False
     gate = PermissionGate(cfg=cfg)
@@ -316,6 +312,7 @@ def test_kill_switch_halts_end_to_end(tmp_path: Path):
         kill_hotkey=None,
     )
     from athena.safety.approval_callback import set_approval_callback
+
     set_approval_callback(lambda _tool, _args: "allow")
     cfg.computer_deny_during_goal_loop = False
     gate = PermissionGate(cfg=cfg)
@@ -381,6 +378,7 @@ def test_dry_run_end_to_end_never_performs(tmp_path: Path):
         kill_hotkey=None,
     )
     from athena.safety.approval_callback import set_approval_callback
+
     set_approval_callback(lambda _tool, _args: "allow")
     cfg.computer_deny_during_goal_loop = False
     gate = PermissionGate(cfg=cfg)
@@ -446,9 +444,7 @@ def test_single_action_tools_refuse_without_confirm_ui(monkeypatch, tmp_path: Pa
     backend = _StubBackend()
     monkeypatch.setattr(tools_mod, "select_backend", lambda c: backend)
 
-    out = json.loads(
-        tools_mod.computer_click(x=10, y=10, target_desc="Tab 2")
-    )
+    out = json.loads(tools_mod.computer_click(x=10, y=10, target_desc="Tab 2"))
     assert out["performed"] is False
     assert "denied" in out["reason"]
     assert backend.perform_calls == []
