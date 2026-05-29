@@ -126,9 +126,13 @@ them would mean another nested dataclass and the current style is inconsistent.
 4. **Sequence by subsystem risk:**
    1. **LANDED** -- SkillsConfig + BashConfig pilot. Single commit;
       proved the pattern (`__getattr__` shim + TOML loader mapping).
-   2. SafetyConfig (`cfg.safety` is currently `dict[str, Any]` with
-      ad-hoc keys -- promote to a real dataclass with the documented
-      fields; biggest reader is the snapshot/audit subsystem).
+   2. **LANDED** -- SafetyConfig promotion. Replaced
+      `cfg.safety: dict[str, Any]` with a real dataclass AND wired it
+      through to `SnapshotStore` (the dict's keys had been advertised
+      in code but never actually consulted -- the retention policy in
+      the user's TOML was a promise the code didn't keep until R4
+      stage 2). The duplicate `extra_denylist` key was dropped (the
+      canonical one lives in `BashConfig`).
    3. ComputerConfig (the `computer_*` flat fields -- already grouped
       by prefix; mechanical rename).
    4. ParseltongueConfig, PluginsConfig (sub-dicts upgraded to

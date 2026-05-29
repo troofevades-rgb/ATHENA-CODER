@@ -478,7 +478,17 @@ class Agent:
                 pdir = _profile_dir(profile)
                 ckpt_dir = pdir / "checkpoints" / self.session_id
                 session_log = pdir / "sessions" / f"{self.session_id}.jsonl"
-                snapshot_store = SnapshotStore()
+                # Wire the [safety] retention policy from cfg.safety.
+                # Until R4 stage 2 SnapshotStore was constructed with
+                # its hardcoded defaults regardless of what the user
+                # had configured -- the [safety] TOML table was a
+                # promise the code never kept.
+                safety_cfg = self.cfg.safety
+                snapshot_store = SnapshotStore(
+                    retention_days=safety_cfg.retention_days,
+                    retention_count=safety_cfg.retention_count,
+                    retention_bytes=safety_cfg.retention_bytes,
+                )
                 self.checkpoint_manager = CheckpointManager(
                     session_id=self.session_id,
                     session_log_path=session_log,
