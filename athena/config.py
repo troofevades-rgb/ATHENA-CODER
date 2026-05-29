@@ -227,6 +227,88 @@ class PluginsConfig:
 
 
 @dataclass
+class ProvidersConfig:
+    """Provider routing + per-provider config slices.
+
+    Phase 18.1 R4 stage 6 (closes R4): promotes ``cfg.providers:
+    dict[str, Any]`` to a typed dataclass. The legacy dict had two
+    roles -- a ``"routing"`` key mapping ``model_name -> provider``
+    PLUS arbitrary other keys (one per provider) carrying that
+    provider's host/fallback/base_url slice. The dataclass splits
+    those:
+
+    - :attr:`routing` -- ``{model_name: provider_name}`` overrides
+      consulted before the prefix-based dispatch in
+      :func:`athena.providers.runtime_resolver._route`.
+    - :attr:`per_provider` -- ``{provider_name: {key: value, ...}}``
+      slice the runtime resolver reads to find ``host``,
+      ``base_url``, ``fallback`` chains, etc.
+
+    Implements ``__getitem__`` / ``get`` / ``__contains__`` so the
+    existing ``(cfg.providers or {}).get("routing")`` /
+    ``.get(name, {})`` readers in
+    :mod:`athena.providers.runtime_resolver` and
+    :mod:`athena.cli.providers` keep working without changes.
+    :meth:`from_dict` lets callers (Config.__post_init__, test
+    fixtures) coerce a legacy dict into the dataclass shape.
+    """
+
+    routing: dict[str, str] = field(default_factory=dict)
+    per_provider: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ProvidersConfig":
+        """Build a ProvidersConfig from the legacy flat-dict envelope.
+
+        ``d["routing"]`` (if a dict) populates :attr:`routing`; every
+        other dict-valued key becomes a :attr:`per_provider` slice.
+        Non-dict garbage is silently dropped -- the runtime resolver
+        already tolerates malformed config and prints warnings at
+        usage time.
+        """
+        if not isinstance(d, dict):
+            return cls()
+        routing_raw = d.get("routing")
+        routing: dict[str, str] = {}
+        if isinstance(routing_raw, dict):
+            for k, v in routing_raw.items():
+                if isinstance(k, str) and isinstance(v, str):
+                    routing[k] = v
+        per_provider: dict[str, dict[str, Any]] = {}
+        for k, v in d.items():
+            if k == "routing":
+                continue
+            if isinstance(k, str) and isinstance(v, dict):
+                per_provider[k] = dict(v)
+        return cls(routing=routing, per_provider=per_provider)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-style read. ``"routing"`` returns the routing map;
+        anything else returns the per-provider slice if present, else
+        ``default``."""
+        if key == "routing":
+            return self.routing
+        return self.per_provider.get(key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "routing":
+            return self.routing
+        return self.per_provider[key]
+
+    def __contains__(self, key: str) -> bool:
+        if key == "routing":
+            return True
+        return key in self.per_provider
+
+    def __bool__(self) -> bool:
+        """Truthy iff at least one routing entry or per-provider slice
+        is present. Keeps the legacy ``(cfg.providers or {}).get(...)``
+        defensive pattern doing the right thing when the config is
+        empty."""
+        return bool(self.routing) or bool(self.per_provider)
+
+
+@dataclass
 class ParseltongueConfig:
     """Parseltongue inference-param policy config.
 
@@ -491,12 +573,16 @@ class Config:
     # from dict[str, Any] to a real dataclass in Phase 18.1 R4 stage
     # 4. See athena/agent/param_policy.py for the policy classes.
     parseltongue: ParseltongueConfig = field(default_factory=ParseltongueConfig)
-    # Provider configuration (Phase 8). Sub-keys:
+    # Provider configuration (Phase 8). Promoted from dict[str, Any] to
+    # ProvidersConfig in Phase 18.1 R4 stage 6. Sub-keys (now attributes
+    # / per_provider slices):
     #   providers.routing     {model_name: provider_name} explicit overrides
     #   providers.<name>.host base URL for ollama / openai_compat
     #   providers.<name>.fallback  ordered list of provider names to try
     #                              when the primary's credentials are exhausted
-    providers: dict[str, Any] = field(default_factory=dict)
+    # The dataclass implements get/__getitem__/__contains__ so existing
+    # ``(cfg.providers or {}).get(...)`` readers keep working unchanged.
+    providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     # Anthropic prompt caching (T2-01). Strategy "system_and_3" attaches
     # cache_control markers to the last system message + the last 3
     # non-system messages on Anthropic, OpenRouter, and Nous-Portal
@@ -980,6 +1066,25 @@ class Config:
     # resolve through Config.__getattr__ + __setattr__.
     ocr: OcrConfig = field(default_factory=OcrConfig)
 
+    def __post_init__(self) -> None:
+        """Coerce legacy dict-shape inputs into their promoted dataclass
+        forms.
+
+        Test fixtures and a long tail of historical call sites build
+        ``Config(providers={"routing": {...}, "<name>": {...}})`` --
+        i.e. they pass a plain dict where the dataclass-generated
+        ``__init__`` would otherwise store it verbatim, leaving the
+        runtime resolver (which now does attribute access) staring at
+        the wrong type. Convert on the spot so the field-type
+        annotation stays accurate.
+        """
+        if isinstance(self.providers, dict):
+            # Bypass __setattr__ so we don't trip the legacy-map shim
+            # on something that is plainly not a legacy flat name.
+            object.__setattr__(
+                self, "providers", ProvidersConfig.from_dict(self.providers)
+            )
+
     def __getattr__(self, name: str) -> Any:
         """Resolve legacy flat field names to their new nested locations.
 
@@ -1137,6 +1242,29 @@ def load_config() -> Config:
             for plugin_name, plugin_cfg in plugins_block.items():
                 if isinstance(plugin_cfg, dict):
                     cfg.plugins.per_plugin[plugin_name] = dict(plugin_cfg)
+        # Phase 18.1 R4 stage 6: ProvidersConfig translation -- same
+        # shape pattern as PluginsConfig. ``[providers.routing]`` is
+        # a fixed sub-table of {model: provider_name}; any other
+        # ``[providers.<name>]`` sub-table is a per-provider slice.
+        # Translate explicitly here BEFORE the generic _assign_field
+        # loop so it doesn't try to setattr() arbitrary provider names
+        # onto the ProvidersConfig dataclass.
+        providers_block = data.pop("providers", None)
+        if isinstance(providers_block, dict):
+            routing_block = providers_block.pop("routing", None)
+            if isinstance(routing_block, dict):
+                cfg.providers.routing.update(
+                    {
+                        k: v
+                        for k, v in routing_block.items()
+                        if isinstance(k, str) and isinstance(v, str)
+                    }
+                )
+            for provider_name, provider_cfg in providers_block.items():
+                if isinstance(provider_cfg, dict):
+                    cfg.providers.per_provider[provider_name] = dict(
+                        provider_cfg
+                    )
         for k, v in data.items():
             if hasattr(cfg, k):
                 _assign_field(cfg, k, v)
