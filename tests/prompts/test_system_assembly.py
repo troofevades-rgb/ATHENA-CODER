@@ -35,7 +35,6 @@ from athena.prompts.system import (
     collect_environment,
 )
 
-
 # ---------------------------------------------------------------------------
 # Section ordering — load-bearing rules front
 # ---------------------------------------------------------------------------
@@ -64,7 +63,8 @@ def test_modelfile_system_comes_first_when_present(tmp_path: Path) -> None:
     get overridden by athena's defaults."""
     modelfile = "You are a helpful pirate."
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         model_modelfile_system=modelfile,
     )
     assert modelfile in out
@@ -76,7 +76,8 @@ def test_goal_invariant_is_last(tmp_path: Path) -> None:
     model treats it as the most-recent / most-authoritative
     instruction. Pin the position."""
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         goal="ship the migration before friday",
     )
     # Find a marker from the goal section and verify it's after
@@ -95,7 +96,8 @@ def test_goal_invariant_is_last(tmp_path: Path) -> None:
 
 def test_project_context_included_when_provided(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         project_context="ATHENA.md contents go here",
     )
     assert "Project context" in out
@@ -109,7 +111,8 @@ def test_project_context_absent_when_not_provided(tmp_path: Path) -> None:
 
 def test_memory_index_included_when_provided(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         memory_index="- [Title](file.md) — hook",
     )
     assert "MEMORY.md" in out
@@ -118,7 +121,8 @@ def test_memory_index_included_when_provided(tmp_path: Path) -> None:
 
 def test_skills_catalog_included_when_provided(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         skills_catalog="# Available skills\n- osint-research",
     )
     assert "osint-research" in out
@@ -126,7 +130,8 @@ def test_skills_catalog_included_when_provided(tmp_path: Path) -> None:
 
 def test_board_auto_maintain_adds_board_section(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         board_auto_maintain=True,
     )
     assert "# Task board" in out
@@ -135,7 +140,8 @@ def test_board_auto_maintain_adds_board_section(tmp_path: Path) -> None:
 
 def test_board_section_absent_when_disabled(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         board_auto_maintain=False,
     )
     assert "# Task board" not in out
@@ -178,13 +184,16 @@ def test_collect_environment_no_git_for_non_repo(tmp_path: Path) -> None:
 
 
 def test_collect_environment_resilient_to_uname_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``uname -r`` doesn't exist on Windows. Function must fall
     back to ``platform.release()`` without raising."""
     import subprocess as _sp
+
     def _boom(*a, **kw):
         raise FileNotFoundError("uname")
+
     monkeypatch.setattr(_sp, "check_output", _boom)
     env = collect_environment(tmp_path, "m")
     assert env.os_version  # falls back to platform.release()
@@ -219,7 +228,8 @@ def test_computer_use_disabled_renders_disabled_block(tmp_path: Path) -> None:
     with a structured payload; the model needs to know this so it
     doesn't try and waste a turn."""
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         computer_use_status={"enabled": False},
     )
     assert "Computer use" in out
@@ -230,10 +240,13 @@ def test_computer_use_disabled_renders_disabled_block(tmp_path: Path) -> None:
 def test_computer_use_observe_only_mode(tmp_path: Path) -> None:
     """observe_only → screenshot/observe work, EVERY input tool refuses."""
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         computer_use_status={
-            "enabled": True, "mode": "observe_only",
-            "allowlist": [], "denylist": [],
+            "enabled": True,
+            "mode": "observe_only",
+            "allowlist": [],
+            "denylist": [],
         },
     )
     assert "ENABLED" in out
@@ -243,10 +256,13 @@ def test_computer_use_observe_only_mode(tmp_path: Path) -> None:
 
 def test_computer_use_per_action_mode(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         computer_use_status={
-            "enabled": True, "mode": "per_action",
-            "allowlist": ["chrome"], "denylist": [],
+            "enabled": True,
+            "mode": "per_action",
+            "allowlist": ["chrome"],
+            "denylist": [],
         },
     )
     assert "per_action" in out
@@ -258,10 +274,13 @@ def test_computer_use_per_action_mode(tmp_path: Path) -> None:
 
 def test_computer_use_per_session_mode(tmp_path: Path) -> None:
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         computer_use_status={
-            "enabled": True, "mode": "per_session",
-            "allowlist": ["chrome"], "denylist": [],
+            "enabled": True,
+            "mode": "per_session",
+            "allowlist": ["chrome"],
+            "denylist": [],
         },
     )
     assert "per_session" in out
@@ -274,10 +293,13 @@ def test_computer_use_empty_allowlist_warns(tmp_path: Path) -> None:
     even in per_action / per_session mode, NO app is approved so
     input WILL refuse."""
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         computer_use_status={
-            "enabled": True, "mode": "per_action",
-            "allowlist": [], "denylist": [],
+            "enabled": True,
+            "mode": "per_action",
+            "allowlist": [],
+            "denylist": [],
         },
     )
     assert "Allowlist:" in out
@@ -289,10 +311,13 @@ def test_computer_use_denylist_explicitly_called_out(tmp_path: Path) -> None:
     """Denylist always wins over allowlist + mode. Must be stated
     explicitly so the model doesn't try a denied app."""
     out = build_system_prompt(
-        workspace=tmp_path, model="m",
+        workspace=tmp_path,
+        model="m",
         computer_use_status={
-            "enabled": True, "mode": "per_action",
-            "allowlist": ["chrome"], "denylist": ["banking"],
+            "enabled": True,
+            "mode": "per_action",
+            "allowlist": ["chrome"],
+            "denylist": ["banking"],
         },
     )
     assert "banking" in out
@@ -315,10 +340,14 @@ def test_computer_use_section_absent_when_not_provided(tmp_path: Path) -> None:
 def test_render_computer_use_unknown_mode_falls_through(tmp_path: Path) -> None:
     """An unknown mode string (e.g. typo or schema drift) must NOT
     crash — render falls through with the generic header."""
-    out = _render_computer_use_status({
-        "enabled": True, "mode": "completely_made_up",
-        "allowlist": [], "denylist": [],
-    })
+    out = _render_computer_use_status(
+        {
+            "enabled": True,
+            "mode": "completely_made_up",
+            "allowlist": [],
+            "denylist": [],
+        }
+    )
     assert "ENABLED" in out
     assert "completely_made_up" in out
 

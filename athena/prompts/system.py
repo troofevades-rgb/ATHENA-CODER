@@ -340,10 +340,7 @@ class EnvironmentInfo:
         Linux examples doesn't reach for `grep` on Windows out of habit.
         """
         if self.platform == "win32":
-            shell_hint = (
-                "Bash is available (Git Bash / MSYS), but POSIX utilities "
-                "may be limited."
-            )
+            shell_hint = "Bash is available (Git Bash / MSYS), but POSIX utilities may be limited."
         elif self.platform == "darwin":
             shell_hint = "BSD userland — `grep`/`sed` flags differ from GNU."
         else:

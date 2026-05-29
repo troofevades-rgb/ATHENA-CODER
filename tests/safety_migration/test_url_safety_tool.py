@@ -33,6 +33,7 @@ def _cfg(**overrides: Any) -> SimpleNamespace:
 def test_url_safety_check_tool_registered():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("url_safety_check")
     assert t is not None
     assert t.toolset == "safety"
@@ -41,6 +42,7 @@ def test_url_safety_check_tool_registered():
 def test_tool_schema_requires_url():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("url_safety_check")
     assert t.parameters["required"] == ["url"]
 
@@ -52,9 +54,11 @@ def test_tool_schema_requires_url():
 
 def test_empty_url_returns_safe_false(monkeypatch):
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
     from athena.tools.security import url_safety_check
+
     out = json.loads(url_safety_check(url=""))
     assert out["safe"] is False
     assert "no URL" in out["reason"]
@@ -63,12 +67,18 @@ def test_empty_url_returns_safe_false(monkeypatch):
 def test_disabled_returns_safe_true(monkeypatch):
     """When operator turns off URL safety entirely (e.g. they
     have their own pre-check), the tool short-circuits with
-    safe=True + a reason that says checks were skipped."""
+    safe=True + a reason that says checks were skipped.
+
+    The tool now sources its cfg via ``_active_cfg.active_cfg`` --
+    monkeypatch that helper directly rather than the module-level
+    ``load_config`` import (which the tool no longer touches).
+    """
     monkeypatch.setattr(
-        "athena.tools.security.load_config",
+        "athena.tools._active_cfg.active_cfg",
         lambda: _cfg(url_safety_enabled=False),
     )
     from athena.tools.security import url_safety_check
+
     out = json.loads(url_safety_check(url="http://example.com"))
     assert out["safe"] is True
     assert "skipped" in out["reason"]
@@ -83,12 +93,15 @@ def test_validation_failure_returns_safe_false(monkeypatch):
         raise URLSecurityDenied("resolved to private IP 192.168.1.1")
 
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
     monkeypatch.setattr(
-        "athena.safety.url_safety.validate_url", _denied,
+        "athena.safety.url_safety.validate_url",
+        _denied,
     )
     from athena.tools.security import url_safety_check
+
     out = json.loads(url_safety_check(url="http://10.0.0.1/"))
     assert out["safe"] is False
     assert "private IP" in out["reason"]
@@ -100,16 +113,19 @@ def test_unparseable_url_returns_safe_false(monkeypatch):
     parse failure) is also caught — the tool always returns
     JSON, never raises."""
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
 
     def _broken(_url):
         raise ValueError("malformed URL")
 
     monkeypatch.setattr(
-        "athena.safety.url_safety.validate_url", _broken,
+        "athena.safety.url_safety.validate_url",
+        _broken,
     )
     from athena.tools.security import url_safety_check
+
     out = json.loads(url_safety_check(url="not://a/valid/url"))
     assert out["safe"] is False
     assert "validation error" in out["reason"]
@@ -120,8 +136,10 @@ def test_safe_url_returns_resolved_ip(monkeypatch):
     """Happy path — validate_url returns the resolved IP +
     the tool relays it."""
     import dataclasses
+
     monkeypatch.setattr(
-        "athena.tools.security.load_config", lambda: _cfg(),
+        "athena.tools.security.load_config",
+        lambda: _cfg(),
     )
 
     from athena.safety.url_safety import ValidatedURL
@@ -135,9 +153,11 @@ def test_safe_url_returns_resolved_ip(monkeypatch):
             resolved_ip="93.184.216.34",
             is_ip_literal=False,
         )
+
     monkeypatch.setattr("athena.safety.url_safety.validate_url", _ok)
 
     from athena.tools.security import url_safety_check
+
     out = json.loads(url_safety_check(url="https://example.com/path"))
     assert out["safe"] is True
     assert out["resolved_ip"] == "93.184.216.34"

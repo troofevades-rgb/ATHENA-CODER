@@ -12,11 +12,10 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import pathlib
+import sys
 from pathlib import Path
 
 import pytest
-
-import sys
 
 # athena/update/__init__.py re-exports `detect` as the FUNCTION
 # which shadows the submodule attribute; pull the module out of
@@ -25,7 +24,6 @@ import athena.update.detect  # noqa: F401 — load the submodule
 
 detect_module = sys.modules["athena.update.detect"]
 from athena.update.detect import InstallMethod, detect
-
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -77,7 +75,9 @@ def _patch_metadata(
 def test_detect_pip(monkeypatch, tmp_path: Path):
     """Vanilla install: metadata present, not editable, no git
     ancestor, path doesn't contain 'pipx'."""
-    monkeypatch.setattr(detect_module, "_package_root", lambda: tmp_path / "site-packages" / "athena")
+    monkeypatch.setattr(
+        detect_module, "_package_root", lambda: tmp_path / "site-packages" / "athena"
+    )
     _patch_metadata(monkeypatch, found=True, distribution=_FakeDistribution())
     assert detect() == InstallMethod.PIP
 
@@ -187,9 +187,7 @@ def test_detect_editable_without_git_ancestor(monkeypatch, tmp_path: Path):
     install -e on a non-repo tree)."""
     pkg_path = tmp_path / "non-repo" / "athena"
     pkg_path.mkdir(parents=True)
-    dist = _FakeDistribution(
-        direct_url={"url": "file://x", "dir_info": {"editable": True}}
-    )
+    dist = _FakeDistribution(direct_url={"url": "file://x", "dir_info": {"editable": True}})
     monkeypatch.setattr(detect_module, "_package_root", lambda: pkg_path)
     _patch_metadata(monkeypatch, found=True, distribution=dist)
     assert detect() == InstallMethod.EDITABLE

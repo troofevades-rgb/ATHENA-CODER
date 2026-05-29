@@ -25,16 +25,16 @@ logger = logging.getLogger(__name__)
 
 
 # Set by the Agent at session start; read by the browser tools.
-_active_browser: contextvars.ContextVar["BrowserSession | None"] = (
-    contextvars.ContextVar("athena_browser_session", default=None)
+_active_browser: contextvars.ContextVar[BrowserSession | None] = contextvars.ContextVar(
+    "athena_browser_session", default=None
 )
 
 
-def get_active_browser() -> "BrowserSession | None":
+def get_active_browser() -> BrowserSession | None:
     return _active_browser.get()
 
 
-def set_active_browser(session: "BrowserSession | None") -> None:
+def set_active_browser(session: BrowserSession | None) -> None:
     _active_browser.set(session)
 
 
@@ -69,8 +69,8 @@ class BrowserSession:
         self.session_id = session_id
         self.cfg = cfg
         self._playwright = None  # type: Any
-        self._context = None     # type: Any
-        self._page = None        # type: Any
+        self._context = None  # type: Any
+        self._page = None  # type: Any
 
     @property
     def started(self) -> bool:
@@ -86,7 +86,7 @@ class BrowserSession:
         except ImportError as e:
             raise BrowserUnavailable(
                 "Playwright is not installed. Install with: "
-                "pip install -e \".[browser]\" && "
+                'pip install -e ".[browser]" && '
                 "playwright install chromium"
             ) from e
 
@@ -100,16 +100,9 @@ class BrowserSession:
             user_data.mkdir(parents=True, exist_ok=True)
 
             headless = bool(getattr(self.cfg, "browser_headless", True))
-            block_downloads = bool(
-                getattr(self.cfg, "browser_block_downloads", True)
-            )
-            user_agent = (
-                getattr(self.cfg, "browser_user_agent", None)
-                or _default_user_agent()
-            )
-            nav_timeout_ms = int(
-                getattr(self.cfg, "browser_nav_timeout_s", 30) * 1000
-            )
+            block_downloads = bool(getattr(self.cfg, "browser_block_downloads", True))
+            user_agent = getattr(self.cfg, "browser_user_agent", None) or _default_user_agent()
+            nav_timeout_ms = int(getattr(self.cfg, "browser_nav_timeout_s", 30) * 1000)
 
             self._context = self._playwright.chromium.launch_persistent_context(
                 user_data_dir=str(user_data),
@@ -122,8 +115,7 @@ class BrowserSession:
             pages = self._context.pages
             self._page = pages[0] if pages else self._context.new_page()
             self._page.set_default_timeout(nav_timeout_ms)
-            logger.info("browser session %s started (headless=%s)",
-                        self.session_id, headless)
+            logger.info("browser session %s started (headless=%s)", self.session_id, headless)
         except Exception:
             # On any startup failure, tear down the playwright
             # driver so we don't leak a partially-initialised
@@ -141,17 +133,13 @@ class BrowserSession:
         """The currently active page. Raises BrowserUnavailable
         if the session hasn't been started yet."""
         if self._page is None:
-            raise BrowserUnavailable(
-                "browser not started; call ensure_started() first"
-            )
+            raise BrowserUnavailable("browser not started; call ensure_started() first")
         return self._page
 
     @property
     def context(self):
         if self._context is None:
-            raise BrowserUnavailable(
-                "browser not started; call ensure_started() first"
-            )
+            raise BrowserUnavailable("browser not started; call ensure_started() first")
         return self._context
 
     def close(self) -> None:

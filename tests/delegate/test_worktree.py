@@ -23,7 +23,6 @@ from athena.delegate.cli import (
     prepare_worktree,
 )
 
-
 # ---------------------------------------------------------------------------
 # subprocess.run stub
 # ---------------------------------------------------------------------------
@@ -86,17 +85,19 @@ def test_worktree_add_on_fresh_branch(tmp_path: Path, monkeypatch):
     <base_ref>` with a freshly-minted branch name + worktree
     outside the main checkout."""
     stub = _GitStub()
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
     repo = _make_repo(tmp_path)
     worktree_root = tmp_path / "worktrees"
 
-    handle = prepare_worktree(
-        repo, base_ref="HEAD", worktree_root=worktree_root
-    )
+    handle = prepare_worktree(repo, base_ref="HEAD", worktree_root=worktree_root)
 
     # The branch prefix and worktree dir both encode the same uuid
     # suffix.
@@ -124,11 +125,15 @@ def test_worktree_outside_main_tree(tmp_path: Path, monkeypatch):
     checkout because git's own worktree machinery forbids
     overlapping paths."""
     stub = _GitStub()
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
     repo = _make_repo(tmp_path)
     worktree_root = tmp_path / "worktrees"
 
@@ -150,11 +155,15 @@ def test_worktree_surfaces_git_failure(tmp_path: Path, monkeypatch):
     """`git worktree add` returning non-zero → DelegateError
     carrying stderr."""
     stub = _GitStub(responses=[{"returncode": 1, "stderr": "fatal: bad ref"}])
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
     repo = _make_repo(tmp_path)
     with pytest.raises(DelegateError, match="bad ref"):
         prepare_worktree(repo, worktree_root=tmp_path / "wt")
@@ -176,11 +185,15 @@ def test_diff_captured_against_base(tmp_path: Path, monkeypatch):
             {"returncode": 0, "stdout": expected_working},
         ]
     )
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
 
     handle = WorktreeHandle(
         branch="delegate/abc",
@@ -204,14 +217,16 @@ def test_diff_empty_when_no_changes(tmp_path: Path, monkeypatch):
     an error — surfacing 'no changes' is a valid outcome the
     caller wants to know about."""
     stub = _GitStub()  # both git diffs return empty stdout
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
-    handle = WorktreeHandle(
-        branch="delegate/abc", worktree=tmp_path / "wt", base_ref="HEAD"
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
     )
+    handle = WorktreeHandle(branch="delegate/abc", worktree=tmp_path / "wt", base_ref="HEAD")
     assert capture_diff(handle) == ""
 
 
@@ -227,11 +242,15 @@ def test_diff_dedupes_committed_and_working(tmp_path: Path, monkeypatch):
             {"returncode": 0, "stdout": same},
         ]
     )
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
     handle = WorktreeHandle(
         branch="delegate/abc",
         worktree=tmp_path / "wt",
@@ -253,11 +272,15 @@ def test_main_tree_untouched(tmp_path: Path, monkeypatch):
     worktree path. No `git checkout` / `git reset` / `git commit`
     against the main repo's cwd."""
     stub = _GitStub()
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
     repo = _make_repo(tmp_path)
 
     handle = prepare_worktree(repo, worktree_root=tmp_path / "wt")
@@ -284,11 +307,15 @@ def test_cleanup_removes_worktree_and_branch(tmp_path: Path, monkeypatch):
     """cleanup_worktree calls `git worktree remove --force`
     followed by `git branch -D <branch>` against the repo."""
     stub = _GitStub()
-    monkeypatch.setattr(cli_mod, "subprocess", SimpleNamespace(
-        run=stub,
-        CompletedProcess=subprocess.CompletedProcess,
-        TimeoutExpired=subprocess.TimeoutExpired,
-    ))
+    monkeypatch.setattr(
+        cli_mod,
+        "subprocess",
+        SimpleNamespace(
+            run=stub,
+            CompletedProcess=subprocess.CompletedProcess,
+            TimeoutExpired=subprocess.TimeoutExpired,
+        ),
+    )
     handle = WorktreeHandle(
         branch="delegate/abc",
         worktree=tmp_path / "wt",

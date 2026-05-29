@@ -24,8 +24,9 @@ import datetime
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..batch.manifest import BatchEntry, BatchManifest
 from ..batch.runner import _safe_filename, batch_run
@@ -63,13 +64,10 @@ def parse_cases_file(path: Path | str) -> list[EvalCase]:
         try:
             obj = json.loads(s)
         except json.JSONDecodeError as e:
-            raise ValueError(
-                f"cases file line {line_no}: not valid JSON: {e}"
-            ) from None
+            raise ValueError(f"cases file line {line_no}: not valid JSON: {e}") from None
         if not isinstance(obj, dict):
             raise ValueError(
-                f"cases file line {line_no}: expected an object, got "
-                f"{type(obj).__name__}"
+                f"cases file line {line_no}: expected an object, got {type(obj).__name__}"
             )
         try:
             cases.append(EvalCase.from_dict(obj))
@@ -79,9 +77,7 @@ def parse_cases_file(path: Path | str) -> list[EvalCase]:
 
 
 def _now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _case_to_batch_entry(case: EvalCase) -> BatchEntry:
@@ -91,7 +87,7 @@ def _case_to_batch_entry(case: EvalCase) -> BatchEntry:
     baselines join cleanly."""
     return BatchEntry(
         task=case.task,
-        run_id=case.case_id,   # already minted by parse_cases_file
+        run_id=case.case_id,  # already minted by parse_cases_file
         cwd=case.cwd,
         timeout_s=case.timeout_s,
         model=case.model,
@@ -125,10 +121,7 @@ def _score_case(
             passed=False,
             score=0.0,
             scorer=scorer_name,
-            details=(
-                f"run did not complete (status={run_status!r}); "
-                f"scorer not invoked"
-            ),
+            details=(f"run did not complete (status={run_status!r}); scorer not invoked"),
             run_status=run_status,
             envelope_path=str(envelope_path),
         )
@@ -165,10 +158,13 @@ def _score_case(
     except Exception as e:  # noqa: BLE001
         logger.warning(
             "scorer %r raised on case %s: %s",
-            scorer_name, case.case_id, e,
+            scorer_name,
+            case.case_id,
+            e,
         )
         score = Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details=f"scorer raised {type(e).__name__}: {e}",
         )
 
@@ -327,16 +323,20 @@ def run_eval(
             # (batch_run wrote it), but a manifest_only edge
             # case might have skipped writing. Surface as
             # error rather than crash.
-            scored.append(EvalScore(
-                case_id=c.case_id, run_id="",
-                task_excerpt=excerpt(c.task),
-                actual_excerpt="",
-                passed=False, score=0.0,
-                scorer=c.scorer or default_scorer,
-                details=f"per-run envelope not found at {envelope_path}",
-                run_status="missing",
-                envelope_path=str(envelope_path),
-            ))
+            scored.append(
+                EvalScore(
+                    case_id=c.case_id,
+                    run_id="",
+                    task_excerpt=excerpt(c.task),
+                    actual_excerpt="",
+                    passed=False,
+                    score=0.0,
+                    scorer=c.scorer or default_scorer,
+                    details=f"per-run envelope not found at {envelope_path}",
+                    run_status="missing",
+                    envelope_path=str(envelope_path),
+                )
+            )
             if score_progress is not None:
                 score_progress(scored[-1], idx, len(cases))
             continue
@@ -344,22 +344,27 @@ def run_eval(
         try:
             envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
         except Exception as e:  # noqa: BLE001
-            scored.append(EvalScore(
-                case_id=c.case_id, run_id="",
-                task_excerpt=excerpt(c.task),
-                actual_excerpt="",
-                passed=False, score=0.0,
-                scorer=c.scorer or default_scorer,
-                details=f"envelope unreadable: {type(e).__name__}: {e}",
-                run_status="missing",
-                envelope_path=str(envelope_path),
-            ))
+            scored.append(
+                EvalScore(
+                    case_id=c.case_id,
+                    run_id="",
+                    task_excerpt=excerpt(c.task),
+                    actual_excerpt="",
+                    passed=False,
+                    score=0.0,
+                    scorer=c.scorer or default_scorer,
+                    details=f"envelope unreadable: {type(e).__name__}: {e}",
+                    run_status="missing",
+                    envelope_path=str(envelope_path),
+                )
+            )
             if score_progress is not None:
                 score_progress(scored[-1], idx, len(cases))
             continue
 
         es = _score_case(
-            c, envelope,
+            c,
+            envelope,
             default_scorer_name=default_scorer,
             envelope_path=envelope_path,
         )
@@ -370,20 +375,15 @@ def run_eval(
     # Aggregate.
     total = len(scored)
     passed = sum(1 for s in scored if s.passed)
-    failed = sum(
-        1 for s in scored if not s.passed and s.run_status == "ok"
-    )
-    errored = sum(
-        1 for s in scored if s.run_status not in ("ok", "")
-    )
+    failed = sum(1 for s in scored if not s.passed and s.run_status == "ok")
+    errored = sum(1 for s in scored if s.run_status not in ("ok", ""))
     pass_rate = (passed / total) if total else 0.0
-    avg_score = (
-        sum(s.score for s in scored) / total if total else 0.0
-    )
+    avg_score = sum(s.score for s in scored) / total if total else 0.0
     by_scorer: dict[str, dict[str, int]] = {}
     for s in scored:
         bucket = by_scorer.setdefault(
-            s.scorer, {"total": 0, "passed": 0, "failed": 0, "errored": 0},
+            s.scorer,
+            {"total": 0, "passed": 0, "failed": 0, "errored": 0},
         )
         bucket["total"] += 1
         if s.passed:
@@ -416,21 +416,22 @@ def run_eval(
         if bl is not None:
             baseline_id, baseline_scores = bl
             regressions, improvements = _diff_against_baseline(
-                scored, baseline_scores,
+                scored,
+                baseline_scores,
             )
             summary.baseline_id = baseline_id
             summary.regressions = regressions
             summary.improvements = improvements
         else:
             logger.warning(
-                "baseline_dir=%s has no readable eval-summary.json; "
-                "skipping comparison",
+                "baseline_dir=%s has no readable eval-summary.json; skipping comparison",
                 baseline_dir,
             )
 
     # Persist artifacts.
     (output_dir / "eval-summary.json").write_text(
-        summary.to_json(indent=2), encoding="utf-8",
+        summary.to_json(indent=2),
+        encoding="utf-8",
     )
     (output_dir / "scores.jsonl").write_text(
         "\n".join(json.dumps(s.to_dict(), ensure_ascii=False) for s in scored) + "\n",

@@ -37,7 +37,8 @@ def _corrupt_cron_expr(jobs_db: Path, job_id: str, bad_expr: str) -> None:
 
 
 def test_restart_with_corrupted_cron_expr_skips_with_warning(
-    tmp_path: Path, caplog,
+    tmp_path: Path,
+    caplog,
 ) -> None:
     """If the persisted cron_expr becomes unparseable, restart must
     log a warning and skip that job — not raise (which would take
@@ -45,6 +46,7 @@ def test_restart_with_corrupted_cron_expr_skips_with_warning(
 
     Pinned behavior (was: re-raise blast radius; now: skip + log)."""
     import logging
+
     db = tmp_path / "scheduler.db"
     jobs_db = tmp_path / "cron_jobs.db"
 
@@ -60,10 +62,9 @@ def test_restart_with_corrupted_cron_expr_skips_with_warning(
     with caplog.at_level(logging.ERROR, logger="athena.cron.scheduler"):
         s2.start()  # MUST NOT raise
     # Failure surfaced via log so an operator can find it
-    assert any(
-        "failed to register at startup" in rec.message
-        for rec in caplog.records
-    ), "corrupt cron silently skipped — no log record visible to operator"
+    assert any("failed to register at startup" in rec.message for rec in caplog.records), (
+        "corrupt cron silently skipped — no log record visible to operator"
+    )
     # Metadata record still there so the user can fix it via CLI
     assert s2.store.get(good.id) is not None
     s2.stop()
@@ -121,7 +122,10 @@ def test_disabled_corrupt_job_does_not_block_startup(tmp_path: Path) -> None:
     s1 = CronScheduler(db_path=db, jobs_db_path=jobs_db)
     s1.start()
     bad = CronJob(
-        cron_expr="0 9 * * *", mode="agent", prompt="x", enabled=False,
+        cron_expr="0 9 * * *",
+        mode="agent",
+        prompt="x",
+        enabled=False,
     )
     s1.add_job(bad)
     s1.stop()

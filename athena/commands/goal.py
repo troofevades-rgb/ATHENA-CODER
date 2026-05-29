@@ -55,8 +55,7 @@ def _show(agent) -> None:
         ui.info("(no state file yet — /goal will initialise it on first turn)")
         return
     ui.console.print(
-        f"  status: [bold]{state.status}[/]  "
-        f"turns: {state.turns_taken}/{state.max_turns}"
+        f"  status: [bold]{state.status}[/]  turns: {state.turns_taken}/{state.max_turns}"
     )
     if state.subgoals:
         ui.console.print("  subgoals:")
@@ -242,9 +241,7 @@ def _resume(agent) -> bool:
         # hide runaway.
         bump = _max_turns(agent)
         state.max_turns += bump
-        ui.info(
-            f"goal resumed — cap bumped by {bump} (now {state.turns_taken}/{state.max_turns})"
-        )
+        ui.info(f"goal resumed — cap bumped by {bump} (now {state.turns_taken}/{state.max_turns})")
     else:
         ui.info(f"goal resumed (status=active, {state.turns_taken}/{state.max_turns})")
     save_state(pdir, state)
@@ -388,9 +385,7 @@ def _project_subgoal_create(agent, state, subgoal) -> str | None:
     except Exception as e:  # noqa: BLE001
         import logging as _logging
 
-        _logging.getLogger(__name__).debug(
-            "could not project subgoal to task store: %s", e
-        )
+        _logging.getLogger(__name__).debug("could not project subgoal to task store: %s", e)
         return None
 
 
@@ -408,9 +403,7 @@ def _project_subgoal_done(agent, state, subgoal) -> None:
     except Exception as e:  # noqa: BLE001
         import logging as _logging
 
-        _logging.getLogger(__name__).debug(
-            "could not project subgoal done to task store: %s", e
-        )
+        _logging.getLogger(__name__).debug("could not project subgoal done to task store: %s", e)
 
 
 def _clear_store_subgoals_for_previous_goal(agent) -> None:
@@ -430,6 +423,4 @@ def _clear_store_subgoals_for_previous_goal(agent) -> None:
     except Exception as e:  # noqa: BLE001
         import logging as _logging
 
-        _logging.getLogger(__name__).debug(
-            "could not clear prior goal's subgoal cards: %s", e
-        )
+        _logging.getLogger(__name__).debug("could not clear prior goal's subgoal cards: %s", e)

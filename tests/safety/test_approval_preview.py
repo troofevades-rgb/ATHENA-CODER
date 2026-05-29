@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from athena.safety.approval_callback import _build_preview
 
-
 # ---------------------------------------------------------------------------
 # Bash
 # ---------------------------------------------------------------------------
@@ -68,7 +67,8 @@ def test_write_preview_shows_path_then_content() -> None:
 def test_write_preview_truncates_long_content() -> None:
     big_body = "\n".join(f"line {i}" for i in range(50))
     preview, kind = _build_preview(
-        "Write", {"file_path": "/tmp/big.txt", "content": big_body},
+        "Write",
+        {"file_path": "/tmp/big.txt", "content": big_body},
     )
     assert kind == "file"
     assert "more lines" in preview
@@ -136,6 +136,7 @@ def test_unknown_tool_falls_back_to_json_args() -> None:
 def test_unknown_tool_with_non_json_args_does_not_crash() -> None:
     """Args containing unserializable types (e.g. open file handles)
     must not raise — fall back to repr()."""
+
     class _NotJsonable:
         pass
 

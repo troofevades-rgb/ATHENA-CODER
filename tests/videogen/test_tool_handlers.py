@@ -18,18 +18,39 @@ from athena.videogen import tools as tools_mod
 
 
 def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
-    base = dict(
-        video_generation_enabled=True,
-        video_backend_prefer="local",
-        media_backend_prefer="local",
-        video_confirm_over_seconds=60.0,
-        video_confirm_over_cost=1.0,
-        video_output_dir=str(tmp_path / "videos"),
-        video_poll_interval_s=0.001,
-        profile="default",
+    """Stub Config shaped for post-R4 stage 5 nested ``cfg.video_generation.*``
+    reads. Test overrides can pass legacy flat names for back-compat;
+    they're translated to the nested namespace below."""
+    legacy_to_nested = {
+        "video_generation_enabled": "enabled",
+        "video_backend_prefer": "backend_prefer",
+        "video_confirm_over_seconds": "confirm_over_seconds",
+        "video_confirm_over_cost": "confirm_over_cost",
+        "video_output_dir": "output_dir",
+        "video_poll_interval_s": "poll_interval_s",
+        "video_backend": "backend",
+    }
+    vg_defaults = dict(
+        enabled=True,
+        backend_prefer="local",
+        confirm_over_seconds=60.0,
+        confirm_over_cost=1.0,
+        output_dir=str(tmp_path / "videos"),
+        poll_interval_s=0.001,
+        backend=None,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top: dict = {"profile": "default", "media_backend_prefer": "local"}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            vg_defaults[legacy_to_nested[k]] = v
+        elif k in vg_defaults:
+            vg_defaults[k] = v
+        else:
+            top[k] = v
+    return SimpleNamespace(
+        video_generation=SimpleNamespace(**vg_defaults),
+        **top,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +62,8 @@ def test_video_generate_refuses_when_disabled(monkeypatch, tmp_path: Path):
     """cfg.video_generation_enabled=False → not_enabled payload,
     NO backend resolution attempted."""
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, video_generation_enabled=False),
     )
 
@@ -59,14 +81,13 @@ def test_video_generate_refuses_when_disabled(monkeypatch, tmp_path: Path):
 
 def test_animate_image_refuses_when_disabled(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, video_generation_enabled=False),
     )
     img = tmp_path / "src.png"
     img.write_bytes(b"img")
-    out = json.loads(
-        tools_mod.animate_image(image_path=str(img), motion_prompt="zoom")
-    )
+    out = json.loads(tools_mod.animate_image(image_path=str(img), motion_prompt="zoom"))
     assert out["status"] == "not_enabled"
 
 
@@ -92,18 +113,14 @@ def test_animate_image_requires_source(monkeypatch, tmp_path: Path):
     assert "image_path" in out1["reason"]
 
     out2 = json.loads(
-        tools_mod.animate_image(
-            image_path=str(tmp_path / "missing.png"), motion_prompt="x"
-        )
+        tools_mod.animate_image(image_path=str(tmp_path / "missing.png"), motion_prompt="x")
     )
     assert out2["status"] == "rejected"
     assert "does not exist" in out2["reason"]
 
     img = tmp_path / "src.png"
     img.write_bytes(b"img")
-    out3 = json.loads(
-        tools_mod.animate_image(image_path=str(img), motion_prompt="")
-    )
+    out3 = json.loads(tools_mod.animate_image(image_path=str(img), motion_prompt=""))
     assert out3["status"] == "rejected"
     assert "motion_prompt" in out3["reason"]
 
@@ -131,11 +148,7 @@ def test_video_generate_writes_output(monkeypatch, tmp_path: Path):
     succeeds → file written + sha + audit."""
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
 
-    out = json.loads(
-        tools_mod.video_generate(
-            prompt="a paper boat", duration_s=3.0
-        )
-    )
+    out = json.loads(tools_mod.video_generate(prompt="a paper boat", duration_s=3.0))
     assert out["status"] == "done"
     assert out["backend"] == "stub_video_local"
     assert "path" in out
@@ -174,12 +187,11 @@ def test_video_generate_long_job_declined_by_default(monkeypatch, tmp_path: Path
     no confirm UI plumbed → default_deny kicks in →
     status=declined, no file produced."""
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, video_confirm_over_seconds=10.0),
     )
-    out = json.loads(
-        tools_mod.video_generate(prompt="long clip", duration_s=120.0)
-    )
+    out = json.loads(tools_mod.video_generate(prompt="long clip", duration_s=120.0))
     assert out["status"] == "declined"
     assert out["estimate"]["seconds_est"] == 120.0
     # And no media file was written for the declined job.

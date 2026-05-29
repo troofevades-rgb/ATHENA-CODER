@@ -16,9 +16,10 @@ from unittest.mock import patch
 import pytest
 
 from athena.browser.session import (
-    BrowserSession, get_active_browser, set_active_browser,
+    BrowserSession,
+    get_active_browser,
+    set_active_browser,
 )
-
 
 # ---------------------------------------------------------------
 # Lazy launch — Agent binds, doesn't launch chromium
@@ -52,9 +53,11 @@ def test_set_active_then_clear(tmp_path: Path):
     """The agent runtime sets, runs, then clears — proven
     here without touching the full Agent class."""
     cfg = SimpleNamespace(
-        browser_enabled=True, browser_headless=True,
+        browser_enabled=True,
+        browser_headless=True,
         browser_user_data_root=str(tmp_path / "ud"),
-        browser_nav_timeout_s=30, browser_block_downloads=True,
+        browser_nav_timeout_s=30,
+        browser_block_downloads=True,
         browser_user_agent=None,
     )
     sess = BrowserSession(session_id="lc-2", cfg=cfg)
@@ -74,6 +77,7 @@ def test_tools_see_session_via_contextvar(tmp_path: Path, monkeypatch):
     the session from the ContextVar — the only branch that
     matters before ensure_started fires."""
     import json
+
     from athena.browser import tools as bt
 
     cfg = SimpleNamespace(
@@ -122,9 +126,11 @@ def test_unused_browser_never_launches(tmp_path: Path):
     False the whole time — that flips True only inside
     ensure_started's launch_persistent_context call."""
     cfg = SimpleNamespace(
-        browser_enabled=True, browser_headless=True,
+        browser_enabled=True,
+        browser_headless=True,
         browser_user_data_root=str(tmp_path / "ud"),
-        browser_nav_timeout_s=30, browser_block_downloads=True,
+        browser_nav_timeout_s=30,
+        browser_block_downloads=True,
         browser_user_agent=None,
     )
 
@@ -142,9 +148,11 @@ def test_unused_browser_never_launches(tmp_path: Path):
 
 def test_close_is_idempotent_on_lifecycle(tmp_path: Path):
     cfg = SimpleNamespace(
-        browser_enabled=True, browser_headless=True,
+        browser_enabled=True,
+        browser_headless=True,
         browser_user_data_root=str(tmp_path / "ud"),
-        browser_nav_timeout_s=30, browser_block_downloads=True,
+        browser_nav_timeout_s=30,
+        browser_block_downloads=True,
         browser_user_agent=None,
     )
     sess = BrowserSession(session_id="lc-close", cfg=cfg)

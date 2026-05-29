@@ -66,6 +66,14 @@ ALLOWLIST: frozenset[str] = frozenset(
         "athena/plugins/loader.py",  # plugin state file
         "athena/profiles/manager.py",  # atomic profile metadata writes
         "athena/profiles/resolution.py",  # active-profile pointer
+        # R2 stage 4 -- one-shot, idempotent copy of legacy
+        # ``~/.athena/projects/<slug>/memory/`` into the new
+        # ``<profile_dir>/memory/legacy/<slug>/`` sub-store. Operator-
+        # facing migration parallel in shape to migration/memory_exporter.py
+        # above; runs at most once per (profile, workspace) pair and is
+        # flag-gated (``cfg.migrate_legacy_memory``) for the dogfood
+        # window.
+        "athena/profiles/migration.py",
         "athena/safety/audit.py",  # the audit log itself
         "athena/safety/snapshots.py",  # the snapshot store itself
         "athena/sessions/jsonl.py",  # session transcript append
@@ -79,11 +87,16 @@ ALLOWLIST: frozenset[str] = frozenset(
         "athena/tools/file_ops.py",  # foreground Read/Edit/Write tools
         "athena/tools/tool_result_storage.py",  # content-addressed blob writes + append-only JSONL index (T2-06)
         "athena/tools/patch_apply.py",  # unified-diff write with per-file backup/restore (T2-07)
-        "athena/commands/save_cmd.py",  # /save slash dumps the transcript to JSON (user-driven, not an agent mutation)
+        "athena/commands/save.py",  # /save slash dumps the transcript to JSON (user-driven, not an agent mutation)
         "athena/transform/dataset.py",  # training dataset exports
         "athena/transform/deploy.py",  # deployment artefacts
         "athena/transform/review.py",  # review artefacts
         "athena/transform/batch_driver.py",  # T3-05R labels sidecar rewrite (same path as review.py)
+        # Per-run training state machine — atomic .athena_train_state.json
+        # under <output_dir>. Machine-managed bookkeeping for resumable
+        # SFT/DPO/export phases (parallel in shape to goal/state.py and
+        # update/apply.py — not user content, not agent-driven mutation).
+        "athena/transform/run_state.py",
         "athena/webhooks/delivery.py",  # webhook delivery journal
         # Rollback CLI is itself audited; the restore() call lives in
         # snapshots.py which is allowlisted as the substrate.
@@ -95,6 +108,27 @@ ALLOWLIST: frozenset[str] = frozenset(
         "athena/cli/batch.py",
         "athena/cli/eval.py",
         "athena/eval/runner.py",
+        # T7-Task2 agent-eval harness — same shape as eval/runner.py
+        # above (operational test infrastructure that writes its own
+        # report JSON, task fixtures, and mock-MCP transcripts; not
+        # agent-driven mutation of user content).
+        "athena/eval/agent/report.py",  # eval report serialization
+        "athena/eval/agent/tasks/_mcp_helpers.py",  # writes workspace/mcp.json pointing at mock servers
+        "athena/eval/agent/tasks/file_ops.py",  # eval task fixtures into tempdir workspaces
+        "athena/eval/agent/tasks/mock_users_server.py",  # mock stdio MCP server transcripts
+        "athena/eval/agent/tasks/shell.py",  # shell eval task fixtures
+        "athena/eval/agent/tasks/structured.py",  # structured-output eval task fixtures
+        # Minimal reference MCP server (stdlib only) used by integration
+        # tests + as a copy-paste example. Same operational role as
+        # mock_users_server.py above.
+        "athena/mcp/demo_server.py",
+        # Skill ingestion (dbfaa09) -- import_skill / import_archive
+        # copy an external SKILL.md (or skill dir / archive) into the
+        # user-global or workspace skills tree. User-driven via
+        # /skill import or `athena skill add`; same provenance shape
+        # as migration/skills_mapper.py already allowlisted (operator-
+        # facing skill ingestion, not agent-driven mutation).
+        "athena/skills/importer.py",
         "athena/delegate/codex.py",
         # T6-05 xAI video adapter — fetch() writes the downloaded
         # MP4 to out_dir, same provenance shape as stub_local.py.
@@ -102,7 +136,7 @@ ALLOWLIST: frozenset[str] = frozenset(
         # /theme save writes the active theme name into config.toml
         # (one line, atomic rewrite). Config file is itself the
         # operator-facing surface, not user content.
-        "athena/commands/theme_cmd.py",
+        "athena/commands/theme.py",
         # User-modeling backend writes auto-extracted facts to
         # ``~/.athena/profiles/<profile>/user_model/<id>.md`` plus
         # an INDEX.md. These are machine-managed observation

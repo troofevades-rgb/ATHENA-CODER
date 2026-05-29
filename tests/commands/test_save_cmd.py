@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from athena.commands.save_cmd import cmd_save
+from athena.commands.save import cmd_save
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def _captured_info() -> tuple[list[str], list]:
     lines: list[str] = []
     patches = [
         patch(
-            "athena.commands.save_cmd.ui.info",
+            "athena.commands.save.ui.info",
             side_effect=lambda msg, *a, **kw: lines.append(msg),
         ),
     ]
@@ -51,9 +51,7 @@ def _run(agent, arg: str) -> str:
 # ---- explicit path --------------------------------------------------
 
 
-def test_save_writes_to_explicit_path(
-    fake_agent: SimpleNamespace, tmp_path: Path
-) -> None:
+def test_save_writes_to_explicit_path(fake_agent: SimpleNamespace, tmp_path: Path) -> None:
     target = tmp_path / "out" / "snapshot.json"
     _run(fake_agent, str(target))
     assert target.exists()
@@ -61,9 +59,7 @@ def test_save_writes_to_explicit_path(
     assert written == fake_agent.messages
 
 
-def test_save_creates_parent_directories(
-    fake_agent: SimpleNamespace, tmp_path: Path
-) -> None:
+def test_save_creates_parent_directories(fake_agent: SimpleNamespace, tmp_path: Path) -> None:
     """Nested target paths should auto-create parent dirs so users
     can use scratch paths without mkdir gymnastics."""
     target = tmp_path / "deeply" / "nested" / "path" / "session.json"
@@ -72,9 +68,7 @@ def test_save_creates_parent_directories(
     assert target.exists()
 
 
-def test_save_uses_indented_json(
-    fake_agent: SimpleNamespace, tmp_path: Path
-) -> None:
+def test_save_uses_indented_json(fake_agent: SimpleNamespace, tmp_path: Path) -> None:
     """Pretty-printed output is the user-facing contract — humans
     read these files, so don't regress to one-line JSON."""
     target = tmp_path / "out.json"
@@ -84,9 +78,7 @@ def test_save_uses_indented_json(
     assert text.startswith("[")  # JSON array of messages
 
 
-def test_save_emits_friendly_path_message(
-    fake_agent: SimpleNamespace, tmp_path: Path
-) -> None:
+def test_save_emits_friendly_path_message(fake_agent: SimpleNamespace, tmp_path: Path) -> None:
     target = tmp_path / "snap.json"
     out = _run(fake_agent, str(target))
     assert "saved" in out.lower()
@@ -97,13 +89,16 @@ def test_save_emits_friendly_path_message(
 
 
 def test_save_with_no_arg_uses_sessions_dir(
-    fake_agent: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    fake_agent: SimpleNamespace,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """No arg → write under SESSIONS_DIR with a timestamp filename.
     Test patches SESSIONS_DIR to a tmp_path so we don't pollute the
     real ~/.athena/sessions."""
     monkeypatch.setattr(
-        "athena.commands.save_cmd.SESSIONS_DIR", tmp_path / "sessions",
+        "athena.commands.save.SESSIONS_DIR",
+        tmp_path / "sessions",
     )
     out = _run(fake_agent, "")
     # Exactly one file written into the sessions dir.
@@ -115,7 +110,9 @@ def test_save_with_no_arg_uses_sessions_dir(
 
 
 def test_save_expands_user_homedir(
-    fake_agent: SimpleNamespace, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    fake_agent: SimpleNamespace,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``~/`` paths should expand to the user's home, not write a
     literal '~' directory."""
@@ -129,9 +126,7 @@ def test_save_expands_user_homedir(
 # ---- content correctness --------------------------------------------
 
 
-def test_save_preserves_messages_round_trip(
-    fake_agent: SimpleNamespace, tmp_path: Path
-) -> None:
+def test_save_preserves_messages_round_trip(fake_agent: SimpleNamespace, tmp_path: Path) -> None:
     """The written file must round-trip to the same list[dict]
     via json.loads — locks the contract /resume relies on."""
     target = tmp_path / "rt.json"
@@ -140,9 +135,7 @@ def test_save_preserves_messages_round_trip(
     assert loaded == fake_agent.messages
 
 
-def test_save_writes_unicode_correctly(
-    tmp_path: Path
-) -> None:
+def test_save_writes_unicode_correctly(tmp_path: Path) -> None:
     """Tool output frequently contains non-ASCII; UTF-8 must be
     preserved exactly (no escape sequences in the saved JSON)."""
     agent = SimpleNamespace(

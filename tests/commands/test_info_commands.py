@@ -17,7 +17,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 # ---- shared helpers -------------------------------------------------
 
 
@@ -31,15 +30,13 @@ def _capture_ui(module_path: str):
         patches.append(
             patch(
                 f"{module_path}.ui.{fn_name}",
-                side_effect=lambda msg, *a, _n=fn_name, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn_name, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             f"{module_path}.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -65,16 +62,38 @@ def _run(cmd_fn, agent, arg: str, module_path: str) -> str:
 def test_help_lists_every_documented_command() -> None:
     """The help block must mention every slash command users
     might type. If we add or remove a command, this test snags it."""
-    from athena.commands.help_cmd import cmd_help
+    from athena.commands.help import cmd_help
 
-    out = _run(cmd_help, SimpleNamespace(), "", "athena.commands.help_cmd")
+    out = _run(cmd_help, SimpleNamespace(), "", "athena.commands.help")
     for expected in [
-        "/help", "/model", "/models", "/tools", "/mcp",
-        "/clear", "/cost", "/status", "/save", "/dump",
-        "/cwd", "/init", "/review", "/loop", "/checkpoint",
-        "/compact", "/resume", "/memory", "/plan", "/steer",
-        "/queue", "/goal", "/subgoal", "/board", "/video",
-        "/theme", "/hooks", "/exit",
+        "/help",
+        "/model",
+        "/models",
+        "/tools",
+        "/mcp",
+        "/clear",
+        "/cost",
+        "/status",
+        "/save",
+        "/dump",
+        "/cwd",
+        "/init",
+        "/review",
+        "/loop",
+        "/checkpoint",
+        "/compact",
+        "/resume",
+        "/memory",
+        "/plan",
+        "/steer",
+        "/queue",
+        "/goal",
+        "/subgoal",
+        "/board",
+        "/video",
+        "/theme",
+        "/hooks",
+        "/exit",
     ]:
         assert expected in out, f"{expected} missing from /help output"
 
@@ -83,7 +102,7 @@ def test_help_lists_every_documented_command() -> None:
 
 
 def test_dump_prints_system_prompt_with_size_summary() -> None:
-    from athena.commands.dump_cmd import cmd_dump
+    from athena.commands.dump import cmd_dump
 
     sysprompt = "You are athena. " * 50  # ~800 chars
     agent = SimpleNamespace(
@@ -92,7 +111,7 @@ def test_dump_prints_system_prompt_with_size_summary() -> None:
             {"role": "user", "content": "hi"},
         ],
     )
-    out = _run(cmd_dump, agent, "", "athena.commands.dump_cmd")
+    out = _run(cmd_dump, agent, "", "athena.commands.dump")
     # Size summary in info() — char count + ~token estimate
     assert "chars" in out
     assert "tokens" in out
@@ -101,18 +120,18 @@ def test_dump_prints_system_prompt_with_size_summary() -> None:
 
 
 def test_dump_errors_when_no_system_message() -> None:
-    from athena.commands.dump_cmd import cmd_dump
+    from athena.commands.dump import cmd_dump
 
     agent = SimpleNamespace(messages=[{"role": "user", "content": "hi"}])
-    out = _run(cmd_dump, agent, "", "athena.commands.dump_cmd")
+    out = _run(cmd_dump, agent, "", "athena.commands.dump")
     assert "no system message" in out.lower()
 
 
 def test_dump_errors_when_messages_empty() -> None:
-    from athena.commands.dump_cmd import cmd_dump
+    from athena.commands.dump import cmd_dump
 
     agent = SimpleNamespace(messages=[])
-    out = _run(cmd_dump, agent, "", "athena.commands.dump_cmd")
+    out = _run(cmd_dump, agent, "", "athena.commands.dump")
     assert "no system message" in out.lower()
 
 
@@ -120,26 +139,31 @@ def test_dump_errors_when_messages_empty() -> None:
 
 
 def test_hooks_no_hooks_message() -> None:
-    from athena.commands.hooks_cmd import cmd_hooks
+    """No hooks configured -> the slash command surfaces a "no hooks"
+    message that mentions settings.json so the user knows where to
+    drop one. Plugin-driven path post-R5."""
+    from athena.commands.hooks import cmd_hooks
 
-    with patch("athena.commands.hooks_cmd.hooks_mod.list_hooks", return_value=[]):
-        out = _run(cmd_hooks, SimpleNamespace(), "", "athena.commands.hooks_cmd")
+    fake_plugin = SimpleNamespace(name="shell_hook", _hooks=[])
+    agent = SimpleNamespace(plugin_hooks=SimpleNamespace(plugins=[fake_plugin]))
+    out = _run(cmd_hooks, agent, "", "athena.commands.hooks")
     assert "no hooks" in out.lower()
-    assert "settings.json" in out  # tells user where to put them
+    assert "settings.json" in out
 
 
 def test_hooks_lists_configured_hooks() -> None:
-    from athena.commands.hooks_cmd import cmd_hooks
+    """``/hooks`` reads from the bundled ShellHookPlugin's ``_hooks`` list.
+    Phase 18.1 R5 retired the legacy ``athena.hooks.list_hooks`` path; the
+    slash handler now looks at the plugin's internal hook list directly."""
+    from athena.commands.hooks import cmd_hooks
 
     fake_hooks = [
         SimpleNamespace(event="PostToolUse", matcher="Bash", command="echo done"),
         SimpleNamespace(event="UserPromptSubmit", matcher=".*", command="logger -t athena"),
     ]
-    with patch(
-        "athena.commands.hooks_cmd.hooks_mod.list_hooks",
-        return_value=fake_hooks,
-    ):
-        out = _run(cmd_hooks, SimpleNamespace(), "", "athena.commands.hooks_cmd")
+    fake_plugin = SimpleNamespace(name="shell_hook", _hooks=fake_hooks)
+    agent = SimpleNamespace(plugin_hooks=SimpleNamespace(plugins=[fake_plugin]))
+    out = _run(cmd_hooks, agent, "", "athena.commands.hooks")
     assert "PostToolUse" in out
     assert "Bash" in out
     assert "echo done" in out
@@ -151,7 +175,7 @@ def test_hooks_lists_configured_hooks() -> None:
 
 
 def test_tools_lists_with_name_and_first_line_of_description() -> None:
-    from athena.commands import tools_cmd
+    from athena.commands import tools as tools_cmd
 
     fake_tools = [
         SimpleNamespace(
@@ -172,10 +196,10 @@ def test_tools_lists_with_name_and_first_line_of_description() -> None:
     ]
     agent = SimpleNamespace(cfg=SimpleNamespace(disabled_tools=[]))
     with patch(
-        "athena.commands.tools_cmd.tools.all_tools",
+        "athena.commands.tools.tools.all_tools",
         return_value=fake_tools,
     ):
-        out = _run(tools_cmd.cmd_tools, agent, "", "athena.commands.tools_cmd")
+        out = _run(tools_cmd.cmd_tools, agent, "", "athena.commands.tools")
     assert "Read" in out
     assert "Reads a file from disk." in out
     # "More detail here." should NOT appear — only first line of description.
@@ -190,7 +214,7 @@ def test_tools_lists_with_name_and_first_line_of_description() -> None:
 def test_tools_passes_disabled_tools_through_to_registry() -> None:
     """``/tools`` must honor the agent's disabled_tools so users see
     the same surface the model sees."""
-    from athena.commands import tools_cmd
+    from athena.commands import tools as tools_cmd
 
     agent = SimpleNamespace(cfg=SimpleNamespace(disabled_tools=["Bash", "Edit"]))
     captured_kwargs: dict = {}
@@ -199,8 +223,8 @@ def test_tools_passes_disabled_tools_through_to_registry() -> None:
         captured_kwargs.update(kwargs)
         return []
 
-    with patch("athena.commands.tools_cmd.tools.all_tools", side_effect=_spy):
-        _run(tools_cmd.cmd_tools, agent, "", "athena.commands.tools_cmd")
+    with patch("athena.commands.tools.tools.all_tools", side_effect=_spy):
+        _run(tools_cmd.cmd_tools, agent, "", "athena.commands.tools")
     assert captured_kwargs.get("disabled") == ["Bash", "Edit"]
 
 
@@ -208,7 +232,7 @@ def test_tools_passes_disabled_tools_through_to_registry() -> None:
 
 
 def test_models_lists_with_active_marker() -> None:
-    from athena.commands.models_cmd import cmd_models
+    from athena.commands.models import cmd_models
 
     agent = SimpleNamespace(
         model="qwen2.5-coder:14b",
@@ -216,7 +240,7 @@ def test_models_lists_with_active_marker() -> None:
             list_models=lambda: ["llama3.2:3b", "qwen2.5-coder:14b", "gemma:7b"],
         ),
     )
-    out = _run(cmd_models, agent, "", "athena.commands.models_cmd")
+    out = _run(cmd_models, agent, "", "athena.commands.models")
     assert "llama3.2:3b" in out
     assert "qwen2.5-coder:14b" in out
     assert "gemma:7b" in out
@@ -230,7 +254,7 @@ def test_models_lists_with_active_marker() -> None:
 def test_models_handles_provider_error() -> None:
     """Provider errors must not crash the REPL — surface a friendly
     ``ui.error`` instead."""
-    from athena.commands.models_cmd import cmd_models
+    from athena.commands.models import cmd_models
 
     def _raise():
         raise ConnectionError("Ollama not running on :11434")
@@ -239,7 +263,7 @@ def test_models_handles_provider_error() -> None:
         model="x",
         provider=SimpleNamespace(list_models=_raise),
     )
-    out = _run(cmd_models, agent, "", "athena.commands.models_cmd")
+    out = _run(cmd_models, agent, "", "athena.commands.models")
     assert "could not list models" in out.lower()
     assert "ollama not running" in out.lower()
 
@@ -248,7 +272,7 @@ def test_models_handles_provider_error() -> None:
 
 
 def test_cost_prints_session_counters() -> None:
-    from athena.commands.cost_cmd import cmd_cost
+    from athena.commands.cost import cmd_cost
 
     # 60s ago started; some activity recorded.
     stats = SimpleNamespace(
@@ -259,7 +283,7 @@ def test_cost_prints_session_counters() -> None:
         eval_tokens=5678,
     )
     agent = SimpleNamespace(stats=stats)
-    out = _run(cmd_cost, agent, "", "athena.commands.cost_cmd")
+    out = _run(cmd_cost, agent, "", "athena.commands.cost")
     assert "turns" in out and "3" in out
     assert "tool calls" in out and "11" in out
     assert "1234" in out
@@ -268,6 +292,7 @@ def test_cost_prints_session_counters() -> None:
     assert "elapsed" in out
     # Pluck out the elapsed number — should be roughly 60.
     import re
+
     match = re.search(r"elapsed:\s*([\d.]+)s", out)
     assert match, f"no elapsed line in: {out!r}"
     elapsed = float(match.group(1))
@@ -277,7 +302,7 @@ def test_cost_prints_session_counters() -> None:
 def test_cost_handles_zero_counters() -> None:
     """A fresh session (no turns yet) must still render without
     error rather than dividing by zero or formatting None."""
-    from athena.commands.cost_cmd import cmd_cost
+    from athena.commands.cost import cmd_cost
 
     agent = SimpleNamespace(
         stats=SimpleNamespace(
@@ -288,6 +313,6 @@ def test_cost_handles_zero_counters() -> None:
             eval_tokens=0,
         ),
     )
-    out = _run(cmd_cost, agent, "", "athena.commands.cost_cmd")
+    out = _run(cmd_cost, agent, "", "athena.commands.cost")
     assert "0" in out
     assert "elapsed" in out

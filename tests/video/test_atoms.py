@@ -21,7 +21,6 @@ from athena.video.atoms import (
 )
 from tests.video.fixtures import FIXTURES_DIR, have_ffmpeg
 
-
 _NEED_FFMPEG = pytest.mark.skipif(
     not have_ffmpeg(),
     reason="ffmpeg not on PATH — fixtures not built",
@@ -59,7 +58,7 @@ def test_parse_handles_64bit_extended_size(tmp_path: Path):
     number of header bytes."""
     payload = b"\x00" * 32
     big_box = (
-        struct.pack(">I", 1)            # 32-bit size = 1 → 64-bit follows
+        struct.pack(">I", 1)  # 32-bit size = 1 → 64-bit follows
         + b"mdat"
         + struct.pack(">Q", 16 + len(payload))
         + payload
@@ -77,8 +76,7 @@ def test_parse_handles_size_zero_last_box(tmp_path: Path):
     """size=0 means "extends to end of file" — the box claims
     the rest of the byte stream."""
     blob = (
-        _craft_box(b"ftyp", b"isom" + b"\x00" * 12)
-        + struct.pack(">I", 0) + b"mdat" + b"\x00" * 32
+        _craft_box(b"ftyp", b"isom" + b"\x00" * 12) + struct.pack(">I", 0) + b"mdat" + b"\x00" * 32
     )
     f = tmp_path / "z.mp4"
     f.write_bytes(blob)

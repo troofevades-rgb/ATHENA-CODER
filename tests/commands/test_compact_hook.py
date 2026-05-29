@@ -17,9 +17,7 @@ def _wait_for_threads_named(prefix: str, timeout: float = 2.0) -> bool:
     Avoids flake by giving the daemon a chance to run on slow CI."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if not any(
-            t.name.startswith(prefix) for t in threading.enumerate() if t.is_alive()
-        ):
+        if not any(t.name.startswith(prefix) for t in threading.enumerate() if t.is_alive()):
             return True
         time.sleep(0.02)
     return False
@@ -49,9 +47,7 @@ def test_no_fire_when_backend_none():
 def test_no_fire_when_flag_off():
     """``ingest_on_compact = False`` must skip the hook even on
     the default markdown backend."""
-    cfg = Config(
-        user_model=UserModelConfig(backend="markdown", ingest_on_compact=False)
-    )
+    cfg = Config(user_model=UserModelConfig(backend="markdown", ingest_on_compact=False))
     agent = _make_agent(cfg)
     _maybe_fire_user_model_ingest(agent, [{"role": "user", "content": "hi"}])
     assert _wait_for_threads_named("athena-user-model-ingest")

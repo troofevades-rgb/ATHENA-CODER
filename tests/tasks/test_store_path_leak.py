@@ -35,9 +35,7 @@ def _reset_module_cache():
     task_mod._store = saved
 
 
-def test_store_rebuilds_when_profile_dir_changes(
-    tmp_path: Path, monkeypatch
-):
+def test_store_rebuilds_when_profile_dir_changes(tmp_path: Path, monkeypatch):
     """First resolve at path A; monkeypatch profile_dir to path B;
     next resolve must yield a store pointing at B, not the cached A."""
     from athena.tools import task as task_mod
@@ -60,16 +58,12 @@ def test_store_rebuilds_when_profile_dir_changes(
     assert store_a is not store_b
 
 
-def test_store_is_cached_when_path_unchanged(
-    tmp_path: Path, monkeypatch
-):
+def test_store_is_cached_when_path_unchanged(tmp_path: Path, monkeypatch):
     """Production hot path: path is stable, so we MUST return the
     same instance — avoids re-reading the JSON on every TaskCreate."""
     from athena.tools import task as task_mod
 
-    monkeypatch.setattr(
-        "athena.config.profile_dir", lambda *a, **kw: tmp_path
-    )
+    monkeypatch.setattr("athena.config.profile_dir", lambda *a, **kw: tmp_path)
     first = task_mod._resolve_store()
     second = task_mod._resolve_store()
     assert first is second

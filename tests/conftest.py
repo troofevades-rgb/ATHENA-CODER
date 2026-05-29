@@ -17,6 +17,35 @@ from athena.skills import loader
 from athena.skills.frontmatter import SkillFrontmatter, serialize_frontmatter
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _disable_background_curator() -> None:
+    """Block ``Agent.__init__``'s session-start curator spawn for the
+    whole pytest run.
+
+    The spawn launches a ``daemon=True`` thread that calls
+    ``maybe_run_curator(self)``, which forks another Agent and hits
+    the LLM provider. ``Agent.close()`` can't reach the daemon
+    thread to stop it — once spawned, it runs until natural
+    completion (often blocked on Ollama I/O) or process exit. In
+    pytest that means a prior test's curator can outlive its
+    Agent and race the next test for Ollama's single-inference
+    queue, deadlocking on socket reads.
+
+    The env var only gates the background spawn from session-start;
+    direct calls to ``maybe_run_curator(agent, force=True)`` from
+    ``tests/curator/`` still hit the real function.
+    """
+    import os
+
+    saved = os.environ.get("ATHENA_DISABLE_BACKGROUND_CURATOR")
+    os.environ["ATHENA_DISABLE_BACKGROUND_CURATOR"] = "1"
+    yield
+    if saved is None:
+        os.environ.pop("ATHENA_DISABLE_BACKGROUND_CURATOR", None)
+    else:
+        os.environ["ATHENA_DISABLE_BACKGROUND_CURATOR"] = saved
+
+
 @pytest.fixture(autouse=True)
 def _path_security_workspace(tmp_path: Path) -> None:
     """Point path_security at tmp_path for every test.
@@ -38,6 +67,24 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("USERPROFILE", str(home))  # Windows
     # Python caches expanduser results; nudge Path.home() by patching it.
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    # ``athena.config.CONFIG_DIR`` is computed at module import time
+    # (``Path.home() / ".athena"`` — frozen as a module-level constant).
+    # Monkeypatching ``Path.home`` AFTER import doesn't change CONFIG_DIR,
+    # so anything that reads via ``profile_dir(...)`` without a ``home=``
+    # override still hits the developer's real ~/.athena. That made
+    # tests like ``test_anthropic_provider_gets_cache_markers`` read the
+    # user's real ``goal_state.json``, and when it had an active goal
+    # with ``max_turns=10000`` the agent looped 10k turns until pytest
+    # timed it out. Redirect every CONFIG_DIR-derived constant in
+    # athena.config so subsystems reading via profile_dir() see the tmp
+    # home too.
+    import athena.config as _athena_config
+
+    tmp_config_dir = home / ".athena"
+    monkeypatch.setattr(_athena_config, "CONFIG_DIR", tmp_config_dir)
+    monkeypatch.setattr(_athena_config, "CONFIG_PATH", tmp_config_dir / "config.toml")
+    monkeypatch.setattr(_athena_config, "SESSIONS_DIR", tmp_config_dir / "sessions")
+    monkeypatch.setattr(_athena_config, "USER_MCP_PATH", tmp_config_dir / "mcp.json")
     # Body cache must not leak across tests.
     loader.invalidate_all()
     return home

@@ -11,7 +11,12 @@ from athena.commands.video import cmd_video
 
 
 def _agent(video_backend=None):
-    cfg = SimpleNamespace(video_backend=video_backend)
+    """Post-R4 stage 5: cfg.video_backend was promoted to
+    cfg.video_generation.backend; the SimpleNamespace stub mirrors
+    the new nested shape."""
+    cfg = SimpleNamespace(
+        video_generation=SimpleNamespace(backend=video_backend),
+    )
     return SimpleNamespace(cfg=cfg)
 
 
@@ -25,15 +30,13 @@ def _capture_ui():
         patches.append(
             patch(
                 f"athena.commands.video.ui.{fn_name}",
-                side_effect=lambda msg, *a, _name=fn_name, **kw:
-                    lines.append(f"{_name}: {msg}"),
+                side_effect=lambda msg, *a, _name=fn_name, **kw: lines.append(f"{_name}: {msg}"),
             )
         )
     patches.append(
         patch(
             "athena.commands.video.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -119,7 +122,7 @@ def test_video_set_updates_cfg(monkeypatch):
     )
     agent = _agent(None)
     _, lines = _run_with_capture(cmd_video, agent, "set xai_video")
-    assert agent.cfg.video_backend == "xai_video"
+    assert agent.cfg.video_generation.backend == "xai_video"
     assert any("xai_video" in l for l in lines)
 
 
@@ -130,7 +133,7 @@ def test_video_set_rejects_unknown_backend(monkeypatch):
     )
     agent = _agent(None)
     _, lines = _run_with_capture(cmd_video, agent, "set bogus_backend")
-    assert agent.cfg.video_backend is None  # unchanged
+    assert agent.cfg.video_generation.backend is None  # unchanged
     joined = "\n".join(lines)
     assert "unknown" in joined.lower()
     assert "stub_video_local" in joined  # offered as available
@@ -151,7 +154,7 @@ def test_video_set_with_no_arg_errors():
 def test_video_clear_resets_to_none():
     agent = _agent("xai_video")
     _, lines = _run_with_capture(cmd_video, agent, "clear")
-    assert agent.cfg.video_backend is None
+    assert agent.cfg.video_generation.backend is None
     joined = "\n".join(lines)
     assert "cleared" in joined.lower()
 
@@ -194,7 +197,8 @@ def test_auth_status_uses_backend_declared_env_vars(monkeypatch, tmp_path):
 
 
 def test_auth_status_falls_back_to_heuristic_for_undeclared_backend(
-    monkeypatch, tmp_path,
+    monkeypatch,
+    tmp_path,
 ):
     """A backend without ``credential_env_vars`` falls back to the
     ATHENA_<NAME>_API_KEY heuristic."""

@@ -35,7 +35,6 @@ from athena.update.check import (
 )
 from athena.update.detect import InstallMethod
 
-
 # ---------------------------------------------------------------------------
 # is_newer / _parse
 # ---------------------------------------------------------------------------
@@ -122,8 +121,12 @@ class _FakeURLOpenResponse:
 def test_latest_pypi_returns_highest_stable(monkeypatch):
     payload = {
         "releases": {
-            "0.1.0": [], "0.2.0": [], "0.3.0a1": [], "0.3.0b1": [],
-            "0.3.0": [], "0.4.0": [],
+            "0.1.0": [],
+            "0.2.0": [],
+            "0.3.0a1": [],
+            "0.3.0b1": [],
+            "0.3.0": [],
+            "0.4.0": [],
         }
     }
     monkeypatch.setattr(
@@ -139,7 +142,8 @@ def test_channel_pre_includes_prerelease(monkeypatch):
     becomes the latest in the pre channel."""
     payload = {
         "releases": {
-            "0.4.0": [], "0.5.0a1": [],
+            "0.4.0": [],
+            "0.5.0a1": [],
         }
     }
     monkeypatch.setattr(
@@ -156,7 +160,9 @@ def test_channel_stable_excludes_prerelease(monkeypatch):
     a1 / b1 / rc1 / dev shapes."""
     payload = {
         "releases": {
-            "0.2.0": [], "0.3.0rc1": [], "0.3.0b1": [],
+            "0.2.0": [],
+            "0.3.0rc1": [],
+            "0.3.0b1": [],
         }
     }
     monkeypatch.setattr(
@@ -390,7 +396,8 @@ def test_changelog_between_returns_sections(monkeypatch, tmp_path: Path):
         encoding="utf-8",
     )
     out = changelog_between(
-        "0.2.0", "0.4.0",
+        "0.2.0",
+        "0.4.0",
         method=InstallMethod.PIP,
         changelog_path=str(changelog),
     )
@@ -406,7 +413,8 @@ def test_changelog_between_returns_sections(monkeypatch, tmp_path: Path):
 def test_changelog_between_missing_file(monkeypatch, tmp_path: Path):
     """No CHANGELOG anywhere → pointer fallback string."""
     out = changelog_between(
-        "0.1.0", "0.2.0",
+        "0.1.0",
+        "0.2.0",
         method=InstallMethod.PIP,
         changelog_path=str(tmp_path / "missing.md"),
     )

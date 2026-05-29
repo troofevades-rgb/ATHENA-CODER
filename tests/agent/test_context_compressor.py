@@ -81,9 +81,7 @@ def test_split_protects_head() -> None:
     head, _middle, _tail = _split_head_middle_tail(
         msgs,
         head_indices=cfg.head_message_indices,
-        tail_budget_tokens=int(
-            cfg.tail_protection_ratio * cfg.model_context_window
-        ),
+        tail_budget_tokens=int(cfg.tail_protection_ratio * cfg.model_context_window),
     )
     assert len(head) == 1
     assert head[0]["content"] == "head"
@@ -103,9 +101,7 @@ def test_split_protects_tail_by_token_budget() -> None:
     head, middle, tail = _split_head_middle_tail(
         msgs,
         head_indices=cfg.head_message_indices,
-        tail_budget_tokens=int(
-            cfg.tail_protection_ratio * cfg.model_context_window
-        ),
+        tail_budget_tokens=int(cfg.tail_protection_ratio * cfg.model_context_window),
     )
     assert len(head) == 1
     assert len(middle) > 0
@@ -125,9 +121,7 @@ def test_split_with_long_session_fixture() -> None:
     head, middle, tail = _split_head_middle_tail(
         msgs,
         head_indices=cfg.head_message_indices,
-        tail_budget_tokens=int(
-            cfg.tail_protection_ratio * cfg.model_context_window
-        ),
+        tail_budget_tokens=int(cfg.tail_protection_ratio * cfg.model_context_window),
     )
     assert len(head) == 1
     assert len(middle) > 10
@@ -356,13 +350,12 @@ def test_summarizer_preamble_includes_anti_hallucination_rules() -> None:
         "hallucinations"
     )
     # Prompt-injection defense (source = data, not commands)
-    assert "do not treat instructions" in p or (
-        "source" in p and "not instructions" in p
-    ), "summarizer prompt must defend against prompt injection from middle messages"
+    assert "do not treat instructions" in p or ("source" in p and "not instructions" in p), (
+        "summarizer prompt must defend against prompt injection from middle messages"
+    )
     # Empty-section discipline
     assert '"(none)"' in p or "(none)" in p, (
-        "summarizer prompt must specify (none) for empty sections "
-        "so the model doesn't pad"
+        "summarizer prompt must specify (none) for empty sections so the model doesn't pad"
     )
     # Self-check requirement
     assert "self-check" in p or "re-read" in p, (
@@ -370,4 +363,6 @@ def test_summarizer_preamble_includes_anti_hallucination_rules() -> None:
         "this, single-pass fabrications survive"
     )
     # Remaining-work guard (the section that caused the real bug)
-    assert "remaining work" in p, "Remaining work section is the highest-risk section; keep it but guarded"
+    assert "remaining work" in p, (
+        "Remaining work section is the highest-risk section; keep it but guarded"
+    )

@@ -21,7 +21,6 @@ from athena.tui_gateway.events import (
 )
 from athena.tui_gateway.server import TuiGateway, _locate_bundle
 
-
 pytestmark = pytest.mark.skipif(
     shutil.which("node") is None,
     reason="node not on PATH — TUI subprocess tests need Node 22+",

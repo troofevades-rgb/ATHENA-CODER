@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from athena.document.extractors.pdf import (
+# PyMuPDF (``fitz``) is an optional dependency -- the extractor and
+# its test fixture both call into it. When the binary wheel isn't
+# installed (e.g., CI's slim test image), skip the suite cleanly
+# rather than letting the imports below blow up at collection time.
+pytest.importorskip("fitz")
+
+from athena.document.extractors.pdf import (  # noqa: E402
     extract,
     rasterize_page,
 )
@@ -39,7 +45,8 @@ def test_pdf_text_extraction(tmp_path: Path):
 def test_pdf_metadata_extraction(tmp_path: Path):
     pdf = make_pdf_with_text(
         tmp_path / "a.pdf",
-        title="Specific Title", author="A. Specific Author",
+        title="Specific Title",
+        author="A. Specific Author",
     )
     result = extract(pdf)
     assert result.metadata["title"] == "Specific Title"
@@ -56,7 +63,11 @@ def test_pdf_outline_extraction(tmp_path: Path):
     assert len(result.outline) == 5
     titles = [e.title for e in result.outline]
     assert titles == [
-        "Introduction", "Methods", "Sub-method A", "Results", "Conclusion",
+        "Introduction",
+        "Methods",
+        "Sub-method A",
+        "Results",
+        "Conclusion",
     ]
     # Levels preserved.
     levels = [e.level for e in result.outline]
@@ -110,11 +121,18 @@ def test_pdf_normalized_shape(tmp_path: Path):
     """The .normalized() output is JSON-safe + has the expected
     top-level keys."""
     import json
+
     pdf = make_pdf_with_text(tmp_path / "a.pdf")
     nd = extract(pdf).normalized()
     # Must round-trip through JSON without error.
     json.dumps(nd)
     assert set(nd.keys()) >= {
-        "text", "pages", "outline", "tables", "metadata",
-        "scanned_pages", "ocr_pages", "figures",
+        "text",
+        "pages",
+        "outline",
+        "tables",
+        "metadata",
+        "scanned_pages",
+        "ocr_pages",
+        "figures",
     }

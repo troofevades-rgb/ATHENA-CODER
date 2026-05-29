@@ -37,8 +37,7 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.loop.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     return lines, patches

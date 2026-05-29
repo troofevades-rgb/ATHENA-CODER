@@ -16,7 +16,9 @@ import pytest
 
 from athena.browser import tools as bt
 from athena.browser.session import (
-    BrowserSession, get_active_browser, set_active_browser,
+    BrowserSession,
+    get_active_browser,
+    set_active_browser,
 )
 
 
@@ -97,6 +99,7 @@ def test_close_with_no_active_session_returns_no_op(tmp_path: Path, monkeypatch)
 def _playwright_with_chromium() -> bool:
     try:
         from playwright.sync_api import sync_playwright
+
         with sync_playwright() as p:
             _ = p.chromium
         return True
@@ -134,7 +137,9 @@ def test_navigate_returns_title(active_session, local_server):
 
 @_NEED_BROWSER
 def test_persistent_context_keeps_cookies_across_calls(
-    active_session, local_server, tmp_path: Path,
+    active_session,
+    local_server,
+    tmp_path: Path,
 ):
     """THE load-bearing test for T4-03: a cookie set on one
     navigation survives across the next."""
@@ -178,13 +183,17 @@ def test_screenshot_writes_file(active_session, local_server, tmp_path: Path):
 
 @_NEED_BROWSER
 def test_screenshot_analyze_routes_to_vision(
-    active_session, local_server, tmp_path: Path, monkeypatch,
+    active_session,
+    local_server,
+    tmp_path: Path,
+    monkeypatch,
 ):
     """analyze_prompt → calls vision_analyze describe. Stub the
     vision module to confirm the prompt + path were passed."""
     bt.browser_navigate(url=local_server)
 
     seen: dict = {}
+
     def _stub_run(*, mode, path, prompt, _cfg, **_):
         seen["mode"] = mode
         seen["path"] = path
@@ -193,6 +202,7 @@ def test_screenshot_analyze_routes_to_vision(
 
     import sys
     import types
+
     fake_mod = types.ModuleType("athena.vision.analyze")
     fake_mod._run = _stub_run
     monkeypatch.setitem(sys.modules, "athena.vision.analyze", fake_mod)
@@ -235,11 +245,18 @@ def test_navigate_logs_capture_entry(active_session, local_server, tmp_path: Pat
 def test_all_browser_tools_registered():
     import athena.tools  # noqa: F401 — trigger registration
     from athena.tools.registry import all_tools
+
     names = {t.name for t in all_tools()}
     for n in (
-        "browser_navigate", "browser_screenshot", "browser_extract_text",
-        "browser_extract_links", "browser_click", "browser_fill",
-        "browser_wait_for", "browser_get_cookies", "browser_close",
+        "browser_navigate",
+        "browser_screenshot",
+        "browser_extract_text",
+        "browser_extract_links",
+        "browser_click",
+        "browser_fill",
+        "browser_wait_for",
+        "browser_get_cookies",
+        "browser_close",
     ):
         assert n in names, f"missing tool: {n}"
 
@@ -247,7 +264,7 @@ def test_all_browser_tools_registered():
 def test_browser_tools_in_browser_toolset():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
-    for n in ("browser_navigate", "browser_screenshot",
-              "browser_extract_text", "browser_click"):
+
+    for n in ("browser_navigate", "browser_screenshot", "browser_extract_text", "browser_click"):
         t = get_tool(n)
         assert t.toolset == "browser"

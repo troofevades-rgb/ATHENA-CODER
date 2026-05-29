@@ -96,26 +96,27 @@ class StubAudioBackend:
     ) -> TranscribeResult:
         if self._raise is not None:
             raise self._raise
-        self.transcribe_calls.append({
-            "path": str(path),
-            "language": language,
-            "diarize": diarize,
-            "chunk_offset_s": chunk_offset_s,
-        })
+        self.transcribe_calls.append(
+            {
+                "path": str(path),
+                "language": language,
+                "diarize": diarize,
+                "chunk_offset_s": chunk_offset_s,
+            }
+        )
         segs: list[Segment] = []
         for i in range(self._per_chunk):
             seg_start = chunk_offset_s + i * 1.0
             seg_end = seg_start + 0.9
-            speaker = (
-                f"SPK{(i % 2)}"
-                if (diarize and self._diarize_supported) else None
+            speaker = f"SPK{(i % 2)}" if (diarize and self._diarize_supported) else None
+            segs.append(
+                Segment(
+                    start=seg_start,
+                    end=seg_end,
+                    text=f"chunk@{chunk_offset_s:.1f}s seg{i}",
+                    speaker=speaker,
+                )
             )
-            segs.append(Segment(
-                start=seg_start,
-                end=seg_end,
-                text=f"chunk@{chunk_offset_s:.1f}s seg{i}",
-                speaker=speaker,
-            ))
         return TranscribeResult(
             segments=segs,
             language=language or "en",

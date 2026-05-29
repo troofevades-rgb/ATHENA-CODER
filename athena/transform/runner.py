@@ -17,10 +17,21 @@ import logging
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Type for the ``runner`` test seam used below — anything with
+# ``subprocess.call``'s signature ``(cmd: list[str], cwd: str | None) -> int``.
+# The prior ``subprocess._SubprocessTarget`` annotation referenced a name that
+# doesn't exist in CPython's ``subprocess`` module; only ``from __future__
+# import annotations`` was hiding the AttributeError because annotations
+# evaluate lazily. ``typing.get_type_hints`` / pydantic / doc-gen on this
+# module would have blown up.
+SubprocessRunner = Callable[..., int]
 
 
 def _default_transform_dir() -> Path:
@@ -46,6 +57,16 @@ class TrainingRun:
     lora_alpha: int = 32
     max_steps: int = -1
     extra_args: list[str] = field(default_factory=list)
+    # Resumability: ``checkpoint_dir`` is where HF Trainer writes its
+    # intermediate ``checkpoint-N`` snapshots. Defaults under
+    # ``output_dir/checkpoints`` so each run has its own checkpoint
+    # namespace (rather than the previous behaviour of dumping into a
+    # shared ``transform/outputs/`` that mixed runs together).
+    # ``resume_from_checkpoint``, when set, is passed through to
+    # ``train_lora.py --resume-from-checkpoint`` so HF Trainer picks
+    # up step / optimizer / scheduler state from that snapshot.
+    checkpoint_dir: Path | None = None
+    resume_from_checkpoint: Path | None = None
 
 
 def run_lora(
@@ -53,7 +74,7 @@ def run_lora(
     *,
     transform_dir: Path | None = None,
     python: str | None = None,
-    runner: subprocess._SubprocessTarget | None = None,
+    runner: SubprocessRunner | None = None,
 ) -> int:
     """Invoke ``transform/scripts/train_lora.py``. Returns the exit code.
 
@@ -87,8 +108,15 @@ def run_lora(
         str(run.lora_alpha),
         "--max-steps",
         str(run.max_steps),
-        *run.extra_args,
     ]
+    # Per-run checkpoint isolation: default to ``<output_dir>/checkpoints``
+    # so multiple concurrent or sequential runs don't stomp on each other's
+    # checkpoint dirs (which they used to do via a shared ``./outputs``).
+    checkpoint_dir = run.checkpoint_dir or (run.output_dir / "checkpoints")
+    cmd.extend(["--checkpoint-dir", str(checkpoint_dir)])
+    if run.resume_from_checkpoint is not None:
+        cmd.extend(["--resume-from-checkpoint", str(run.resume_from_checkpoint)])
+    cmd.extend(run.extra_args)
     logger.info("running LoRA training: %s", " ".join(cmd))
     call = runner or subprocess.call
     return call(cmd, cwd=str(transform_dir))
@@ -100,7 +128,7 @@ def run_dpo(
     *,
     transform_dir: Path | None = None,
     python: str | None = None,
-    runner: subprocess._SubprocessTarget | None = None,
+    runner: SubprocessRunner | None = None,
 ) -> int:
     """Invoke ``transform/scripts/train_dpo.py`` on top of an SFT LoRA.
 
@@ -146,7 +174,7 @@ def export_to_gguf(
     base_model: str | None = None,
     transform_dir: Path | None = None,
     python: str | None = None,
-    runner: subprocess._SubprocessTarget | None = None,
+    runner: SubprocessRunner | None = None,
 ) -> int:
     """Invoke ``transform/scripts/export_to_ollama.py`` to merge the
     LoRA, convert to GGUF, and register with Ollama under ``ollama_name``.

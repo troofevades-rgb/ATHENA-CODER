@@ -66,12 +66,9 @@ def _format_theme_preview(theme: ui.Theme) -> str:
         ("accent", theme.accent),
         ("acc.dim", theme.accent_dim),
     ]
-    swatch_row = "  " + "  ".join(
-        _swatch(_hex_to_rgb(hex_)) for _, hex_ in fields
-    )
+    swatch_row = "  " + "  ".join(_swatch(_hex_to_rgb(hex_)) for _, hex_ in fields)
     label_row = "  " + "  ".join(
-        f"{_ansi_fg(_hex_to_rgb(hex_))}{name:<6}{_RESET}"
-        for name, hex_ in fields
+        f"{_ansi_fg(_hex_to_rgb(hex_))}{name:<6}{_RESET}" for name, hex_ in fields
     )
     lines.append(swatch_row)
     lines.append(label_row)
@@ -80,13 +77,13 @@ def _format_theme_preview(theme: ui.Theme) -> str:
     # fade. Render each step as 4 cells of bg so you can see the
     # progression.
     if theme.gradient:
-        grad = "  " + "".join(
-            _swatch(_hex_to_rgb(c), width=4) for c in theme.gradient
-        )
+        grad = "  " + "".join(_swatch(_hex_to_rgb(c), width=4) for c in theme.gradient)
         lines.append(grad)
         lines.append(
-            "  " + _ansi_fg(_hex_to_rgb(theme.primary_dim))
-            + f"gradient ({len(theme.gradient)} stops)" + _RESET,
+            "  "
+            + _ansi_fg(_hex_to_rgb(theme.primary_dim))
+            + f"gradient ({len(theme.gradient)} stops)"
+            + _RESET,
         )
 
     return "\n".join(lines)
@@ -106,8 +103,7 @@ def _cmd_preview(args: argparse.Namespace) -> int:
     if args.name:
         if args.name not in ui.THEMES:
             sys.stderr.write(
-                f"unknown theme: {args.name!r}. "
-                f"Available: {', '.join(sorted(ui.THEMES))}\n",
+                f"unknown theme: {args.name!r}. Available: {', '.join(sorted(ui.THEMES))}\n",
             )
             return 1
         themes = [ui.THEMES[args.name]]
@@ -143,7 +139,8 @@ def main(argv: list[str]) -> int:
         help="Render color swatches for one or every theme.",
     )
     sub_preview.add_argument(
-        "name", nargs="?",
+        "name",
+        nargs="?",
         help="Theme name to preview (default: all registered themes).",
     )
     sub_preview.set_defaults(func=_cmd_preview)

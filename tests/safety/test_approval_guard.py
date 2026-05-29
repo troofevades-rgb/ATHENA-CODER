@@ -322,9 +322,9 @@ def test_request_approval_sync_auto_approve_in_background():
 
     origin = set_current_write_origin(BACKGROUND_REVIEW)
     try:
-        assert request_approval_sync(
-            "file:/x", never_called, auto_approve_in_background=True
-        ) is True
+        assert (
+            request_approval_sync("file:/x", never_called, auto_approve_in_background=True) is True
+        )
     finally:
         reset_current_write_origin(origin)
 

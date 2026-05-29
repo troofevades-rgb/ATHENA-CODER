@@ -18,8 +18,8 @@ try:
     from . import faster_whisper_local as _fw  # noqa: F401
 except Exception:  # noqa: BLE001 — defensive at import time
     import logging
+
     logging.getLogger(__name__).debug(
-        "faster_whisper_local backend not loaded "
-        "(faster-whisper missing or import failed)",
+        "faster_whisper_local backend not loaded (faster-whisper missing or import failed)",
         exc_info=True,
     )

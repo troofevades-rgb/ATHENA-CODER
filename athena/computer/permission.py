@@ -83,11 +83,13 @@ _RESOURCE_DESTRUCTIVE_PREFIX = "computer_destructive::"
 # (input always caches now; destructive never does). Any other
 # string in cfg.computer_permission_mode is treated like
 # observe_only (defensive refuse on typos).
-_KNOWN_PERMISSION_MODES = frozenset({
-    "observe_only",
-    "per_action",
-    "per_session",
-})
+_KNOWN_PERMISSION_MODES = frozenset(
+    {
+        "observe_only",
+        "per_action",
+        "per_session",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -132,9 +134,7 @@ _DESTRUCTIVE_KEYS = frozenset(
 )
 
 
-_CLICK_VERBS: frozenset[str] = frozenset(
-    ("click", "double_click", "right_click", "drag")
-)
+_CLICK_VERBS: frozenset[str] = frozenset(("click", "double_click", "right_click", "drag"))
 
 
 def classify(action: Action) -> Tier:
@@ -234,11 +234,13 @@ def _goal_loop_active(cfg: Any) -> bool:
 
     Defensive: any exception in the path returns False so a goal-
     module bug never auto-engages the deny. Pinned by test."""
-    if not getattr(cfg, "computer_deny_during_goal_loop", True):
+    computer = getattr(cfg, "computer", None)
+    if computer is not None and not computer.deny_during_goal_loop:
         return False
     try:
         from ..config import profile_dir
         from ..goal.state import load_state
+
         profile = getattr(cfg, "profile", None) or "default"
         state = load_state(profile_dir(profile))
         if state is None:
@@ -305,14 +307,14 @@ class PermissionGate:
         # the apps they want to delegate.
         if not self._allowlisted(action.app):
             logger.info(
-                "computer permission: refused (app %r not in allowlist; "
-                "action=%r)",
+                "computer permission: refused (app %r not in allowlist; action=%r)",
                 action.app,
                 action.describe(),
             )
             return False
 
-        mode = getattr(self.cfg, "computer_permission_mode", "observe_only")
+        computer = getattr(self.cfg, "computer", None)
+        mode = computer.permission_mode if computer is not None else "observe_only"
 
         # observe_only mode blocks every input regardless of
         # allowlist — no prompt burned. Unknown modes (typos in
@@ -320,9 +322,9 @@ class PermissionGate:
         # opening into an unrecognised branch would be unsafe.
         if mode == "observe_only" or mode not in _KNOWN_PERMISSION_MODES:
             logger.info(
-                "computer permission: refused (mode=%r non-permissive; "
-                "action=%r)",
-                mode, action.describe(),
+                "computer permission: refused (mode=%r non-permissive; action=%r)",
+                mode,
+                action.describe(),
             )
             return False
 
@@ -359,15 +361,15 @@ class PermissionGate:
             return False
         except Exception as e:  # noqa: BLE001
             logger.warning(
-                "computer permission: approval surface raised (%s); "
-                "treating as denial",
+                "computer permission: approval surface raised (%s); treating as denial",
                 e,
             )
             return False
 
         logger.info(
             "computer permission: %s %s — %s",
-            tier, action.describe(),
+            tier,
+            action.describe(),
             "approved" if allowed else "refused",
         )
         return allowed
@@ -384,14 +386,16 @@ class PermissionGate:
     # ----- internals -----
 
     def _denylisted(self, app: str | None) -> bool:
-        deny = list(getattr(self.cfg, "computer_app_denylist", []) or [])
+        computer = getattr(self.cfg, "computer", None)
+        deny = list(computer.app_denylist or []) if computer is not None else []
         if not deny or not app:
             return False
         haystack = app.lower()
         return any(d.lower() in haystack for d in deny)
 
     def _allowlisted(self, app: str | None) -> bool:
-        allow = list(getattr(self.cfg, "computer_app_allowlist", []) or [])
+        computer = getattr(self.cfg, "computer", None)
+        allow = list(computer.app_allowlist or []) if computer is not None else []
         if not allow:
             return False
         if not app:
@@ -412,6 +416,7 @@ def _build_prompt_callback(action: Action, tier: Tier):
     carry the human-readable action description + app + tier
     for the UI to render.
     """
+
     def _prompt(_resource_id: str) -> bool:
         cb = get_approval_callback()
         tool_name = f"computer_{tier}"
@@ -425,8 +430,7 @@ def _build_prompt_callback(action: Action, tier: Tier):
             verdict = cb(tool_name, args)
         except Exception as e:  # noqa: BLE001
             logger.warning(
-                "computer permission: approval callback raised (%s); "
-                "treating as denial",
+                "computer permission: approval callback raised (%s); treating as denial",
                 e,
             )
             return False
@@ -468,8 +472,7 @@ def computer_use_panic(cfg: Any = None) -> None:
     except Exception:  # noqa: BLE001
         logger.debug("computer_use_panic: clear_grants failed", exc_info=True)
     logger.warning(
-        "computer_use_panic engaged — input/destructive disabled, "
-        "all cached approvals dropped"
+        "computer_use_panic engaged — input/destructive disabled, all cached approvals dropped"
     )
 
 

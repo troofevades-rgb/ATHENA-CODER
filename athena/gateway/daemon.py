@@ -51,8 +51,56 @@ logger = logging.getLogger(__name__)
 CommandDispatcher = Callable[[MessageEvent, str, str], Awaitable[str]]
 
 
-async def _stub_dispatch(event: MessageEvent, session_id: str, cmd: str) -> str:
-    return f"(command /{cmd} not yet implemented)"
+_BUILTIN_GATEWAY_COMMANDS = {"help", "status", "session"}
+
+
+def _make_default_dispatcher(daemon: GatewayDaemon) -> CommandDispatcher:
+    """Build the production gateway command dispatcher.
+
+    The pre-Phase-10.7 stub just returned a fixed "not yet implemented"
+    string for every command. That was the right placeholder when the
+    daemon was being prototyped, but every operator who ran the
+    gateway in production saw the placeholder reach end users. Until
+    the full CLI command table is bridged in, this dispatcher handles
+    the three commands that are useful without the agent-loop context
+    (``/help``, ``/status``, ``/session``) and returns an explicit
+    unsupported message for everything else.
+    """
+
+    async def _dispatch(event: MessageEvent, session_id: str, cmd: str) -> str:
+        verb = cmd.strip().split(maxsplit=1)[0] if cmd.strip() else ""
+        if verb == "help":
+            supported = ", ".join(sorted("/" + c for c in _BUILTIN_GATEWAY_COMMANDS))
+            return (
+                "Gateway slash commands currently supported: "
+                f"{supported}.\n"
+                "The full CLI command table is not yet bridged to the "
+                "gateway transport — Phase 10.7 will wire it in."
+            )
+        if verb == "status":
+            try:
+                meta = daemon.router.get_meta(session_id)
+            except Exception:
+                meta = None
+            if meta is None:
+                return f"(no session metadata for {session_id})"
+            model = getattr(meta, "model", "?")
+            provider = getattr(meta, "provider", "?")
+            profile = getattr(meta, "profile", "?")
+            return f"session {session_id[:8]}: model={model} provider={provider} profile={profile}"
+        if verb == "session":
+            return f"session id: {session_id}"
+        logger.warning(
+            "gateway command /%s requested but not bridged to CLI table; "
+            "returning unsupported notice",
+            verb,
+        )
+        return (
+            f"(command /{verb} is not supported in the gateway transport. "
+            f"Try /help for the list of bridged commands.)"
+        )
+
+    return _dispatch
 
 
 class GatewayDaemon:
@@ -99,7 +147,7 @@ class GatewayDaemon:
         )
         self.approvals = ApprovalRouter()
         self.continuity = ContinuityManager(self.router)
-        self._dispatch_command = command_dispatcher or _stub_dispatch
+        self._dispatch_command = command_dispatcher or _make_default_dispatcher(self)
         self.adapters: list[GatewayAdapter] = []
         self._adapter_tasks: list[asyncio.Task] = []
         self._started = False
@@ -246,6 +294,24 @@ class GatewayDaemon:
                 )
                 for t in still_running:
                     t.cancel()
+                # Await the cancelled tasks' ``finally`` blocks before
+                # tearing down the daemon. Without this wait,
+                # cancellation is queued but each task's finally (which
+                # releases approval callbacks, decrements pool pins,
+                # writes the last turn) was racing
+                # pool.evict_all() / router.close() -- producing the
+                # "Cannot operate on a closed database" warnings the
+                # pin/use model alone could not prevent.
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*still_running, return_exceptions=True),
+                        timeout=5.0,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "daemon.stop: cancelled tasks did not unwind in 5s; "
+                        "proceeding with teardown",
+                    )
 
         # Deny every pending approval so any worker thread blocked on
         # request_sync unwinds cleanly before pool.evict_all closes

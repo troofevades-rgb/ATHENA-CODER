@@ -29,9 +29,7 @@ def on_posix(monkeypatch):
 
 
 def test_simple_path_normalized(on_windows):
-    out = _normalize_windows_paths(
-        r"python C:\Users\foo\bar.py"
-    )
+    out = _normalize_windows_paths(r"python C:\Users\foo\bar.py")
     assert out == "python C:/Users/foo/bar.py"
 
 
@@ -47,18 +45,14 @@ def test_lowercase_drive_letter(on_windows):
 
 
 def test_multiple_paths_in_one_command(on_windows):
-    out = _normalize_windows_paths(
-        r"cp C:\src\file.txt D:\dst\file.txt"
-    )
+    out = _normalize_windows_paths(r"cp C:\src\file.txt D:\dst\file.txt")
     assert out == "cp C:/src/file.txt D:/dst/file.txt"
 
 
 def test_path_with_chained_commands(on_windows):
     """The transcript pattern: model uses && to chain. Drive paths in
     each segment should both get fixed."""
-    out = _normalize_windows_paths(
-        r"cd C:\Users\foo && python C:\Users\foo\bar.py"
-    )
+    out = _normalize_windows_paths(r"cd C:\Users\foo && python C:\Users\foo\bar.py")
     assert out == "cd C:/Users/foo && python C:/Users/foo/bar.py"
 
 
@@ -66,9 +60,7 @@ def test_quoted_path_also_rewritten(on_windows):
     """Quoted paths get the same treatment — the quote characters
     aren't valid drive-letter prefixes, so the regex starts AT the
     drive letter and stops at the next shell metacharacter."""
-    out = _normalize_windows_paths(
-        r'python "C:\Users\foo\bar.py"'
-    )
+    out = _normalize_windows_paths(r'python "C:\Users\foo\bar.py"')
     assert out == 'python "C:/Users/foo/bar.py"'
 
 
@@ -141,7 +133,5 @@ def test_bash_description_warns_about_backslashes():
 def test_exact_regression_from_transcript(on_windows):
     """The literal command from the user's transcript — verify it
     would now reach python with a runnable path."""
-    out = _normalize_windows_paths(
-        r"python C:\Users\mtt_j\projects\ocodev2\hello_world.py"
-    )
+    out = _normalize_windows_paths(r"python C:\Users\mtt_j\projects\ocodev2\hello_world.py")
     assert out == "python C:/Users/mtt_j/projects/ocodev2/hello_world.py"

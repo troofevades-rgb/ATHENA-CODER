@@ -23,8 +23,16 @@ from typing import Any
 
 import pytest
 
+# document_analyze tool tests reach for the PyMuPDF / python-docx
+# fixtures in tests/document/conftest.py; skip the suite cleanly
+# when either dep isn't installed (matches test_pdf.py + test_docx.py).
+pytest.importorskip("fitz")
+pytest.importorskip("docx")
+
+import pytest
+
 from athena.document import tools as doc_tools
-from athena.document.tools import _run, VALID_MODES
+from athena.document.tools import VALID_MODES, _run
 from tests.document.conftest import (
     make_docx_with_structure,
     make_pdf_with_outline,
@@ -73,6 +81,7 @@ def _route_profile_dir(tmp_path: Path, monkeypatch):
 def test_tool_registered_in_vision_toolset():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("document_analyze")
     assert t is not None
     assert t.toolset == "vision"
@@ -81,6 +90,7 @@ def test_tool_registered_in_vision_toolset():
 def test_schema_lists_all_modes():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("document_analyze")
     enum = t.parameters["properties"]["extract"]["enum"]
     assert set(enum) == set(VALID_MODES)
@@ -93,10 +103,12 @@ def test_schema_lists_all_modes():
 
 def test_document_analyze_disabled_short_circuits(tmp_path: Path):
     pdf = make_pdf_with_text(tmp_path / "a.pdf")
-    out = json.loads(_run(
-        path=str(pdf),
-        _cfg=_cfg(tmp_path, document_analyze_enabled=False),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            _cfg=_cfg(tmp_path, document_analyze_enabled=False),
+        )
+    )
     assert out["available"] is False
     assert "document_analyze_enabled=False" in out["error"]
 
@@ -108,20 +120,25 @@ def test_missing_path_rejected(tmp_path: Path):
 
 
 def test_missing_file_rejected(tmp_path: Path):
-    out = json.loads(_run(
-        path=str(tmp_path / "nope.pdf"),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(tmp_path / "nope.pdf"),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is False
     assert "file not found" in out["error"]
 
 
 def test_unknown_extract_mode_rejected(tmp_path: Path):
     pdf = make_pdf_with_text(tmp_path / "a.pdf")
-    out = json.loads(_run(
-        path=str(pdf), extract="hum",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="hum",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is False
     assert "unknown extract mode" in out["error"]
 
@@ -131,10 +148,12 @@ def test_unsupported_type_unavailable(tmp_path: Path):
     unavailable, NOT an error or exception."""
     bogus = tmp_path / "a.txt"
     bogus.write_text("plain text file", encoding="utf-8")
-    out = json.loads(_run(
-        path=str(bogus),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(bogus),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is False
     assert "unsupported document type" in out["reason"]
 
@@ -146,10 +165,13 @@ def test_unsupported_type_unavailable(tmp_path: Path):
 
 def test_pdf_structure_mode_includes_text_and_outline(tmp_path: Path):
     pdf = make_pdf_with_outline(tmp_path / "outlined.pdf")
-    out = json.loads(_run(
-        path=str(pdf), extract="structure",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="structure",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is True
     assert out["mode"] == "structure"
     assert "Introduction" in out["text"]
@@ -160,10 +182,13 @@ def test_pdf_structure_mode_includes_text_and_outline(tmp_path: Path):
 
 def test_pdf_text_mode_omits_outline(tmp_path: Path):
     pdf = make_pdf_with_outline(tmp_path / "a.pdf")
-    out = json.loads(_run(
-        path=str(pdf), extract="text",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="text",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is True
     assert "text" in out
     assert "outline" not in out  # trimmed in text mode
@@ -171,10 +196,13 @@ def test_pdf_text_mode_omits_outline(tmp_path: Path):
 
 def test_pdf_metadata_mode_only_metadata(tmp_path: Path):
     pdf = make_pdf_with_text(tmp_path / "a.pdf")
-    out = json.loads(_run(
-        path=str(pdf), extract="metadata",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="metadata",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is True
     assert "metadata" in out
     # Other content trimmed.
@@ -185,13 +213,15 @@ def test_pdf_metadata_mode_only_metadata(tmp_path: Path):
 
 def test_pdf_full_mode_carries_everything(tmp_path: Path):
     pdf = make_pdf_with_outline(tmp_path / "a.pdf")
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is True
-    for key in ("text", "outline", "tables", "metadata",
-                "scanned_pages", "ocr_pages", "figures"):
+    for key in ("text", "outline", "tables", "metadata", "scanned_pages", "ocr_pages", "figures"):
         assert key in out
 
 
@@ -202,10 +232,13 @@ def test_pdf_full_mode_carries_everything(tmp_path: Path):
 
 def test_docx_structure_mode(tmp_path: Path):
     docx = make_docx_with_structure(tmp_path / "a.docx")
-    out = json.loads(_run(
-        path=str(docx), extract="structure",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(docx),
+            extract="structure",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is True
     assert "Section A" in out["text"]
     # Outline includes Title + headings.
@@ -216,10 +249,13 @@ def test_docx_structure_mode(tmp_path: Path):
 
 def test_docx_tables_mode(tmp_path: Path):
     docx = make_docx_with_structure(tmp_path / "a.docx")
-    out = json.loads(_run(
-        path=str(docx), extract="tables",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(docx),
+            extract="tables",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is True
     assert len(out["tables"]) == 1
     assert out["tables"][0]["rows"][0] == ["Name", "Age", "Role"]
@@ -242,11 +278,14 @@ def test_scanned_page_routes_to_ocr(tmp_path: Path):
         ocr_calls.append(image_path)
         return {"text": f"OCR'd text from page rasterised at {image_path.name}"}
 
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path),
-        _ocr_fn=_ocr,
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path),
+            _ocr_fn=_ocr,
+        )
+    )
     assert out["available"] is True
     # Page 2 was scanned + OCR'd.
     assert out["scanned_pages"] == [2]
@@ -268,16 +307,20 @@ def test_no_ocr_flags_scanned_pages(tmp_path: Path, monkeypatch):
     # Force the default OCR factory to return None — the
     # spec's "no OCR backend → flag empty, not raise" path.
     monkeypatch.setattr(
-        doc_tools, "_default_ocr_fn",
+        doc_tools,
+        "_default_ocr_fn",
         lambda cfg: None,
     )
 
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path, document_ocr_fallback=True),
-        # _ocr_fn left None so the default factory's None
-        # propagates through.
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path, document_ocr_fallback=True),
+            # _ocr_fn left None so the default factory's None
+            # propagates through.
+        )
+    )
     assert out["available"] is True
     assert out["scanned_pages"] == [2]
     assert out["ocr_pages"] == []  # nothing OCR'd
@@ -291,10 +334,13 @@ def test_ocr_fallback_disabled_by_cfg(tmp_path: Path):
     + cfg flag off means the helper is never built."""
     pdf = make_pdf_with_scanned_page(tmp_path / "scanned.pdf")
 
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path, document_ocr_fallback=False),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path, document_ocr_fallback=False),
+        )
+    )
     assert out["available"] is True
     assert out["ocr_pages"] == []
 
@@ -309,11 +355,14 @@ def test_ocr_empty_result_doesnt_flag_ocr_pages(tmp_path: Path):
     def _ocr_empty(image_path: Path) -> dict:
         return {"text": ""}
 
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path),
-        _ocr_fn=_ocr_empty,
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path),
+            _ocr_fn=_ocr_empty,
+        )
+    )
     assert out["scanned_pages"] == [2]
     assert out["ocr_pages"] == []
 
@@ -336,11 +385,14 @@ def test_figures_described_when_vision_present(tmp_path: Path):
         vision_calls.append(image_bytes)
         return "stub figure description"
 
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path, document_describe_figures=True),
-        _vision_fn=_vision,
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path, document_describe_figures=True),
+            _vision_fn=_vision,
+        )
+    )
     # No figures in this PDF → vision_fn was never called.
     # The path is still validated by the test below for a
     # PDF that does have figures.
@@ -355,13 +407,16 @@ def test_vision_fn_called_for_each_figure_page(tmp_path: Path):
     caches the rasterized page so multi-figure pages don't
     re-rasterize)."""
     import fitz
+
     pdf_path = tmp_path / "with_figure.pdf"
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((72, 72), "Caption above figure", fontsize=12)
     # Insert a tiny solid-color image so PyMuPDF reports a figure.
-    from PIL import Image
     import io
+
+    from PIL import Image
+
     img = Image.new("RGB", (100, 50), color=(200, 100, 50))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -375,20 +430,21 @@ def test_vision_fn_called_for_each_figure_page(tmp_path: Path):
         vision_calls.append(image_bytes)
         return "described"
 
-    out = json.loads(_run(
-        path=str(pdf_path), extract="full",
-        _cfg=_cfg(tmp_path, document_describe_figures=True),
-        _vision_fn=_vision,
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf_path),
+            extract="full",
+            _cfg=_cfg(tmp_path, document_describe_figures=True),
+            _vision_fn=_vision,
+        )
+    )
     assert out["available"] is True
     # At least one figure was found by the PDF extractor.
     assert len(out["figures"]) >= 1
     # Vision was called at least once.
     assert len(vision_calls) >= 1
     # Each figure now has a description.
-    assert any(
-        f.get("description") == "described" for f in out["figures"]
-    )
+    assert any(f.get("description") == "described" for f in out["figures"])
 
 
 def test_figures_not_described_when_disabled(tmp_path: Path):
@@ -397,19 +453,23 @@ def test_figures_not_described_when_disabled(tmp_path: Path):
     pdf = make_pdf_with_text(tmp_path / "a.pdf")
 
     vision_calls: list = []
+
     def _vision(image_bytes: bytes) -> str:
         vision_calls.append(image_bytes)
         return "should not be called"
 
-    out = json.loads(_run(
-        path=str(pdf), extract="full",
-        _cfg=_cfg(tmp_path, document_describe_figures=False),
-        # _vision_fn passed but the gate is the cfg flag —
-        # _default_vision_fn returns None when the flag is off
-        # so the injected _vision_fn IS used directly here. To
-        # truly disable, just inject None.
-        _vision_fn=None,
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="full",
+            _cfg=_cfg(tmp_path, document_describe_figures=False),
+            # _vision_fn passed but the gate is the cfg flag —
+            # _default_vision_fn returns None when the flag is off
+            # so the injected _vision_fn IS used directly here. To
+            # truly disable, just inject None.
+            _vision_fn=None,
+        )
+    )
     # With _vision_fn=None and no default-factory build,
     # nothing should fire.
     assert vision_calls == []
@@ -426,7 +486,8 @@ def test_figures_only_in_full_mode(tmp_path: Path):
         return "desc"
 
     _run(
-        path=str(pdf), extract="structure",  # NOT full
+        path=str(pdf),
+        extract="structure",  # NOT full
         _cfg=_cfg(tmp_path, document_describe_figures=True),
         _vision_fn=_vision,
     )
@@ -455,10 +516,13 @@ def test_audit_row_written_per_call(tmp_path: Path):
 
 def test_artifact_persisted_under_documents_dir(tmp_path: Path):
     pdf = make_pdf_with_text(tmp_path / "a.pdf")
-    out = json.loads(_run(
-        path=str(pdf), extract="structure",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(pdf),
+            extract="structure",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     artifact = Path(out["artifact_path"])
     assert artifact.exists()
     # The artifact is JSON of the full normalized result.

@@ -50,8 +50,44 @@ def get_provider(name: str = "builtin_file") -> MemoryProvider:
 # ---- Profile-keyed convenience API --------------------------------------
 
 
-def load_index(profile: str, *, provider_name: str = "builtin_file") -> str | None:
-    return get_provider(provider_name).load_index(profile)
+def memory_dir(
+    profile: str,
+    *,
+    workspace: Path | None = None,
+    provider_name: str = "builtin_file",
+) -> Path:
+    """Return the on-disk directory for ``(profile, workspace)``.
+
+    The ``/memory dir`` slash subcommand uses this to show users where
+    their memories live; the Phase 14 :mod:`athena.profiles.migration`
+    importer will use it to know where to copy legacy data.
+
+    Only works for file-backed providers (the built-in
+    :class:`BuiltinFileProvider`). Plugin providers that aren't
+    file-backed should raise ``NotImplementedError``.
+    """
+    provider = get_provider(provider_name)
+    method = getattr(provider, "_memory_dir", None)
+    if method is None:
+        raise NotImplementedError(
+            f"{provider.name!r} provider is not file-backed; memory_dir() unavailable."
+        )
+    return method(profile, workspace=workspace)
+
+
+def load_index(
+    profile: str,
+    *,
+    workspace: Path | None = None,
+    provider_name: str = "builtin_file",
+) -> str | None:
+    """Load the MEMORY.md index for ``profile``.
+
+    ``workspace`` (R2 stage 1) selects a workspace-scoped sub-store --
+    the agent's system-prompt build will pass its workspace here in
+    stage 2. MCP server tools and the ``athena memory`` CLI leave it
+    ``None`` (single store per profile)."""
+    return get_provider(provider_name).load_index(profile, workspace=workspace)
 
 
 def write_entry(
@@ -63,6 +99,7 @@ def write_entry(
     type: str,
     body: str,
     write_origin: str,
+    workspace: Path | None = None,
     provider_name: str = "builtin_file",
 ) -> Path:
     return get_provider(provider_name).write_entry(
@@ -73,21 +110,37 @@ def write_entry(
         type=type,
         body=body,
         write_origin=write_origin,
+        workspace=workspace,
     )
 
 
-def list_entries(profile: str, *, provider_name: str = "builtin_file") -> list[MemoryEntry]:
-    return get_provider(provider_name).list_entries(profile)
+def list_entries(
+    profile: str,
+    *,
+    workspace: Path | None = None,
+    provider_name: str = "builtin_file",
+) -> list[MemoryEntry]:
+    return get_provider(provider_name).list_entries(profile, workspace=workspace)
 
 
 def read_entry(
-    profile: str, name: str, *, provider_name: str = "builtin_file"
+    profile: str,
+    name: str,
+    *,
+    workspace: Path | None = None,
+    provider_name: str = "builtin_file",
 ) -> MemoryEntry | None:
-    return get_provider(provider_name).read_entry(profile, name)
+    return get_provider(provider_name).read_entry(profile, name, workspace=workspace)
 
 
-def delete_entry(profile: str, name: str, *, provider_name: str = "builtin_file") -> bool:
-    return get_provider(provider_name).delete_entry(profile, name)
+def delete_entry(
+    profile: str,
+    name: str,
+    *,
+    workspace: Path | None = None,
+    provider_name: str = "builtin_file",
+) -> bool:
+    return get_provider(provider_name).delete_entry(profile, name, workspace=workspace)
 
 
 def query(
@@ -95,6 +148,7 @@ def query(
     *,
     query: str,
     k: int = 5,
+    workspace: Path | None = None,
     provider_name: str = "builtin_file",
 ) -> list[MemoryEntry]:
-    return get_provider(provider_name).query(profile, query=query, k=k)
+    return get_provider(provider_name).query(profile, query=query, k=k, workspace=workspace)

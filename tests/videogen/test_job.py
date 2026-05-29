@@ -22,7 +22,6 @@ from athena.videogen.job import (
     run_generation,
 )
 
-
 # ---------------------------------------------------------------------------
 # Stub backend
 # ---------------------------------------------------------------------------
@@ -84,14 +83,38 @@ class _StubBackend:
 
 
 def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
-    base = dict(
-        video_confirm_over_seconds=60.0,
-        video_confirm_over_cost=1.0,
-        video_output_dir=str(tmp_path / "videos"),
-        video_poll_interval_s=0.001,
+    """Post-R4 stage 5: video_* generation fields moved into the nested
+    cfg.video_generation dataclass."""
+    legacy_to_nested = {
+        "video_confirm_over_seconds": "confirm_over_seconds",
+        "video_confirm_over_cost": "confirm_over_cost",
+        "video_output_dir": "output_dir",
+        "video_poll_interval_s": "poll_interval_s",
+        "video_backend": "backend",
+        "video_backend_prefer": "backend_prefer",
+        "video_generation_enabled": "enabled",
+    }
+    vg = dict(
+        enabled=True,
+        backend=None,
+        backend_prefer="local",
+        confirm_over_seconds=60.0,
+        confirm_over_cost=1.0,
+        output_dir=str(tmp_path / "videos"),
+        poll_interval_s=0.001,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top: dict = {}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            vg[legacy_to_nested[k]] = v
+        elif k in vg:
+            vg[k] = v
+        else:
+            top[k] = v
+    return SimpleNamespace(
+        video_generation=SimpleNamespace(**vg),
+        **top,
+    )
 
 
 def _no_sleep(_s: float) -> None:
@@ -115,9 +138,7 @@ def test_job_polls_until_done(tmp_path: Path):
             {"status": "done", "progress": 1.0},
         ]
     )
-    request = GenerationRequest(
-        mode="text_to_video", prompt="a paper boat", duration_s=5.0
-    )
+    request = GenerationRequest(mode="text_to_video", prompt="a paper boat", duration_s=5.0)
     result = run_generation(
         request,
         backend=backend,
@@ -137,9 +158,7 @@ def test_output_hash_logged(tmp_path: Path):
     """A done job lands in the media_log.jsonl in the output
     directory alongside the file."""
     backend = _StubBackend(fetch_payload=b"clip-bytes-here")
-    request = GenerationRequest(
-        mode="text_to_video", prompt="hello", duration_s=3.0
-    )
+    request = GenerationRequest(mode="text_to_video", prompt="hello", duration_s=3.0)
     result = run_generation(
         request,
         backend=backend,

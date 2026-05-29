@@ -23,7 +23,9 @@ from athena.skills.metrics import SkillMetricsStore, metrics_path
 def _make_skill(workspace: Path, name: str) -> None:
     skill_dir = workspace / ".athena" / "skills" / name
     skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "skill.md").write_text(
+    # Canonical name is ``SKILL.md`` (uppercase); lowercase only
+    # resolves on case-insensitive filesystems.
+    (skill_dir / "SKILL.md").write_text(
         f"---\nname: {name}\ndescription: x\nstate: active\n"
         f"pinned: false\nwrite_origin: foreground\n---\n\nbody\n",
         encoding="utf-8",
@@ -59,9 +61,7 @@ def test_never_used_appears_in_prompt_section(monkeypatch, tmp_path: Path) -> No
     monkeypatch.setattr("athena.config.profile_dir", lambda _p: profile)
     monkeypatch.setattr(
         "athena.skills.discovery.discover_skills",
-        lambda ws=None, **_: {
-            n: (None, None) for n in ("used-skill", "never-touched")
-        },
+        lambda ws=None, **_: {n: (None, None) for n in ("used-skill", "never-touched")},
     )
 
     from athena.curator.orchestrator import _build_usage_section_for_prompt

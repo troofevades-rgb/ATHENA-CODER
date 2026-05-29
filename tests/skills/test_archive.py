@@ -63,3 +63,38 @@ def test_unarchive_non_archived_raises(isolated_home: Path, write_skill) -> None
     write_skill(user_skills, "active-skill")
     with pytest.raises(SkillNotFoundError, match="not archived"):
         unarchive_skill("active-skill")
+
+
+def test_archive_rolls_back_on_frontmatter_failure(
+    isolated_home: Path,
+    write_skill,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If ``_patch_state`` raises after the directory move, the move
+    must be reversed -- otherwise the catalog ends up with a skill
+    living under ``.archive/`` whose frontmatter still says
+    ``state=active``, invisible to default ``discover_skills``."""
+    user_skills = isolated_home / ".athena" / "skills"
+    user_skills.mkdir(parents=True)
+    write_skill(user_skills, "rollback-me")
+    original = user_skills / "rollback-me"
+    assert original.exists()
+
+    import athena.skills.archive as archive_mod
+
+    def _explode(*_a, **_kw):
+        raise RuntimeError("simulated frontmatter write failure")
+
+    monkeypatch.setattr(archive_mod, "_patch_state", _explode)
+
+    with pytest.raises(RuntimeError, match="simulated"):
+        archive_mod.archive_skill("rollback-me")
+
+    # Directory must be back at its original location; .archive/ must
+    # not contain a half-archived entry.
+    assert original.exists(), (
+        "archive_skill failed to roll back the move; skill is orphaned under .archive/"
+    )
+    archive_dir = user_skills / ".archive"
+    if archive_dir.exists():
+        assert not (archive_dir / "rollback-me").exists()

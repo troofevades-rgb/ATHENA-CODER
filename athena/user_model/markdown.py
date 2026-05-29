@@ -107,9 +107,7 @@ class MarkdownUserModel:
 
     # ---- ingest --------------------------------------------------
 
-    async def ingest_session(
-        self, transcript: Transcript, *, session_id: str
-    ) -> IngestResult:
+    async def ingest_session(self, transcript: Transcript, *, session_id: str) -> IngestResult:
         start = time.perf_counter()
         existing = self._load_existing_ids()
         prompt = self._build_extraction_prompt(transcript, existing)
@@ -144,9 +142,7 @@ class MarkdownUserModel:
 
     # ---- query ---------------------------------------------------
 
-    async def query(
-        self, question: str, *, max_tokens: int = 800
-    ) -> QueryResult:
+    async def query(self, question: str, *, max_tokens: int = 800) -> QueryResult:
         auto_facts = self._load_auto_facts()
         user_facts = self._load_authored_facts()
         if not auto_facts and not user_facts:
@@ -155,9 +151,7 @@ class MarkdownUserModel:
                 sources=[],
                 confidence=0.0,
             )
-        prompt = self._build_query_prompt(
-            question, auto=auto_facts, user=user_facts
-        )
+        prompt = self._build_query_prompt(question, auto=auto_facts, user=user_facts)
         try:
             raw = await self._llm(_QUERY_SYSTEM_PROMPT, prompt)
         except Exception as e:  # noqa: BLE001
@@ -221,9 +215,7 @@ class MarkdownUserModel:
                 out.append((p.stem, parsed))
         return out
 
-    def _build_extraction_prompt(
-        self, transcript: Transcript, existing_ids: set[str]
-    ) -> str:
+    def _build_extraction_prompt(self, transcript: Transcript, existing_ids: set[str]) -> str:
         lines: list[str] = []
         lines.append("existing_ids: " + (", ".join(sorted(existing_ids)) or "(none)"))
         lines.append("")
@@ -284,9 +276,7 @@ class MarkdownUserModel:
                 continue
             preview = parsed.splitlines()[0][:100] if parsed else ""
             lines.append(f"- [{p.stem}]({p.name}) — {preview}")
-        (self.storage_dir / "INDEX.md").write_text(
-            "\n".join(lines) + "\n", encoding="utf-8"
-        )
+        (self.storage_dir / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 # ---- module-level helpers (no self) ----------------------------------

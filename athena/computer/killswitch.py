@@ -33,7 +33,8 @@ import dataclasses
 import logging
 import signal
 import threading
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -202,8 +203,7 @@ def _try_start_hotkey_listener(hotkey: str) -> Any:
         from pynput import keyboard  # type: ignore[import-untyped]
     except ImportError:
         logger.info(
-            "kill switch: pynput not installed; hotkey %r unavailable, "
-            "Ctrl+C remains active",
+            "kill switch: pynput not installed; hotkey %r unavailable, Ctrl+C remains active",
             hotkey,
         )
         return None

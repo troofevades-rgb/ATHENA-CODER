@@ -26,6 +26,8 @@ def _isolate_approval_state():
     )
     from athena.safety.approval_callback import (
         _approval as _approval_cb_var,
+    )
+    from athena.safety.approval_callback import (
         _interactive_approval,
     )
     from athena.safety.approval_guard import _approval_grants, clear_grants

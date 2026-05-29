@@ -131,7 +131,7 @@ def test_dispatch_returns_warning_on_third_identical_call(monkeypatch):
         return "stable-result"
 
     # Register a temporary tool just for this test.
-    from athena.tools.registry import Tool, _REGISTRY
+    from athena.tools.registry import _REGISTRY, Tool
 
     saved = _REGISTRY.get("__thrash_test_tool")
     _REGISTRY["__thrash_test_tool"] = Tool(

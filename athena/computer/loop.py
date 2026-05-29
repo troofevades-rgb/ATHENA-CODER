@@ -43,7 +43,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any, Optional
 
 from . import killswitch
 from .audit import ActionAuditLog
@@ -68,8 +69,8 @@ class ActionProposal:
     """
 
     done: bool
-    action: Optional[Action] = None
-    message: Optional[str] = None
+    action: Action | None = None
+    message: str | None = None
 
 
 ProposeFn = Callable[[str, Screenshot, list], ActionProposal]
@@ -136,7 +137,10 @@ def map_coords(
     if (cx, cy) != (x, y):
         logger.warning(
             "computer loop: clamped out-of-bounds coords (%d,%d) → (%d,%d)",
-            x, y, cx, cy,
+            x,
+            y,
+            cx,
+            cy,
         )
     return (cx, cy)
 
@@ -173,9 +177,15 @@ def computer_do(
                  BUT backend.perform is not called. T6-04.6
                  surfaces this flag from cfg.computer_dry_run.
     """
-    killswitch.arm(hotkey=getattr(cfg, "computer_kill_hotkey", None))
-    max_actions = int(getattr(cfg, "computer_max_actions_per_task", 40))
-    max_per_sec = float(getattr(cfg, "computer_max_actions_per_sec", 2.0))
+    computer = getattr(cfg, "computer", None)
+    if computer is not None:
+        killswitch.arm(hotkey=computer.kill_hotkey)
+        max_actions = int(computer.max_actions_per_task)
+        max_per_sec = float(computer.max_actions_per_sec)
+    else:
+        killswitch.arm(hotkey=None)
+        max_actions = 40
+        max_per_sec = 2.0
     delay = 1.0 / max_per_sec if max_per_sec > 0 else 0.0
     history: list[dict] = []
     actions_taken = 0
@@ -188,9 +198,7 @@ def computer_do(
             # 1. Kill switch — checked TOP of every iteration.
             decision = killswitch.poll_for_halt()
             if decision.halted:
-                logger.warning(
-                    "computer loop: halted by kill switch (%s)", decision.reason
-                )
+                logger.warning("computer loop: halted by kill switch (%s)", decision.reason)
                 _log_halt(audit, decision.reason or "kill switch")
                 return LoopResult(
                     status="halted",
@@ -200,9 +208,7 @@ def computer_do(
 
             # 2. Cap enforcement.
             if actions_taken >= max_actions:
-                logger.info(
-                    "computer loop: reached max actions/task (%d)", max_actions
-                )
+                logger.info("computer loop: reached max actions/task (%d)", max_actions)
                 return LoopResult(
                     status="max_actions",
                     actions_taken=actions_taken,
@@ -235,9 +241,7 @@ def computer_do(
                     return LoopResult(
                         status="stuck",
                         actions_taken=actions_taken,
-                        halt_reason=(
-                            f"screen unchanged after {unchanged_count} attempts"
-                        ),
+                        halt_reason=(f"screen unchanged after {unchanged_count} attempts"),
                     )
             else:
                 unchanged_count = 0
@@ -292,7 +296,9 @@ def computer_do(
                 confirmed=allowed if action.is_input else None,
                 executed=allowed and not dry_run,
                 screenshot=shot,
-                result=("ok" if allowed and not dry_run else "denied" if not allowed else "dry-run"),
+                result=(
+                    "ok" if allowed and not dry_run else "denied" if not allowed else "dry-run"
+                ),
             )
             history.append(
                 {
@@ -313,9 +319,7 @@ def computer_do(
                 try:
                     backend.perform(action)
                 except Exception as e:  # noqa: BLE001
-                    logger.warning(
-                        "computer loop: backend.perform failed: %s", e
-                    )
+                    logger.warning("computer loop: backend.perform failed: %s", e)
                     return LoopResult(
                         status="error",
                         actions_taken=actions_taken,

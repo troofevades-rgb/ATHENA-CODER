@@ -54,9 +54,7 @@ class _StubBackend:
     def screenshot(self) -> Screenshot:
         if self._raise is not None:
             raise self._raise
-        return Screenshot(
-            png_bytes=self._payload, width=200, height=100, scale=1.0
-        )
+        return Screenshot(png_bytes=self._payload, width=200, height=100, scale=1.0)
 
     def active_app(self):
         return self._app
@@ -69,14 +67,50 @@ class _StubBackend:
 
 
 def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
-    base = dict(
-        computer_use_enabled=True,
-        computer_audit_path=str(tmp_path / "audit.jsonl"),
-        computer_screenshots_dir=str(tmp_path / "screenshots"),
-        profile="default",
+    """Stub Config shaped for post-R4 nested ``cfg.computer.*`` reads.
+
+    Test overrides can pass either the legacy ``computer_X`` flat
+    names (translated to nested) or the new ``X`` names directly."""
+    legacy_to_nested = {
+        "computer_use_enabled": "use_enabled",
+        "computer_permission_mode": "permission_mode",
+        "computer_app_allowlist": "app_allowlist",
+        "computer_app_denylist": "app_denylist",
+        "computer_kill_hotkey": "kill_hotkey",
+        "computer_max_actions_per_task": "max_actions_per_task",
+        "computer_max_actions_per_sec": "max_actions_per_sec",
+        "computer_backend": "backend",
+        "computer_dry_run": "dry_run",
+        "computer_audit_path": "audit_path",
+        "computer_screenshots_dir": "screenshots_dir",
+        "computer_deny_during_goal_loop": "deny_during_goal_loop",
+    }
+    computer_defaults = dict(
+        use_enabled=True,
+        permission_mode="observe_only",
+        app_allowlist=[],
+        app_denylist=[],
+        kill_hotkey="ctrl+alt+k",
+        max_actions_per_task=40,
+        max_actions_per_sec=2.0,
+        backend="auto",
+        dry_run=False,
+        audit_path=str(tmp_path / "audit.jsonl"),
+        screenshots_dir=str(tmp_path / "screenshots"),
+        deny_during_goal_loop=True,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top_defaults: dict = {"profile": "default"}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            computer_defaults[legacy_to_nested[k]] = v
+        elif k in computer_defaults:
+            computer_defaults[k] = v
+        else:
+            top_defaults[k] = v
+    return SimpleNamespace(
+        computer=SimpleNamespace(**computer_defaults),
+        **top_defaults,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -109,7 +143,8 @@ def test_screenshot_refuses_when_disabled(monkeypatch, tmp_path: Path):
 
     out = json.loads(tools_mod.computer_screenshot())
     assert out["available"] is False
-    assert "computer_use_enabled" in out["reason"]
+    # Post-R4 the message references the new nested path.
+    assert "use_enabled" in out["reason"]
     assert backend_calls["n"] == 0
 
 
@@ -126,9 +161,7 @@ def test_observe_refuses_when_disabled(monkeypatch, tmp_path: Path):
 
 def test_screenshot_when_backend_unavailable(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend(available=False)
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend(available=False))
     out = json.loads(tools_mod.computer_screenshot())
     assert out["available"] is False
     assert "not available" in out["reason"]
@@ -155,9 +188,7 @@ def test_screenshot_backend_error_returns_structured(monkeypatch, tmp_path: Path
 
 def test_screenshot_returns_image_and_logs(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
 
     out = json.loads(tools_mod.computer_screenshot())
     assert out["available"] is True
@@ -210,9 +241,7 @@ def test_screenshot_payload_NEVER_in_audit_log(monkeypatch, tmp_path: Path):
 
 def test_observe_empty_question_rejected(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
     out = json.loads(tools_mod.computer_observe(question=""))
     assert out["available"] is False
     assert "question" in out["reason"]
@@ -224,9 +253,7 @@ def test_observe_no_vision_backend(monkeypatch, tmp_path: Path):
     user can install a vision-capable provider or fall through
     to a base64 screenshot the agent passes elsewhere."""
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
 
     # Empty vision capability set. Two patch sites needed: the
     # source-of-truth registry AND the imported alias inside
@@ -257,9 +284,7 @@ def test_observe_resolves_vision_backend(monkeypatch, tmp_path: Path):
     )  # type: ignore[method-assign]
 
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
     monkeypatch.setattr("athena.providers._REGISTRY", {"stub_vision": _VisionStub})
     monkeypatch.setattr("athena.media.registry._REGISTRY", {"stub_vision": _VisionStub})
 

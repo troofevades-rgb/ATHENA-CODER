@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from athena.commands.plan_command import cmd_plan, cmd_plan_exit
+from athena.commands.plan import cmd_plan, cmd_plan_exit
 
 
 def _capture():
@@ -14,9 +14,8 @@ def _capture():
     for fn in ("info", "warn", "error"):
         patches.append(
             patch(
-                f"athena.commands.plan_command.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                f"athena.commands.plan.ui.{fn}",
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     return lines, patches
@@ -43,7 +42,7 @@ def test_plan_no_arg_enters_mode_and_returns_empty() -> None:
     doesn't send anything to the model."""
     enter_calls: list[None] = []
     with patch(
-        "athena.commands.plan_command.plan_mod.enter_plan_mode",
+        "athena.commands.plan.plan_mod.enter_plan_mode",
         side_effect=lambda: enter_calls.append(None),
     ):
         out, ret = _run(cmd_plan, "")
@@ -58,7 +57,7 @@ def test_plan_with_prompt_returns_drafting_prompt() -> None:
     user message asking the model to draft a plan for the prompt."""
     enter_calls: list[None] = []
     with patch(
-        "athena.commands.plan_command.plan_mod.enter_plan_mode",
+        "athena.commands.plan.plan_mod.enter_plan_mode",
         side_effect=lambda: enter_calls.append(None),
     ):
         out, ret = _run(cmd_plan, "refactor the auth layer")
@@ -73,7 +72,7 @@ def test_plan_with_prompt_returns_drafting_prompt() -> None:
 def test_plan_strips_whitespace_from_arg() -> None:
     enter_calls: list[None] = []
     with patch(
-        "athena.commands.plan_command.plan_mod.enter_plan_mode",
+        "athena.commands.plan.plan_mod.enter_plan_mode",
         side_effect=lambda: enter_calls.append(None),
     ):
         _, ret = _run(cmd_plan, "   leading and trailing   ")
@@ -87,7 +86,7 @@ def test_plan_strips_whitespace_from_arg() -> None:
 def test_plan_exit_calls_exit_silent_and_returns_empty() -> None:
     exit_calls: list[None] = []
     with patch(
-        "athena.commands.plan_command.plan_mod.exit_plan_mode_silent",
+        "athena.commands.plan.plan_mod.exit_plan_mode_silent",
         side_effect=lambda: exit_calls.append(None),
     ):
         out, ret = _run(cmd_plan_exit, "")
@@ -101,7 +100,7 @@ def test_plan_exit_ignores_arg() -> None:
     not break it."""
     exit_calls: list[None] = []
     with patch(
-        "athena.commands.plan_command.plan_mod.exit_plan_mode_silent",
+        "athena.commands.plan.plan_mod.exit_plan_mode_silent",
         side_effect=lambda: exit_calls.append(None),
     ):
         _, ret = _run(cmd_plan_exit, "ignored garbage")

@@ -52,9 +52,13 @@ def extract(path: Path | str) -> DocumentResult:
             body_parts.append(text)
         level = _heading_level(para)
         if level is not None and text:
-            outline.append(OutlineEntry(
-                level=level, title=text, page=0,
-            ))
+            outline.append(
+                OutlineEntry(
+                    level=level,
+                    title=text,
+                    page=0,
+                )
+            )
 
     tables = _extract_tables(doc)
     metadata = _extract_metadata(doc)
@@ -69,8 +73,8 @@ def extract(path: Path | str) -> DocumentResult:
         metadata=metadata,
         scanned_pages=[],
         figures=[],  # python-docx exposes images but not bbox;
-                     # we leave figure extraction as a TODO for
-                     # the format that benefits most (PDF)
+        # we leave figure extraction as a TODO for
+        # the format that benefits most (PDF)
         page_texts={},
     )
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from athena.ui import _summarize_tool_result
 
-
 # ---------------------------------------------------------------------------
 # skill_view / skill_manage(view)
 # ---------------------------------------------------------------------------
@@ -60,9 +59,7 @@ def test_skill_view_truncates_long_descriptions() -> None:
 
 
 def test_skill_view_caps_body_lines() -> None:
-    output = "---\nname: x\ndescription: y\n---\n\n" + "\n".join(
-        f"line {i}" for i in range(20)
-    )
+    output = "---\nname: x\ndescription: y\n---\n\n" + "\n".join(f"line {i}" for i in range(20))
     result = _summarize_tool_result("skill_view", output)
     # 5 body lines + "more lines" marker + header = ~7
     assert "more body lines" in result
@@ -131,7 +128,7 @@ def test_unknown_tool_passes_through_unchanged() -> None:
     """Tools the summarizer doesn't recognize must return the EXACT
     input. Otherwise we'd silently mangle tool output."""
     for tool in ("Read", "Bash", "Grep", "WebFetch", "my_custom_tool"):
-        for sample in ("hello", "multi\nline\noutput", "", "{\"json\": true}"):
+        for sample in ("hello", "multi\nline\noutput", "", '{"json": true}'):
             assert _summarize_tool_result(tool, sample) == sample, (
                 f"summarizer modified {tool}'s output unexpectedly"
             )

@@ -121,7 +121,7 @@ def _rejected(reason: str) -> str:
         "``error``). When the user asks for a video, CALL THIS TOOL — "
         "don't pre-judge whether config is right. The tool returns a "
         "structured response and you react to that. Refusing to call "
-        "on the basis of \"video gen might be disabled\" wastes a turn "
+        'on the basis of "video gen might be disabled" wastes a turn '
         "and misinforms the operator."
     ),
     parameters={
@@ -155,7 +155,8 @@ def video_generate(
     **_kwargs: Any,
 ) -> str:
     cfg = _load_cfg()
-    if not getattr(cfg, "video_generation_enabled", False):
+    vg = getattr(cfg, "video_generation", None)
+    if vg is None or not vg.enabled:
         return _disabled_payload()
 
     if not prompt or not str(prompt).strip():
@@ -220,7 +221,8 @@ def animate_image(
     **_kwargs: Any,
 ) -> str:
     cfg = _load_cfg()
-    if not getattr(cfg, "video_generation_enabled", False):
+    vg = getattr(cfg, "video_generation", None)
+    if vg is None or not vg.enabled:
         return _disabled_payload()
 
     if not image_path or not str(image_path).strip():

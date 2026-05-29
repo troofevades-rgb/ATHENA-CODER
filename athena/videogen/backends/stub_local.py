@@ -27,9 +27,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .. import job as job_mod
 from ...providers import register_provider
 from ...providers.base import Capabilities, Provider, StreamChunk
+from .. import job as job_mod
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class StubLocalVideoBackend(Provider):
     # VideoGenerationBackend protocol
     # ------------------------------------------------------------------
 
-    def estimate(self, request: "job_mod.GenerationRequest") -> "job_mod.CostEstimate":
+    def estimate(self, request: job_mod.GenerationRequest) -> job_mod.CostEstimate:
         """Treat the duration as the wall-clock estimate — a
         useful fiction for the cost-guard tests + a sane real
         number for the placeholder generation. Cost None
@@ -94,15 +94,19 @@ class StubLocalVideoBackend(Provider):
             cost_est=None,
         )
 
-    def submit(self, request: "job_mod.GenerationRequest") -> "job_mod.JobHandle":
+    def submit(self, request: job_mod.GenerationRequest) -> job_mod.JobHandle:
         return job_mod.JobHandle(
             backend=self.name,
             job_id=f"stub-{uuid.uuid4().hex[:12]}",
             status="pending",
-            extra={"request": dataclasses.asdict(request) if dataclasses.is_dataclass(request) else None},
+            extra={
+                "request": dataclasses.asdict(request)
+                if dataclasses.is_dataclass(request)
+                else None
+            },
         )
 
-    def poll(self, handle: "job_mod.JobHandle") -> "job_mod.JobHandle":
+    def poll(self, handle: job_mod.JobHandle) -> job_mod.JobHandle:
         """Local stub completes immediately. (A real local
         renderer would advance progress over multiple polls;
         this one is a placeholder.)"""
@@ -110,7 +114,7 @@ class StubLocalVideoBackend(Provider):
         handle.progress = 1.0
         return handle
 
-    def fetch(self, handle: "job_mod.JobHandle", *, out_dir: Path) -> Path:
+    def fetch(self, handle: job_mod.JobHandle, *, out_dir: Path) -> Path:
         """Write a placeholder file to the outputs dir. Bytes
         include the request payload so distinct runs produce
         distinct sha256."""

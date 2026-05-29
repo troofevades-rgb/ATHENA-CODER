@@ -108,10 +108,7 @@ def with_retry(
             # rotate callback gets a chance to swap creds.
             if classification.error_class is ErrorClass.RATE_LIMIT:
                 consecutive_429s += 1
-                if (
-                    consecutive_429s >= _ROTATE_AFTER_N_429s
-                    and on_rotate_credential is not None
-                ):
+                if consecutive_429s >= _ROTATE_AFTER_N_429s and on_rotate_credential is not None:
                     classification = Classification(
                         action=ErrorAction.ROTATE_CREDENTIAL,
                         error_class=classification.error_class,
@@ -145,14 +142,6 @@ def with_retry(
                     classification.reason,
                     classification.error_class.value,
                 )
-                if on_abort is not None:
-                    on_abort(classification)
-                raise
-
-            if action is ErrorAction.FALLBACK_PROVIDER:
-                # Reserved; treat as abort until cross-provider
-                # fallback machinery exists (Tier 3/4).
-                logger.error("[%s] fallback_provider not implemented; aborting", provider_label)
                 if on_abort is not None:
                     on_abort(classification)
                 raise

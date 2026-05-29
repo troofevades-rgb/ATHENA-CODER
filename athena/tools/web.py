@@ -29,9 +29,7 @@ import httpx
 from ..safety.url_safety import URLSecurityDenied, validate_url
 from .registry import tool
 
-_TIMEOUT = float(
-    os.environ.get("ATHENA_WEB_TIMEOUT") or "30"
-)
+_TIMEOUT = float(os.environ.get("ATHENA_WEB_TIMEOUT") or "30")
 _USER_AGENT = (
     os.environ.get("ATHENA_WEB_USER_AGENT")
     or "Mozilla/5.0 (compatible; athena/0.1; local research agent)"
@@ -221,9 +219,7 @@ def _search_brave(query: str, max_results: int) -> list[dict[str, str]]:
 
 
 def _search_searxng(query: str, max_results: int) -> list[dict[str, str]]:
-    base = (
-        os.environ.get("ATHENA_SEARXNG_URL") or ""
-    ).rstrip("/")
+    base = (os.environ.get("ATHENA_SEARXNG_URL") or "").rstrip("/")
     if not base:
         return [{"error": "ATHENA_SEARXNG_URL env var not set"}]
     # SearxNG base URL comes from an env var the operator sets, which
@@ -273,10 +269,7 @@ def _search_searxng(query: str, max_results: int) -> list[dict[str, str]]:
     },
 )
 def WebSearch(query: str, max_results: int = 8) -> str:
-    backend = (
-        os.environ.get("ATHENA_SEARCH_BACKEND")
-        or "duckduckgo"
-    ).lower()
+    backend = (os.environ.get("ATHENA_SEARCH_BACKEND") or "duckduckgo").lower()
     try:
         if backend == "brave":
             results = _search_brave(query, max_results)

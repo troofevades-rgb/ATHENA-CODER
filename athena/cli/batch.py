@@ -27,7 +27,6 @@ from typing import Any
 
 from ..config import load_config, profile_dir
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +41,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("tasks_file", help="Path to the tasks JSONL.")
     p.add_argument(
-        "--output-dir", "-o",
+        "--output-dir",
+        "-o",
         help=(
             "Where to write per-run envelopes + the manifest. "
             "Defaults to <profile_dir>/batch/<batch_id>/ — a "
@@ -58,8 +58,10 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--parallel", "-j",
-        type=int, default=1,
+        "--parallel",
+        "-j",
+        type=int,
+        default=1,
         help=(
             "Number of tasks to run concurrently. Default 1 "
             "(serial). Each worker uses its own Agent + "
@@ -87,7 +89,8 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress per-entry progress lines on stderr.",
     )
@@ -96,7 +99,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Active profile (overrides ATHENA_PROFILE / config).",
     )
     p.add_argument(
-        "--cwd", "-C",
+        "--cwd",
+        "-C",
         help=(
             "Default workspace for entries that don't override "
             "via their own `cwd` field. Defaults to the current "
@@ -107,7 +111,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _resolve_output_dir(
-    args: argparse.Namespace, *, batch_id: str, cfg: Any,
+    args: argparse.Namespace,
+    *,
+    batch_id: str,
+    cfg: Any,
 ) -> Path:
     if args.output_dir:
         return Path(args.output_dir).expanduser()
@@ -116,16 +123,21 @@ def _resolve_output_dir(
 
 
 def _run_one(
-    *, entry, cfg, workspace_default, output_dir, force,
+    *,
+    entry,
+    cfg,
+    workspace_default,
+    output_dir,
+    force,
 ) -> tuple[Any, dict]:
     """Run one batch entry — used by both the serial path and
     the ThreadPool path. Returns (manifest_entry, envelope_dict).
     Skipped entries return a synthesized manifest_entry +
     re-reads the existing envelope.
     """
-    from ..headless import run_headless
-    from ..batch.runner import _safe_filename
     from ..batch.manifest import ManifestEntry
+    from ..batch.runner import _safe_filename
+    from ..headless import run_headless
 
     envelope_path = output_dir / f"{_safe_filename(entry.run_id)}.json"
     if envelope_path.exists() and not force:
@@ -133,20 +145,25 @@ def _run_one(
             existing = json.loads(envelope_path.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             existing = {
-                "run_id": entry.run_id, "status": "ok", "exit_code": 0,
-                "duration_s": 0.0, "task": entry.task, "error": None,
+                "run_id": entry.run_id,
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 0.0,
+                "task": entry.task,
+                "error": None,
             }
         return ManifestEntry.from_run_result(
-            envelope=existing, envelope_path=envelope_path,
+            envelope=existing,
+            envelope_path=envelope_path,
         ), existing
 
-    workspace = (
-        Path(entry.cwd).expanduser().resolve()
-        if entry.cwd else workspace_default
-    )
+    workspace = Path(entry.cwd).expanduser().resolve() if entry.cwd else workspace_default
     result = run_headless(
-        task=entry.task, cfg=cfg, workspace=workspace,
-        model=entry.model, run_id=entry.run_id,
+        task=entry.task,
+        cfg=cfg,
+        workspace=workspace,
+        model=entry.model,
+        run_id=entry.run_id,
         timeout_s=entry.timeout_s,
     )
     envelope = result.to_dict()
@@ -155,39 +172,46 @@ def _run_one(
         encoding="utf-8",
     )
     return ManifestEntry.from_run_result(
-        envelope=envelope, envelope_path=envelope_path,
+        envelope=envelope,
+        envelope_path=envelope_path,
     ), envelope
 
 
-def _run_parallel(entries, *, cfg, workspace_default, output_dir,
-                  force, parallel, progress, batch_id):
+def _run_parallel(
+    entries, *, cfg, workspace_default, output_dir, force, parallel, progress, batch_id
+):
     """ThreadPoolExecutor wrapper. Workers each construct their
     own Agent inside run_headless — no shared state. Results
     return in input order (not completion order) so the
     manifest's entries list reflects the input JSONL line
     ordering, not the wall-clock-finish ordering."""
-    from ..batch.manifest import BatchManifest, ManifestEntry
     import datetime
     import time
 
-    started = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
+    from ..batch.manifest import BatchManifest, ManifestEntry
+
+    started = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     t0 = time.monotonic()
 
     # Pre-allocate IDs so the resume-safety check can fire
     # before submitting any work.
     import uuid as _uuid
+
     for e in entries:
         if not e.run_id:
             e.run_id = f"r-{_uuid.uuid4().hex[:12]}"
 
     manifest = BatchManifest(
         batch_id=batch_id,
-        started_at=started, finished_at=started, duration_s=0.0,
+        started_at=started,
+        finished_at=started,
+        duration_s=0.0,
         output_dir=str(output_dir),
-        total=len(entries), completed=0, skipped=0,
-        by_status={}, entries=[],
+        total=len(entries),
+        completed=0,
+        skipped=0,
+        by_status={},
+        entries=[],
     )
 
     # Each entry → (manifest_entry, envelope) when done.
@@ -196,16 +220,16 @@ def _run_parallel(entries, *, cfg, workspace_default, output_dir,
 
     def _task(idx: int, entry):
         return idx, _run_one(
-            entry=entry, cfg=cfg,
+            entry=entry,
+            cfg=cfg,
             workspace_default=workspace_default,
-            output_dir=output_dir, force=force,
+            output_dir=output_dir,
+            force=force,
         )
 
     try:
         with ThreadPoolExecutor(max_workers=max(1, parallel)) as ex:
-            futures = [
-                ex.submit(_task, i, e) for i, e in enumerate(entries)
-            ]
+            futures = [ex.submit(_task, i, e) for i, e in enumerate(entries)]
             done_count = 0
             for fut in _as_completed(futures):
                 idx, (me, envelope) = fut.result()
@@ -220,12 +244,15 @@ def _run_parallel(entries, *, cfg, workspace_default, output_dir,
             if i in results:
                 continue
             ph = {
-                "run_id": entry.run_id, "status": "interrupted",
-                "exit_code": 130, "duration_s": 0.0,
+                "run_id": entry.run_id,
+                "status": "interrupted",
+                "exit_code": 130,
+                "duration_s": 0.0,
                 "task": entry.task,
                 "error": "batch interrupted before this entry completed",
             }
             from ..batch.runner import _safe_filename
+
             results[i] = (
                 ManifestEntry.from_run_result(
                     envelope=ph,
@@ -262,13 +289,15 @@ def _run_parallel(entries, *, cfg, workspace_default, output_dir,
     manifest.skipped = skipped_count
 
     import time as _t
+
     manifest.finished_at = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%S.%fZ"
     )
     manifest.duration_s = _t.monotonic() - t0
 
     (output_dir / "manifest.json").write_text(
-        manifest.to_json(indent=2), encoding="utf-8",
+        manifest.to_json(indent=2),
+        encoding="utf-8",
     )
     return manifest
 
@@ -278,6 +307,7 @@ def _as_completed(futures):
     as_completed so the caller's `for fut in ...:` shape works
     without an extra import in the call site."""
     from concurrent.futures import as_completed
+
     yield from as_completed(futures)
 
 
@@ -294,8 +324,11 @@ def _progress_to_stderr(quiet: bool):
         # would also depend on stdout — and progress is
         # specifically for stderr.
         status_mark = {
-            "ok": "OK", "error": "ERR", "timeout": "TO",
-            "interrupted": "INT", "invalid": "INV",
+            "ok": "OK",
+            "error": "ERR",
+            "timeout": "TO",
+            "interrupted": "INT",
+            "invalid": "INV",
         }.get(me.status, me.status[:3].upper())
         sys.stderr.write(
             f"[{done:>4}/{total}] {status_mark:3} {me.run_id}  "
@@ -313,9 +346,7 @@ def main(argv: list[str]) -> int:
     if args.profile:
         cfg.profile = args.profile
 
-    workspace = (
-        Path(args.cwd).expanduser().resolve() if args.cwd else Path.cwd().resolve()
-    )
+    workspace = Path(args.cwd).expanduser().resolve() if args.cwd else Path.cwd().resolve()
     if not workspace.is_dir():
         sys.stderr.write(f"batch: workspace not a directory: {workspace}\n")
         return 2
@@ -326,6 +357,7 @@ def main(argv: list[str]) -> int:
     # malformed.
     try:
         from ..batch import parse_tasks_file
+
         entries = parse_tasks_file(args.tasks_file)
     except FileNotFoundError as e:
         sys.stderr.write(f"batch: {e}\n")
@@ -338,27 +370,34 @@ def main(argv: list[str]) -> int:
         sys.stderr.write("batch: tasks file has no entries\n")
         # Not an error — empty input is valid (the manifest
         # will reflect total=0). Exit 0.
-        from ..batch.manifest import BatchManifest, mint_batch_id
         import datetime
+
+        from ..batch.manifest import BatchManifest, mint_batch_id
+
         bid = args.batch_id or mint_batch_id()
         output_dir = _resolve_output_dir(args, batch_id=bid, cfg=cfg)
         output_dir.mkdir(parents=True, exist_ok=True)
-        now = datetime.datetime.now(datetime.timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%S.%fZ"
-        )
+        now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         manifest = BatchManifest(
-            batch_id=bid, started_at=now, finished_at=now,
-            duration_s=0.0, output_dir=str(output_dir),
-            total=0, completed=0, skipped=0,
+            batch_id=bid,
+            started_at=now,
+            finished_at=now,
+            duration_s=0.0,
+            output_dir=str(output_dir),
+            total=0,
+            completed=0,
+            skipped=0,
         )
         (output_dir / "manifest.json").write_text(
-            manifest.to_json(indent=2), encoding="utf-8",
+            manifest.to_json(indent=2),
+            encoding="utf-8",
         )
         if args.json:
             sys.stdout.write(manifest.to_json(indent=None) + "\n")
         return 0
 
     from ..batch.manifest import mint_batch_id
+
     bid = args.batch_id or mint_batch_id()
     output_dir = _resolve_output_dir(args, batch_id=bid, cfg=cfg)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -367,17 +406,25 @@ def main(argv: list[str]) -> int:
 
     if args.parallel and args.parallel > 1:
         manifest = _run_parallel(
-            entries, cfg=cfg, workspace_default=workspace,
-            output_dir=output_dir, force=args.force,
+            entries,
+            cfg=cfg,
+            workspace_default=workspace,
+            output_dir=output_dir,
+            force=args.force,
             parallel=args.parallel,
-            progress=progress_fn, batch_id=bid,
+            progress=progress_fn,
+            batch_id=bid,
         )
     else:
         # Serial path — straight delegation to the runner.
         from ..batch import batch_run
+
         manifest = batch_run(
-            entries, cfg=cfg, workspace_default=workspace,
-            output_dir=output_dir, batch_id=bid,
+            entries,
+            cfg=cfg,
+            workspace_default=workspace,
+            output_dir=output_dir,
+            batch_id=bid,
             force=args.force,
             progress=progress_fn,
         )
@@ -412,6 +459,4 @@ def main(argv: list[str]) -> int:
 def _summary_status_str(by_status: dict[str, int]) -> str:
     if not by_status:
         return "no entries"
-    return ", ".join(
-        f"{k}={v}" for k, v in sorted(by_status.items())
-    )
+    return ", ".join(f"{k}={v}" for k, v in sorted(by_status.items()))

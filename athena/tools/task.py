@@ -76,10 +76,11 @@ def _resolve_store() -> Any:
     the tmp-path profile, which had been polluting the user's
     default board with pytest tmp-dir cards on every test run."""
     global _store
-    from ..config import load_config, profile_dir
+    from ..config import profile_dir
     from ..tasks.model import TaskStore, default_task_store_path
+    from ._active_cfg import active_cfg
 
-    cfg = load_config()
+    cfg = active_cfg()
     profile = getattr(cfg, "profile", None) or "default"
     path = default_task_store_path(cfg, profile_dir(profile))
     if _store is None or _store.path != path:
@@ -153,7 +154,7 @@ def _existing_active_form(note: str | None) -> str:
         return ""
     for line in note.splitlines():
         if line.startswith("activeForm: "):
-            return line[len("activeForm: "):].strip()
+            return line[len("activeForm: ") :].strip()
     return ""
 
 
@@ -258,19 +259,11 @@ def TaskUpdate(
         # values for the field that wasn't passed). This matches
         # the pre-T6-06.2 contract where TaskUpdate(description=X)
         # sets description to X.
-        new_desc = (
-            description
-            if description is not None
-            else _existing_description(existing.note)
+        new_desc = description if description is not None else _existing_description(existing.note)
+        new_active = activeForm if activeForm is not None else _existing_active_form(existing.note)
+        update_kwargs["note"] = (
+            _encode_note(new_desc, new_active, subject=subject or existing.title) or ""
         )
-        new_active = (
-            activeForm
-            if activeForm is not None
-            else _existing_active_form(existing.note)
-        )
-        update_kwargs["note"] = _encode_note(
-            new_desc, new_active, subject=subject or existing.title
-        ) or ""
 
     if not update_kwargs:
         return f"Task {taskId}: no changes"

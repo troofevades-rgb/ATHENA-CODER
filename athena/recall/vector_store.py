@@ -16,10 +16,14 @@ and optionally on ``workspace``. Cosine similarity is computed
 in pure Python; at the per-user scale this stays fast enough
 without numpy.
 
-Persistence: a single JSON file. ``add`` and ``backfill`` write
-synchronously. Atomicity isn't critical (a crash mid-write
-might lose the entry being added; the next embed-on-write
-recovers).
+Persistence: a single JSONL file (one entry per line). ``add``
+appends one line per call — O(1) per write instead of rewriting
+the whole index — and ``backfill`` rewrites once at the end.
+Repeated ``add`` calls for the same ``doc_id`` accumulate on
+disk; the loader dedupes by doc_id, last-wins. Atomicity isn't
+critical (a crash mid-write might lose the entry being added;
+the next embed-on-write recovers). Legacy pretty-printed JSON
+array files are read transparently for one release.
 """
 
 from __future__ import annotations
@@ -28,8 +32,9 @@ import dataclasses
 import json
 import logging
 import math
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +128,7 @@ class VectorStore:
             text_preview=text_preview or text[:200],
         )
         self._upsert(entry)
-        self._save()
+        self._append_one(entry)
         return entry
 
     def backfill(self, items: Iterable[tuple[str, str, str]]) -> int:
@@ -155,7 +160,7 @@ class VectorStore:
             )
             count += 1
         if count:
-            self._save()
+            self._rewrite_all()
         return count
 
     # ------------------------------------------------------------------
@@ -215,25 +220,76 @@ class VectorStore:
         if not self.path.exists():
             return []
         try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as e:
+            text = self.path.read_text(encoding="utf-8")
+        except OSError as e:
             logger.warning("vector store unreadable, starting fresh: %s", e)
             return []
-        out: list[VectorEntry] = []
-        for item in raw if isinstance(raw, list) else []:
+        if not text.strip():
+            return []
+
+        # Legacy format: a single pretty-printed JSON array. Detect by
+        # checking the first non-whitespace char; one-time auto-migrate.
+        stripped = text.lstrip()
+        items: list[dict[str, Any]] = []
+        if stripped.startswith("["):
             try:
-                out.append(VectorEntry.from_dict(item))
+                raw = json.loads(text)
+                if isinstance(raw, list):
+                    items = [r for r in raw if isinstance(r, dict)]
+            except json.JSONDecodeError as e:
+                logger.warning("legacy vector store unreadable, starting fresh: %s", e)
+                return []
+        else:
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(obj, dict):
+                    items.append(obj)
+
+        # Dedupe by doc_id, last write wins. Preserves insertion order
+        # for first-seen doc_ids so search ranking is stable across reloads.
+        by_doc: dict[str, VectorEntry] = {}
+        order: list[str] = []
+        for item in items:
+            try:
+                entry = VectorEntry.from_dict(item)
             except (TypeError, KeyError, ValueError) as e:
                 logger.warning("skipping malformed vector entry: %s", e)
-        return out
+                continue
+            if entry.doc_id not in by_doc:
+                order.append(entry.doc_id)
+            by_doc[entry.doc_id] = entry
+        return [by_doc[d] for d in order]
 
-    def _save(self) -> None:
+    def _append_one(self, entry: VectorEntry) -> None:
+        """Append one entry's JSON to the JSONL store. O(1) per call."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = [e.to_dict() for e in self._entries]
-        self.path.write_text(
-            json.dumps(payload, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry.to_dict(), sort_keys=True))
+            f.write("\n")
+
+    def _rewrite_all(self) -> None:
+        """Atomically rewrite the entire JSONL file from in-memory state.
+        Used after bulk operations (backfill) and to compact away
+        superseded entries that accumulated from repeated upserts."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            for entry in self._entries:
+                f.write(json.dumps(entry.to_dict(), sort_keys=True))
+                f.write("\n")
+        tmp.replace(self.path)
+
+    def compact(self) -> None:
+        """Public hook: rewrite the file from in-memory state. Removes
+        accumulated superseded entries from repeated upserts. Callers
+        can run this opportunistically (e.g., on session close)."""
+        self._rewrite_all()
 
 
 def _cosine(a: list[float], b: list[float]) -> float:

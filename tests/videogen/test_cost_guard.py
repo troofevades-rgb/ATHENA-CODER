@@ -16,9 +16,12 @@ from athena.videogen.job import CostEstimate
 
 
 def _cfg(*, sec: float = 60.0, cost: float = 1.0) -> SimpleNamespace:
+    # Post-R4 stage 5: video_confirm_over_* moved to cfg.video_generation.
     return SimpleNamespace(
-        video_confirm_over_seconds=sec,
-        video_confirm_over_cost=cost,
+        video_generation=SimpleNamespace(
+            confirm_over_seconds=sec,
+            confirm_over_cost=cost,
+        ),
     )
 
 
@@ -64,9 +67,7 @@ def test_boundary_exact_threshold_does_not_confirm():
     document the boundary explicitly than to argue about
     "should 60.0 seconds confirm or not"."""
     cfg = _cfg(sec=60.0, cost=1.0)
-    assert (
-        CostEstimate(seconds_est=60.0, cost_est=1.0).needs_confirm(cfg) is False
-    )
+    assert CostEstimate(seconds_est=60.0, cost_est=1.0).needs_confirm(cfg) is False
 
 
 def test_partial_thresholds():

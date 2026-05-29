@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 
 from athena.audio import tools as audio_tools
-from athena.audio.tools import _run, transcribe_track, VALID_MODES
+from athena.audio.tools import VALID_MODES, _run, transcribe_track
 from tests.audio.conftest import StubAudioBackend, make_wav
 
 
@@ -63,6 +63,7 @@ def _route_profile_dir(tmp_path: Path, monkeypatch):
 def test_tool_registered_in_vision_toolset():
     import athena.tools  # noqa: F401 — trigger registration
     from athena.tools.registry import get_tool
+
     t = get_tool("audio_analyze")
     assert t is not None
     assert t.toolset == "vision"
@@ -71,6 +72,7 @@ def test_tool_registered_in_vision_toolset():
 def test_schema_lists_all_modes():
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("audio_analyze")
     enum = t.parameters["properties"]["mode"]["enum"]
     assert set(enum) == set(VALID_MODES)
@@ -83,42 +85,51 @@ def test_schema_lists_all_modes():
 
 def test_audio_disabled_short_circuits(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav", duration_s=0.5)
-    out = json.loads(_run(
-        path=str(wav),
-        _cfg=_cfg(tmp_path, audio_analyze_enabled=False),
-        _backend=StubAudioBackend(),
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            _cfg=_cfg(tmp_path, audio_analyze_enabled=False),
+            _backend=StubAudioBackend(),
+        )
+    )
     assert out["available"] is False
     assert "audio_analyze_enabled=False" in out["error"]
 
 
 def test_unknown_mode_rejected(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav")
-    out = json.loads(_run(
-        path=str(wav), mode="hum",
-        _cfg=_cfg(tmp_path),
-        _backend=StubAudioBackend(),
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            mode="hum",
+            _cfg=_cfg(tmp_path),
+            _backend=StubAudioBackend(),
+        )
+    )
     assert out["available"] is False
     assert "unknown mode" in out["error"]
 
 
 def test_missing_path_rejected(tmp_path: Path):
-    out = json.loads(_run(
-        path=None,
-        _cfg=_cfg(tmp_path),
-        _backend=StubAudioBackend(),
-    ))
+    out = json.loads(
+        _run(
+            path=None,
+            _cfg=_cfg(tmp_path),
+            _backend=StubAudioBackend(),
+        )
+    )
     assert out["available"] is False
     assert "path is required" in out["error"]
 
 
 def test_missing_file_rejected(tmp_path: Path):
-    out = json.loads(_run(
-        path=str(tmp_path / "nope.wav"),
-        _cfg=_cfg(tmp_path),
-        _backend=StubAudioBackend(),
-    ))
+    out = json.loads(
+        _run(
+            path=str(tmp_path / "nope.wav"),
+            _cfg=_cfg(tmp_path),
+            _backend=StubAudioBackend(),
+        )
+    )
     assert out["available"] is False
     assert "file not found" in out["error"]
 
@@ -126,10 +137,12 @@ def test_missing_file_rejected(tmp_path: Path):
 def test_no_backend_branch_via_monkeypatch(tmp_path: Path, monkeypatch):
     wav = make_wav(tmp_path / "a.wav")
     monkeypatch.setattr(audio_tools, "_resolve_backend", lambda cfg: None)
-    out = json.loads(_run(
-        path=str(wav),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["available"] is False
     assert "no audio backend configured" in out["reason"]
 
@@ -142,11 +155,14 @@ def test_no_backend_branch_via_monkeypatch(tmp_path: Path, monkeypatch):
 def test_transcribe_mode_returns_segments(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav", duration_s=0.5)
     backend = StubAudioBackend(per_chunk_segments=2)
-    out = json.loads(_run(
-        path=str(wav), mode="transcribe",
-        _cfg=_cfg(tmp_path),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            mode="transcribe",
+            _cfg=_cfg(tmp_path),
+            _backend=backend,
+        )
+    )
     assert out["available"] is True
     assert out["mode"] == "transcribe"
     assert len(out["segments"]) == 2
@@ -161,7 +177,8 @@ def test_transcribe_writes_audit_row(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav", duration_s=0.5)
     backend = StubAudioBackend(per_chunk_segments=1)
     _run(
-        path=str(wav), mode="transcribe",
+        path=str(wav),
+        mode="transcribe",
         _cfg=_cfg(tmp_path),
         _backend=backend,
     )
@@ -179,11 +196,13 @@ def test_transcript_text_file_alongside_json(tmp_path: Path):
     output operators can read at a glance."""
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(per_chunk_segments=2)
-    out = json.loads(_run(
-        path=str(wav),
-        _cfg=_cfg(tmp_path),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            _cfg=_cfg(tmp_path),
+            _backend=backend,
+        )
+    )
     json_path = Path(out["transcript_path"])
     txt_path = json_path.with_suffix(".txt")
     assert json_path.exists() and txt_path.exists()
@@ -201,7 +220,8 @@ def test_diarize_mode_passes_diarize_true_when_enabled(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(diarize_supported=True, per_chunk_segments=2)
     _run(
-        path=str(wav), mode="diarize",
+        path=str(wav),
+        mode="diarize",
         _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
         _backend=backend,
     )
@@ -216,7 +236,8 @@ def test_diarize_mode_passes_diarize_false_when_disabled(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(diarize_supported=True, per_chunk_segments=1)
     _run(
-        path=str(wav), mode="diarize",
+        path=str(wav),
+        mode="diarize",
         _cfg=_cfg(tmp_path, audio_diarization_enabled=False),
         _backend=backend,
     )
@@ -226,13 +247,17 @@ def test_diarize_mode_passes_diarize_false_when_disabled(tmp_path: Path):
 def test_diarize_segments_carry_speaker_when_supported(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(
-        diarize_supported=True, per_chunk_segments=2,
+        diarize_supported=True,
+        per_chunk_segments=2,
     )
-    out = json.loads(_run(
-        path=str(wav), mode="diarize",
-        _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            mode="diarize",
+            _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
+            _backend=backend,
+        )
+    )
     speakers = [s.get("speaker") for s in out["segments"]]
     assert any(s is not None for s in speakers)
 
@@ -244,13 +269,17 @@ def test_diarize_segments_no_speaker_when_unsupported(tmp_path: Path):
     fields in the output."""
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(
-        diarize_supported=False, per_chunk_segments=2,
+        diarize_supported=False,
+        per_chunk_segments=2,
     )
-    out = json.loads(_run(
-        path=str(wav), mode="diarize",
-        _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            mode="diarize",
+            _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
+            _backend=backend,
+        )
+    )
     for s in out["segments"]:
         assert "speaker" not in s  # to_dict omits None
 
@@ -263,11 +292,14 @@ def test_diarize_segments_no_speaker_when_unsupported(tmp_path: Path):
 def test_classify_mode_sets_content_type(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(content_type="music", per_chunk_segments=1)
-    out = json.loads(_run(
-        path=str(wav), mode="classify",
-        _cfg=_cfg(tmp_path),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            mode="classify",
+            _cfg=_cfg(tmp_path),
+            _backend=backend,
+        )
+    )
     assert out["content_type"] == "music"
 
 
@@ -278,11 +310,14 @@ def test_full_mode_carries_everything(tmp_path: Path):
         diarize_supported=True,
         content_type="speech",
     )
-    out = json.loads(_run(
-        path=str(wav), mode="full",
-        _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            mode="full",
+            _cfg=_cfg(tmp_path, audio_diarization_enabled=True),
+            _backend=backend,
+        )
+    )
     assert out["content_type"] == "speech"
     assert len(out["segments"]) == 2
     speakers = [s.get("speaker") for s in out["segments"]]
@@ -298,7 +333,9 @@ def test_transcribe_track_returns_result_directly(tmp_path: Path):
     wav = make_wav(tmp_path / "a.wav")
     backend = StubAudioBackend(per_chunk_segments=3)
     result = transcribe_track(
-        wav, cfg=_cfg(tmp_path), backend=backend,
+        wav,
+        cfg=_cfg(tmp_path),
+        backend=backend,
     )
     assert len(result.segments) == 3
     assert result.language == "en"
@@ -330,11 +367,13 @@ def test_backend_exception_surfaces_as_structured_error(tmp_path: Path):
     backend = StubAudioBackend(
         raise_on_transcribe=RuntimeError("model offline"),
     )
-    out = json.loads(_run(
-        path=str(wav),
-        _cfg=_cfg(tmp_path),
-        _backend=backend,
-    ))
+    out = json.loads(
+        _run(
+            path=str(wav),
+            _cfg=_cfg(tmp_path),
+            _backend=backend,
+        )
+    )
     assert out["available"] is True
     assert "transcribe failed" in out["error"]
     assert "model offline" in out["error"]

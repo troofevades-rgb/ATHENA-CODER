@@ -47,6 +47,382 @@ def mcp_config_paths(workspace: Path) -> list[Path]:
 
 
 @dataclass
+class SkillsConfig:
+    """Skills subsystem config.
+
+    Pilot for the Phase 18.1 R4 nested-config migration: the legacy
+    ``cfg.skills_autoload`` + ``cfg.skills_autoload_interval`` flat
+    fields are still accessible via ``Config.__getattr__`` shims that
+    emit a ``DeprecationWarning`` and resolve through this nested
+    instance. New code should read ``cfg.skills.autoload`` directly.
+    """
+
+    # When True, the Agent runs a polling watcher over the skill search
+    # paths and reloads the catalog in place whenever a SKILL.md is
+    # added, edited, or removed. OFF by default to avoid a per-session
+    # background thread for users who never edit skills mid-session.
+    autoload: bool = False
+    # Poll interval (seconds) for the skill watcher when ``autoload`` is
+    # True. Default tuned low enough to feel interactive but high enough
+    # that the watch loop is invisible in profilers.
+    autoload_interval: float = 2.0
+
+
+@dataclass
+class SafetyConfig:
+    """Snapshot + audit retention policy + mutation-snapshot behaviour.
+
+    Phase 18.1 R4 stage 2: replaces the ``cfg.safety: dict[str, Any]``
+    blob whose keys were advertised in code but never actually consulted
+    (verified by grep: zero readers). This commit also threads the
+    dataclass through to :class:`~athena.safety.snapshots.SnapshotStore`
+    so the user's ``[safety]`` TOML table finally takes effect.
+
+    Defaults match the prior dict exactly (no behaviour change for
+    users on factory settings).
+    """
+
+    # When True, also snapshot mutations made under
+    # write_origin="foreground" -- not just background_review / curator /
+    # migration. False by default because foreground writes are
+    # user-driven and undo is already a user-driven question; the
+    # snapshot/audit chain mainly exists for autonomous mutations.
+    snapshot_foreground: bool = False
+    # Retention policy. The store's prune() pass deletes snapshots older
+    # than retention_days, beyond retention_count, or in excess of
+    # retention_bytes total on disk -- whichever fires first. Pinned
+    # snapshots bypass every rule.
+    retention_days: int = 90
+    retention_count: int = 5_000
+    retention_bytes: int = 5 * 1024**3
+    # Note: bash denylist patterns live in BashConfig.extra_denylist.
+    # The legacy cfg.safety["extra_denylist"] key was a duplicate that
+    # nobody read; dropped here to avoid the parallel-keys footgun.
+
+
+@dataclass
+class OcrConfig:
+    """OCR subsystem (Tesseract by default, capability-brokered).
+
+    Phase 18.1 R4 stage 5: promotes the five ``ocr_*`` flat fields.
+    Legacy reads/writes still resolve through the Config shim.
+    """
+
+    enabled: bool = True
+    backend_prefer: str = "local"
+    # ISO 639-2/T language codes -- tesseract joins with '+'. Each
+    # non-default language needs the matching tessdata file installed.
+    languages: list[str] = field(default_factory=lambda: ["eng"])
+    # Drop OCR blocks below this engine-reported confidence (0-100).
+    # 0 keeps everything; 60+ filters noisy recognitions.
+    min_confidence: int = 0
+    # Override the tesseract binary path. None -> PATH lookup.
+    tesseract_cmd: str | None = None
+
+
+@dataclass
+class VideoGenerationConfig:
+    """Native video generation broker (T6-05).
+
+    Phase 18.1 R4 stage 5: half the legacy ``video_*`` namespace --
+    the generation broker bits (``video_generation_enabled``,
+    ``video_backend*``, cost guards). The analysis half lives in
+    :class:`VideoAnalysisConfig`; this split keeps the two distinct
+    subsystems from sharing ambiguous field names.
+    """
+
+    enabled: bool = False
+    # Capability-broker preference order; "local" prefers in-tree
+    # backends, "remote" prefers hosted vendor adapters.
+    backend_prefer: str = "local"
+    # Cost guard. The model confirms before submitting any job
+    # exceeding either threshold; never silently spend.
+    confirm_over_seconds: float = 60.0
+    confirm_over_cost: float = 1.0
+    # Default <profile_dir>/videos when None.
+    output_dir: str | None = None
+    poll_interval_s: float = 5.0
+    # Pinned backend name (overrides the broker). None lets the
+    # broker pick via backend_prefer. Mutated by ``/video set <name>``.
+    backend: str | None = None
+
+
+@dataclass
+class VideoAnalysisConfig:
+    """video_analyze tool (T4-04).
+
+    Phase 18.1 R4 stage 5: the analysis half of the legacy ``video_*``
+    namespace. Wraps ffmpeg/ffprobe for frame extraction + per-frame
+    vision routing. The generation broker bits live in
+    :class:`VideoGenerationConfig`.
+    """
+
+    enabled: bool = True
+    ffmpeg_path: str = "ffmpeg"
+    ffprobe_path: str = "ffprobe"
+    # Default <profile_dir>/video/frames when None.
+    frames_dir: str | None = None
+    # Cap extracted frames per file -- vision context window protection.
+    max_frames: int = 200
+    # Default extract mode: ``"keyframes"`` | ``"sampled"`` | ``"range"``.
+    default_extract: str = "keyframes"
+    # Interval between sampled frames in seconds when default_extract
+    # == "sampled".
+    sampled_interval_s: float = 5.0
+
+
+@dataclass
+class PluginsConfig:
+    """Plugin enable overrides + per-plugin config slices.
+
+    Phase 18.1 R4 stage 4b: promotes ``cfg.plugins: dict[str, Any]`` to
+    a typed dataclass. The dict had two roles -- an ``"enabled"`` key
+    mapping ``plugin_name -> bool`` AND arbitrary other keys (one per
+    plugin) carrying per-plugin config. The dataclass splits those:
+
+    - :attr:`enabled` -- ``{plugin_name: bool}`` override map. Managed
+      by ``athena plugins {enable,disable}`` writing to
+      ``~/.athena/plugins_state.json``.
+    - :attr:`per_plugin` -- ``{plugin_name: {key: value, ...}}`` for
+      the slice the plugin's ``Plugin.__init__`` receives as
+      ``config``.
+
+    Implements ``__getitem__`` + ``get`` so existing dict-style readers
+    (``cfg.plugins.get("enabled")``, ``cfg.plugins["plugin_name"]``)
+    keep working without changes. Internal helpers
+    (:meth:`as_dict_for_loader`) bridge to call sites that need the
+    legacy dict envelope.
+    """
+
+    enabled: dict[str, bool] = field(default_factory=dict)
+    per_plugin: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-style read. ``"enabled"`` returns the enable map;
+        anything else returns the per-plugin slice if present, else
+        ``default``."""
+        if key == "enabled":
+            return self.enabled
+        return self.per_plugin.get(key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "enabled":
+            return self.enabled
+        return self.per_plugin[key]
+
+    def __contains__(self, key: str) -> bool:
+        if key == "enabled":
+            return True
+        return key in self.per_plugin
+
+    def as_dict_for_loader(self) -> dict[str, Any]:
+        """Reconstitute the legacy ``{"enabled": ..., "<name>": ...}``
+        envelope the plugin loader expects. Kept narrow on purpose --
+        ad-hoc dict conversions across the rest of the codebase should
+        prefer :meth:`get` / attribute access."""
+        return {
+            "enabled": dict(self.enabled),
+            **{k: dict(v) for k, v in self.per_plugin.items()},
+        }
+
+
+@dataclass
+class ProvidersConfig:
+    """Provider routing + per-provider config slices.
+
+    Phase 18.1 R4 stage 6 (closes R4): promotes ``cfg.providers:
+    dict[str, Any]`` to a typed dataclass. The legacy dict had two
+    roles -- a ``"routing"`` key mapping ``model_name -> provider``
+    PLUS arbitrary other keys (one per provider) carrying that
+    provider's host/fallback/base_url slice. The dataclass splits
+    those:
+
+    - :attr:`routing` -- ``{model_name: provider_name}`` overrides
+      consulted before the prefix-based dispatch in
+      :func:`athena.providers.runtime_resolver._route`.
+    - :attr:`per_provider` -- ``{provider_name: {key: value, ...}}``
+      slice the runtime resolver reads to find ``host``,
+      ``base_url``, ``fallback`` chains, etc.
+
+    Implements ``__getitem__`` / ``get`` / ``__contains__`` so the
+    existing ``(cfg.providers or {}).get("routing")`` /
+    ``.get(name, {})`` readers in
+    :mod:`athena.providers.runtime_resolver` and
+    :mod:`athena.cli.providers` keep working without changes.
+    :meth:`from_dict` lets callers (Config.__post_init__, test
+    fixtures) coerce a legacy dict into the dataclass shape.
+    """
+
+    routing: dict[str, str] = field(default_factory=dict)
+    per_provider: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ProvidersConfig:
+        """Build a ProvidersConfig from the legacy flat-dict envelope.
+
+        ``d["routing"]`` (if a dict) populates :attr:`routing`; every
+        other dict-valued key becomes a :attr:`per_provider` slice.
+        Non-dict garbage is silently dropped -- the runtime resolver
+        already tolerates malformed config and prints warnings at
+        usage time.
+        """
+        if not isinstance(d, dict):
+            return cls()
+        routing_raw = d.get("routing")
+        routing: dict[str, str] = {}
+        if isinstance(routing_raw, dict):
+            for k, v in routing_raw.items():
+                if isinstance(k, str) and isinstance(v, str):
+                    routing[k] = v
+        per_provider: dict[str, dict[str, Any]] = {}
+        for k, v in d.items():
+            if k == "routing":
+                continue
+            if isinstance(k, str) and isinstance(v, dict):
+                per_provider[k] = dict(v)
+        return cls(routing=routing, per_provider=per_provider)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-style read. ``"routing"`` returns the routing map;
+        anything else returns the per-provider slice if present, else
+        ``default``."""
+        if key == "routing":
+            return self.routing
+        return self.per_provider.get(key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "routing":
+            return self.routing
+        return self.per_provider[key]
+
+    def __contains__(self, key: str) -> bool:
+        if key == "routing":
+            return True
+        return key in self.per_provider
+
+    def __bool__(self) -> bool:
+        """Truthy iff at least one routing entry or per-provider slice
+        is present. Keeps the legacy ``(cfg.providers or {}).get(...)``
+        defensive pattern doing the right thing when the config is
+        empty."""
+        return bool(self.routing) or bool(self.per_provider)
+
+
+@dataclass
+class ParseltongueConfig:
+    """Parseltongue inference-param policy config.
+
+    Phase 18.1 R4 stage 4: promotes ``cfg.parseltongue: dict[str, Any]``
+    to a real dataclass. The dict's documented schema (``policy``,
+    ``defaults``, ``user_rules``, ``classifier_model``) is now
+    type-checked at construction; unknown keys in the TOML table fall
+    through silently rather than being treated as live config (matches
+    the prior dict behaviour exactly).
+    """
+
+    # Which policy class drives params_for(). One of "static",
+    # "heuristic", "llm_classifier". Empty string means "use the
+    # heuristic default". The llm_classifier branch currently raises
+    # at construction time (see ``policy_from_config``).
+    policy: str = "heuristic"
+    # Param dict baked into StaticPolicy when ``policy == "static"``.
+    # Keys match provider stream_chat kwargs (temperature, top_p,
+    # repeat_penalty, mirostat*, etc.).
+    defaults: dict[str, Any] = field(default_factory=dict)
+    # User-defined rules layered on top of the built-in heuristic
+    # rules. Each entry: {"when": str, "params": dict[str, Any],
+    # plus when-specific keys like ``pattern`` or ``count``}. See
+    # athena/agent/param_policy.py:user_rules_from_config for the
+    # supported ``when`` predicates.
+    user_rules: list[dict[str, Any]] = field(default_factory=list)
+    # Classifier model when ``policy == "llm_classifier"`` (deferred).
+    # Kept on the dataclass so the future implementation can read it
+    # without a schema migration.
+    classifier_model: str = "qwen2.5:1.5b"
+
+
+@dataclass
+class ComputerConfig:
+    """Computer-use subsystem config (T6-04 + T6-04R).
+
+    Phase 18.1 R4 stage 3: promotes the 12 flat ``computer_*`` Config
+    fields into one nested dataclass. Legacy reads (``cfg.computer_use_enabled``)
+    keep working for one release via ``Config.__getattr__``; legacy
+    writes (``cfg.computer_use_enabled = True``, common in test fixtures)
+    route through ``Config.__setattr__`` to the nested instance so
+    canonical readers and test mutations agree.
+    """
+
+    # Master enable. Disabled by default -- the model gets a structured
+    # "computer use is disabled" tool result on every input call until
+    # the operator turns this on.
+    use_enabled: bool = False
+    # Permission gate mode:
+    #   "observe_only"  watches + advises, never inputs (default)
+    #   "per_action"    confirm every input event (safest active mode)
+    #   "per_session"   confirm input once per task; destructive STILL
+    #                   confirms individually in every mode
+    permission_mode: str = "observe_only"
+    app_allowlist: list[str] = field(default_factory=list)
+    app_denylist: list[str] = field(
+        default_factory=lambda: [
+            # Sensible defaults -- denylist wins, so even when the user
+            # opts in to control they must explicitly REMOVE one of
+            # these to touch it.
+            "1password",
+            "bitwarden",
+            "lastpass",
+            "keychain",
+            "keepass",
+            "banking",
+            "wallet",
+            "ledger live",
+            "metamask",
+        ]
+    )
+    kill_hotkey: str = "ctrl+alt+k"
+    max_actions_per_task: int = 40
+    max_actions_per_sec: float = 2.0
+    backend: str = "auto"
+    dry_run: bool = False
+    audit_path: str | None = None  # default <profile_dir>/computer_audit.jsonl
+    # T6-04.4 follow-up: screenshots are written to disk (NOT inlined
+    # as base64 -- a 4K screen would be ~30 MB of base64 -> ~10M tokens,
+    # way beyond local-model context windows). Default location is
+    # <profile_dir>/screenshots/<ts>-<sha8>.bmp.
+    screenshots_dir: str | None = None
+    # T6-04R: refuse input + destructive when the autonomous /goal
+    # continuation loop is driving turns. The goal loop runs in
+    # FOREGROUND origin (not BACKGROUND_REVIEW), so approval_guard's
+    # background-deny alone wouldn't catch it; this is the
+    # computer-use-specific extra check. Default True -- the
+    # autonomous loop never gets to drive the desktop unless the
+    # operator deliberately disables this.
+    deny_during_goal_loop: bool = True
+
+
+@dataclass
+class BashConfig:
+    """Bash gate config -- allowlist + extra denylist patterns.
+
+    Pilot for the Phase 18.1 R4 nested-config migration: the legacy
+    ``cfg.bash_allowlist`` + ``cfg.bash_extra_denylist`` flat fields
+    are still accessible via ``Config.__getattr__`` shims. New code
+    should read ``cfg.bash.allowlist`` / ``cfg.bash.extra_denylist``.
+    """
+
+    # Per-Bash command allowlist; entries are word-boundary matched
+    # against the binary token. E.g. ``["git", "ls", "cat"]``.
+    # Allowlisted commands skip the confirmation prompt even when
+    # ``auto_approve_tools`` is False.
+    allowlist: list[str] = field(default_factory=list)
+    # Additional regex denylist patterns appended to
+    # ``athena.safety.shell_policy.DEFAULT_DENYLIST``. Always enforced
+    # before the allowlist; matching commands are rejected outright.
+    extra_denylist: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ReviewConfig:
     """Per-turn background review settings."""
 
@@ -144,6 +520,16 @@ class Config:
     # contexts (default / personal / client-foo) separated without juggling
     # ATHENA_HOME values.
     profile: str = "default"
+    # R2 stage 4: opt-in one-shot migration of legacy workspace-keyed
+    # memory at ``~/.athena/projects/<slug>/memory/`` into the new
+    # profile-keyed location at
+    # ``<profile_dir>/memory/legacy/<workspace-slug>/``. Off by default
+    # for a release so operators dogfood; flip to True in config.toml
+    # to opt in. Idempotent (skips if target exists), per-workspace
+    # (only migrates the active workspace's slug per session). Removal:
+    # default flips to True at R2 stage 5; flag retires together with
+    # the legacy ``athena.memory`` module.
+    migrate_legacy_memory: bool = False
     review: ReviewConfig = field(default_factory=ReviewConfig)
     curator: CuratorConfig = field(default_factory=CuratorConfig)
     gateway: GatewayConfig = field(default_factory=GatewayConfig)
@@ -170,40 +556,43 @@ class Config:
     # athena/prompts/system.py SECTIONS (e.g. "executing_with_care",
     # "session_guidance", "memory_header"). Combines with lean_prompt.
     disabled_prompt_sections: list[str] = field(default_factory=list)
-    # Per-Bash command allowlist; entries are word-boundary matched
-    # against the binary token (Phase 17 ShellPolicy). E.g.
-    # ["git", "ls", "cat"]. Allowlisted commands skip the
-    # confirmation prompt even when auto_approve_tools is False.
-    bash_allowlist: list[str] = field(default_factory=list)
-    # Additional regex denylist patterns appended to
-    # athena.safety.shell_policy.DEFAULT_DENYLIST. Always enforced
-    # before the allowlist; matching commands are rejected outright
-    # by the Bash tool.
-    bash_extra_denylist: list[str] = field(default_factory=list)
-    # Phase 17 [safety] settings. Keys preserved in a sub-dict so
-    # athena.safety modules can read them without growing the top-
-    # level Config surface for every new option.
-    safety: dict[str, Any] = field(
-        default_factory=lambda: {
-            "snapshot_foreground": False,
-            "retention_days": 90,
-            "retention_count": 5_000,
-            "retention_bytes": 5 * 1024**3,
-            "extra_denylist": [],
-        }
-    )
+    # Bash gate config (Phase 17 ShellPolicy). Nested per Phase 18.1
+    # R4; legacy flat names ``bash_allowlist`` / ``bash_extra_denylist``
+    # still resolve via ``Config.__getattr__`` with a deprecation
+    # warning.
+    bash: BashConfig = field(default_factory=BashConfig)
+    # Skills subsystem config. Nested per Phase 18.1 R4; legacy flat
+    # names ``skills_autoload`` / ``skills_autoload_interval`` still
+    # resolve via ``Config.__getattr__`` with a deprecation warning.
+    skills: SkillsConfig = field(default_factory=SkillsConfig)
+    # [safety] subsystem config. Promoted from dict[str, Any] to a
+    # real dataclass in Phase 18.1 R4 stage 2. Until that promotion
+    # this dict's keys were advertised in code but never consulted
+    # (the SnapshotStore used its own hardcoded defaults); the
+    # dataclass is now actually wired through to SnapshotStore in
+    # agent/core.py + cli/snapshot.py.
+    safety: SafetyConfig = field(default_factory=SafetyConfig)
     # Hard cap on tool-call rounds per user turn. Stops runaway loops.
     max_turn_steps: int = 25
-    # Plugin configuration. ``plugins["enabled"]`` is a {plugin_name: bool}
-    # override map maintained by ``athena plugins enable|disable``. Per-plugin
-    # config slices live under ``plugins[<plugin_name>]``.
-    plugins: dict[str, Any] = field(default_factory=dict)
-    # Provider configuration (Phase 8). Sub-keys:
+    # Plugin enable map + per-plugin config slices. Promoted from
+    # dict[str, Any] to PluginsConfig in Phase 18.1 R4 stage 4b. The
+    # dataclass implements __getitem__ / get / __contains__ so existing
+    # dict-style readers keep working without modification.
+    plugins: PluginsConfig = field(default_factory=PluginsConfig)
+    # Parseltongue: context-aware inference param policy. Promoted
+    # from dict[str, Any] to a real dataclass in Phase 18.1 R4 stage
+    # 4. See athena/agent/param_policy.py for the policy classes.
+    parseltongue: ParseltongueConfig = field(default_factory=ParseltongueConfig)
+    # Provider configuration (Phase 8). Promoted from dict[str, Any] to
+    # ProvidersConfig in Phase 18.1 R4 stage 6. Sub-keys (now attributes
+    # / per_provider slices):
     #   providers.routing     {model_name: provider_name} explicit overrides
     #   providers.<name>.host base URL for ollama / openai_compat
     #   providers.<name>.fallback  ordered list of provider names to try
     #                              when the primary's credentials are exhausted
-    providers: dict[str, Any] = field(default_factory=dict)
+    # The dataclass implements get/__getitem__/__contains__ so existing
+    # ``(cfg.providers or {}).get(...)`` readers keep working unchanged.
+    providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     # Anthropic prompt caching (T2-01). Strategy "system_and_3" attaches
     # cache_control markers to the last system message + the last 3
     # non-system messages on Anthropic, OpenRouter, and Nous-Portal
@@ -288,7 +677,6 @@ class Config:
     proxy_default_provider: str = "anthropic"
     proxy_bind_host: str = "127.0.0.1"
     proxy_bind_port: int = 11434
-    proxy_require_auth: bool = False
     proxy_log_path: str = "~/.athena/proxy.jsonl"
     proxy_log_bodies: bool = False
     proxy_bodies_dir: str = "~/.athena/proxy_bodies"
@@ -496,45 +884,12 @@ class Config:
     #   "per_action"    confirm every input event (safest active mode)
     #   "per_session"   confirm input once per task; destructive STILL
     #                   confirms individually in every mode
-    computer_use_enabled: bool = False
-    computer_permission_mode: str = "observe_only"
-    computer_app_allowlist: list[str] = field(default_factory=list)
-    computer_app_denylist: list[str] = field(
-        default_factory=lambda: [
-            # Sensible defaults — denylist wins, so even when the
-            # user opts in to control they must explicitly REMOVE
-            # one of these to touch it.
-            "1password",
-            "bitwarden",
-            "lastpass",
-            "keychain",
-            "keepass",
-            "banking",
-            "wallet",
-            "ledger live",
-            "metamask",
-        ]
-    )
-    computer_kill_hotkey: str = "ctrl+alt+k"
-    computer_max_actions_per_task: int = 40
-    computer_max_actions_per_sec: float = 2.0
-    computer_backend: str = "auto"
-    computer_dry_run: bool = False
-    computer_audit_path: str | None = None  # default <profile_dir>/computer_audit.jsonl
-    # T6-04.4 follow-up: screenshots are written to disk
-    # (NOT inlined as base64 in the tool result — a 4K screen
-    # would be ~30 MB of base64 → ~10M tokens, way beyond
-    # local-model context windows). Default location is
-    # <profile_dir>/screenshots/<ts>-<sha8>.bmp.
-    computer_screenshots_dir: str | None = None
-    # T6-04R: refuse input + destructive when the autonomous
-    # /goal continuation loop is driving turns. The goal loop
-    # runs in FOREGROUND origin (not BACKGROUND_REVIEW), so
-    # approval_guard's background-deny alone wouldn't catch it;
-    # this is the computer-use-specific extra check. Default
-    # True — the autonomous loop never gets to drive the
-    # desktop unless the operator deliberately disables this.
-    computer_deny_during_goal_loop: bool = True
+    # Computer-use subsystem config (T6-04 + T6-04R). Promoted to a
+    # nested dataclass in Phase 18.1 R4 stage 3. The legacy flat
+    # ``computer_*`` names still resolve via Config.__getattr__ +
+    # __setattr__ shims for one release; new code should read
+    # ``cfg.computer.use_enabled`` etc.
+    computer: ComputerConfig = field(default_factory=ComputerConfig)
     # T6-05: native video generation. video_generate +
     # animate_image tools backed by the T5-05 media broker
     # (video_generation capability). Cost / latency guard
@@ -542,20 +897,12 @@ class Config:
     # configured thresholds — never silently spend. Outputs
     # land under video_output_dir + are hash-logged in
     # media_log.jsonl alongside.
-    video_generation_enabled: bool = False
-    video_backend_prefer: str = "local"
-    video_confirm_over_seconds: float = 60.0
-    video_confirm_over_cost: float = 1.0
-    video_output_dir: str | None = None  # default <profile_dir>/videos
-    video_poll_interval_s: float = 5.0
-    # Selected video-generation backend by name. When set, overrides
-    # the capability-broker resolution and pins exec to a specific
-    # registered backend (e.g. ``stub_video_local``, ``xai_video``,
-    # ``runway``, ``pika``). Switch interactively with ``/video set
-    # <name>`` — that mutates this field in the live cfg without
-    # touching the TOML on disk. Persist via /video persist if you
-    # want the choice to survive restart. None = let the broker pick.
-    video_backend: str | None = None
+    # Video generation broker config (T6-05). Phase 18.1 R4 stage 5
+    # promoted the seven ``video_generation_*`` / ``video_backend*`` /
+    # ``video_confirm_over_*`` / ``video_output_dir`` / ``video_poll_*``
+    # flat fields into VideoGenerationConfig. The legacy names still
+    # resolve through Config.__getattr__ + __setattr__.
+    video_generation: VideoGenerationConfig = field(default_factory=VideoGenerationConfig)
     # T6-06: auto kanban. Promotes the in-memory TaskCreate /
     # TaskUpdate / TaskList tracker to a persisted store + a
     # board view. Single backing store also receives goal-loop
@@ -611,13 +958,13 @@ class Config:
     # ffprobe drives the codec / encoder / GOP modes. Atoms parser
     # is pure Python — the most useful container-tampering signal
     # remains available even on a host without ffmpeg.
-    video_enabled: bool = True
-    video_ffmpeg_path: str = "ffmpeg"
-    video_ffprobe_path: str = "ffprobe"
-    video_frames_dir: str | None = None  # default <profile_dir>/video/frames
-    video_max_frames: int = 200
-    video_default_extract: str = "keyframes"  # keyframes | sampled | range
-    video_sampled_interval_s: float = 5.0
+    # Video analysis config (T4-04). Phase 18.1 R4 stage 5 promoted
+    # the seven ``video_enabled`` / ``video_ffmpeg_path`` /
+    # ``video_ffprobe_path`` / ``video_frames_dir`` / ``video_max_frames``
+    # / ``video_default_extract`` / ``video_sampled_interval_s`` flat
+    # fields into VideoAnalysisConfig. Legacy reads/writes resolve
+    # through Config.__getattr__ + __setattr__.
+    video_analysis: VideoAnalysisConfig = field(default_factory=VideoAnalysisConfig)
     # T4-03: persistent CDP browser tools (Playwright). One
     # browser context per athena session — cookies/storage
     # survive across tool calls within the session. Lazy
@@ -629,7 +976,7 @@ class Config:
     browser_engine: str = "chromium"
     browser_headless: bool = True
     browser_user_data_root: str | None = None  # default ~/.athena/browser
-    browser_capture_path: str | None = None    # default <profile_dir>/browser_capture.jsonl
+    browser_capture_path: str | None = None  # default <profile_dir>/browser_capture.jsonl
     browser_screenshots_dir: str | None = None  # default <profile_dir>/browser/shots
     browser_nav_timeout_s: float = 30.0
     browser_min_interval_s: float = 1.0
@@ -724,23 +1071,129 @@ class Config:
     # document_analyze for scanned PDF pages and callable from
     # T4-01 vision when "what does the text in this image say"
     # is the question (OCR reads; vision describes).
-    ocr_enabled: bool = True
-    ocr_backend_prefer: str = "local"
-    # Languages passed to tesseract: ISO 639-2/T codes, one or
-    # more (tesseract joins with '+'). "eng" is the default;
-    # "eng+fra" recognises both English and French in the same
-    # image. Each non-default language requires the matching
-    # tessdata file installed.
-    ocr_languages: list[str] = field(default_factory=lambda: ["eng"])
-    # Drop blocks below this OCR-engine-reported confidence
-    # (0-100). 0 keeps everything (default); 60+ is a good
-    # filter for "treat noisy recognitions as 'unreadable'".
-    ocr_min_confidence: int = 0
-    # Path override to the tesseract binary. None → use the
-    # system PATH lookup (default; works when tesseract is
-    # installed via scoop / brew / apt). Set explicitly when
-    # the binary isn't on PATH.
-    ocr_tesseract_cmd: str | None = None
+    # OCR subsystem (T4-06). Phase 18.1 R4 stage 5 promoted the five
+    # ``ocr_*`` flat fields into OcrConfig. Legacy reads/writes
+    # resolve through Config.__getattr__ + __setattr__.
+    ocr: OcrConfig = field(default_factory=OcrConfig)
+
+    def __post_init__(self) -> None:
+        """Coerce legacy dict-shape inputs into their promoted dataclass
+        forms.
+
+        Test fixtures and a long tail of historical call sites build
+        ``Config(providers={"routing": {...}, "<name>": {...}})`` --
+        i.e. they pass a plain dict where the dataclass-generated
+        ``__init__`` would otherwise store it verbatim, leaving the
+        runtime resolver (which now does attribute access) staring at
+        the wrong type. Convert on the spot so the field-type
+        annotation stays accurate.
+        """
+        if isinstance(self.providers, dict):
+            # Bypass __setattr__ so we don't trip the legacy-map shim
+            # on something that is plainly not a legacy flat name.
+            object.__setattr__(self, "providers", ProvidersConfig.from_dict(self.providers))
+
+    def __getattr__(self, name: str) -> Any:
+        """Resolve legacy flat field names to their new nested locations.
+
+        Phase 18.1 R4 promoted several subsystems' flat fields into
+        nested dataclasses (``cfg.bash_allowlist`` -> ``cfg.bash.allowlist``,
+        ``cfg.skills_autoload`` -> ``cfg.skills.autoload``, etc.). For one
+        release the legacy names keep working but emit a deprecation
+        warning so callers can update at their own pace.
+
+        Important: ``__getattr__`` is only called when normal attribute
+        lookup fails, so this never shadows the actual nested dataclass
+        attributes (``cfg.bash``, ``cfg.skills``) -- those resolve via the
+        dataclass-generated ``__init__`` normally and never reach here.
+        """
+        mapping = _LEGACY_FIELD_MAP.get(name)
+        if mapping is None:
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+        import warnings as _warnings
+
+        nested_name, sub_name = mapping
+        _warnings.warn(
+            f"Config.{name} is deprecated; read cfg.{nested_name}.{sub_name} "
+            "instead (Phase 18.1 R4 nested-config migration).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(getattr(self, nested_name), sub_name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Route legacy flat-name writes to their new nested locations.
+
+        Test fixtures commonly mutate Config via
+        ``cfg.computer_use_enabled = True`` etc. After the R4 promotion
+        those flat names no longer correspond to fields; without this
+        shim such writes would create *new* attributes on the Config
+        instance, shadowing the nested dataclass and silently breaking
+        canonical readers that go through ``cfg.computer.use_enabled``.
+
+        Unlike :meth:`__getattr__`, this DOESN'T warn -- once a caller
+        emits a deprecation warning on read, double-warning on every
+        corresponding write is noise. The plain read-side warning is
+        enough signal.
+        """
+        mapping = _LEGACY_FIELD_MAP.get(name)
+        if mapping is not None:
+            nested_name, sub_name = mapping
+            nested = self.__dict__.get(nested_name)
+            if nested is not None:
+                setattr(nested, sub_name, value)
+                return
+            # Nested instance not yet constructed (e.g. during the
+            # dataclass-generated __init__, before all fields are set).
+            # Fall through to the normal setattr so the bookkeeping
+            # works; the dataclass __init__ will populate the nested
+            # instance shortly.
+        super().__setattr__(name, value)
+
+
+# Map legacy flat-field name -> (nested_dataclass_field, attribute_on_nested).
+# Add new entries here as subsystems migrate. The Config.__getattr__ /
+# __setattr__ shims walk this table to translate legacy access at runtime.
+_LEGACY_FIELD_MAP: dict[str, tuple[str, str]] = {
+    "skills_autoload": ("skills", "autoload"),
+    "skills_autoload_interval": ("skills", "autoload_interval"),
+    "bash_allowlist": ("bash", "allowlist"),
+    "bash_extra_denylist": ("bash", "extra_denylist"),
+    "computer_use_enabled": ("computer", "use_enabled"),
+    "computer_permission_mode": ("computer", "permission_mode"),
+    "computer_app_allowlist": ("computer", "app_allowlist"),
+    "computer_app_denylist": ("computer", "app_denylist"),
+    "computer_kill_hotkey": ("computer", "kill_hotkey"),
+    "computer_max_actions_per_task": ("computer", "max_actions_per_task"),
+    "computer_max_actions_per_sec": ("computer", "max_actions_per_sec"),
+    "computer_backend": ("computer", "backend"),
+    "computer_dry_run": ("computer", "dry_run"),
+    "computer_audit_path": ("computer", "audit_path"),
+    "computer_screenshots_dir": ("computer", "screenshots_dir"),
+    "computer_deny_during_goal_loop": ("computer", "deny_during_goal_loop"),
+    # R4 stage 5 -- OCR
+    "ocr_enabled": ("ocr", "enabled"),
+    "ocr_backend_prefer": ("ocr", "backend_prefer"),
+    "ocr_languages": ("ocr", "languages"),
+    "ocr_min_confidence": ("ocr", "min_confidence"),
+    "ocr_tesseract_cmd": ("ocr", "tesseract_cmd"),
+    # R4 stage 5 -- Video generation broker
+    "video_generation_enabled": ("video_generation", "enabled"),
+    "video_backend_prefer": ("video_generation", "backend_prefer"),
+    "video_confirm_over_seconds": ("video_generation", "confirm_over_seconds"),
+    "video_confirm_over_cost": ("video_generation", "confirm_over_cost"),
+    "video_output_dir": ("video_generation", "output_dir"),
+    "video_poll_interval_s": ("video_generation", "poll_interval_s"),
+    "video_backend": ("video_generation", "backend"),
+    # R4 stage 5 -- Video analysis
+    "video_enabled": ("video_analysis", "enabled"),
+    "video_ffmpeg_path": ("video_analysis", "ffmpeg_path"),
+    "video_ffprobe_path": ("video_analysis", "ffprobe_path"),
+    "video_frames_dir": ("video_analysis", "frames_dir"),
+    "video_max_frames": ("video_analysis", "max_frames"),
+    "video_default_extract": ("video_analysis", "default_extract"),
+    "video_sampled_interval_s": ("video_analysis", "sampled_interval_s"),
+}
 
 
 def load_config() -> Config:
@@ -758,11 +1211,65 @@ def load_config() -> Config:
                 "rename to 'auto_approve_tools'.",
                 file=sys.stderr,
             )
+        # Phase 18.1 R4: legacy flat keys (skills_autoload, bash_allowlist,
+        # ...) are accepted with a one-line stderr note and folded into
+        # their new nested home. ``[skills]`` and ``[bash]`` tables take
+        # precedence when both shapes appear -- explicit new-shape wins.
+        for legacy_key, (nested_name, sub_name) in _LEGACY_FIELD_MAP.items():
+            if legacy_key not in data:
+                continue
+            nested_block = data.get(nested_name)
+            already_set_in_new_shape = isinstance(nested_block, dict) and sub_name in nested_block
+            if already_set_in_new_shape:
+                data.pop(legacy_key)
+                continue
+            data.setdefault(nested_name, {})[sub_name] = data.pop(legacy_key)
+            print(
+                f"warning: {CONFIG_PATH}: '{legacy_key}' is deprecated; "
+                f"move to [{nested_name}] table with key '{sub_name}'.",
+                file=sys.stderr,
+            )
+        # Phase 18.1 R4 stage 4b: PluginsConfig needs custom TOML
+        # translation. The block has two layers -- a fixed ``enabled``
+        # sub-table (plugin_name -> bool) plus arbitrary ``<name>``
+        # sub-tables (per-plugin config slice). Translate it explicitly
+        # here BEFORE the generic _assign_field loop so the loop's
+        # dataclass-merge logic doesn't try to setattr() arbitrary
+        # plugin names onto the PluginsConfig dataclass.
+        plugins_block = data.pop("plugins", None)
+        if isinstance(plugins_block, dict):
+            enabled_block = plugins_block.pop("enabled", None)
+            if isinstance(enabled_block, dict):
+                cfg.plugins.enabled.update({k: bool(v) for k, v in enabled_block.items()})
+            for plugin_name, plugin_cfg in plugins_block.items():
+                if isinstance(plugin_cfg, dict):
+                    cfg.plugins.per_plugin[plugin_name] = dict(plugin_cfg)
+        # Phase 18.1 R4 stage 6: ProvidersConfig translation -- same
+        # shape pattern as PluginsConfig. ``[providers.routing]`` is
+        # a fixed sub-table of {model: provider_name}; any other
+        # ``[providers.<name>]`` sub-table is a per-provider slice.
+        # Translate explicitly here BEFORE the generic _assign_field
+        # loop so it doesn't try to setattr() arbitrary provider names
+        # onto the ProvidersConfig dataclass.
+        providers_block = data.pop("providers", None)
+        if isinstance(providers_block, dict):
+            routing_block = providers_block.pop("routing", None)
+            if isinstance(routing_block, dict):
+                cfg.providers.routing.update(
+                    {
+                        k: v
+                        for k, v in routing_block.items()
+                        if isinstance(k, str) and isinstance(v, str)
+                    }
+                )
+            for provider_name, provider_cfg in providers_block.items():
+                if isinstance(provider_cfg, dict):
+                    cfg.providers.per_provider[provider_name] = dict(provider_cfg)
         for k, v in data.items():
             if hasattr(cfg, k):
                 _assign_field(cfg, k, v)
     # Merge plugin enable state from the machine-managed sidecar file.
-    cfg.plugins = _merge_plugin_state(cfg.plugins)
+    _merge_plugin_state(cfg.plugins)
     if env := os.environ.get("ATHENA_MODEL"):
         cfg.model = env
     if env := os.environ.get("OLLAMA_HOST"):
@@ -870,16 +1377,18 @@ def save_plugin_state(state: dict[str, Any]) -> None:
     )
 
 
-def _merge_plugin_state(plugins_cfg: dict[str, Any]) -> dict[str, Any]:
-    """Overlay plugins_state.json onto plugin config from config.toml."""
+def _merge_plugin_state(plugins_cfg: PluginsConfig) -> None:
+    """Overlay plugins_state.json onto the PluginsConfig in place.
+
+    R4 stage 4b: signature changed from ``dict -> dict`` to
+    ``PluginsConfig -> None`` (mutation). The sidecar file is
+    machine-managed by ``athena plugins {enable,disable}``; merging
+    it in place keeps every caller's reference to ``cfg.plugins``
+    valid without any swap-the-reference dance.
+    """
     state = load_plugin_state()
     if not state:
-        return plugins_cfg
-    merged = dict(plugins_cfg)
+        return
     state_enabled = state.get("enabled")
     if isinstance(state_enabled, dict):
-        existing_enabled = merged.get("enabled")
-        if not isinstance(existing_enabled, dict):
-            existing_enabled = {}
-        merged["enabled"] = {**existing_enabled, **state_enabled}
-    return merged
+        plugins_cfg.enabled.update({k: bool(v) for k, v in state_enabled.items()})

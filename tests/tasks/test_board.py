@@ -29,7 +29,6 @@ from athena.tasks.board import (
 from athena.tasks.model import TaskStore
 from athena.tools import task as task_mod
 
-
 # ---------------------------------------------------------------------------
 # project_board
 # ---------------------------------------------------------------------------
@@ -72,7 +71,9 @@ def test_board_projection_card_shape(tmp_path: Path):
     updated_at."""
     s = _make_store(tmp_path)
     t = s.create(
-        title="card", workspace="/ws", goal_id="g1",
+        title="card",
+        workspace="/ws",
+        goal_id="g1",
         note="some detail",
     )
     cols = project_board(s, workspace="/ws")
@@ -155,9 +156,7 @@ def _clean_task_store(monkeypatch, tmp_path: Path):
         profile="default",
     )
     monkeypatch.setattr("athena.config.load_config", lambda: cfg)
-    monkeypatch.setattr(
-        "athena.config.profile_dir", lambda profile: tmp_path / "profile"
-    )
+    monkeypatch.setattr("athena.config.profile_dir", lambda profile: tmp_path / "profile")
     task_mod._reset_for_tests()
 
     from athena.tools import file_ops

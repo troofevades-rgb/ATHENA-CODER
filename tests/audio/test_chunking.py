@@ -27,7 +27,6 @@ from athena.audio.tools import (
 )
 from tests.audio.conftest import StubAudioBackend, make_wav
 
-
 # ---------------------------------------------------------------
 # _chunk_boundaries
 # ---------------------------------------------------------------
@@ -78,7 +77,8 @@ def test_zero_overlap_chunks_are_contiguous():
 def test_stitch_passthrough_for_one_chunk():
     r = TranscribeResult(
         segments=[Segment(0.0, 1.0, "hello")],
-        language="en", duration=1.0,
+        language="en",
+        duration=1.0,
     )
     out = _stitch([r], chunk_windows=[(0.0, 1.0)], overlap_s=2.0)
     assert out is r  # short-circuit
@@ -108,16 +108,20 @@ def test_stitch_dedupes_seam_repeat():
     should be kept once. The dedupe rule: same text +
     timestamp inside the overlap region → drop the duplicate."""
     chunks = [
-        TranscribeResult(segments=[
-            Segment(25.0, 28.5, "preceding segment"),
-            Segment(28.5, 30.0, "in overlap region"),  # at chunk seam
-        ]),
-        TranscribeResult(segments=[
-            # Backend re-emits the overlap segment from this
-            # chunk's perspective — same text, similar timestamp.
-            Segment(28.5, 30.0, "in overlap region"),  # dup
-            Segment(30.0, 32.0, "after seam"),
-        ]),
+        TranscribeResult(
+            segments=[
+                Segment(25.0, 28.5, "preceding segment"),
+                Segment(28.5, 30.0, "in overlap region"),  # at chunk seam
+            ]
+        ),
+        TranscribeResult(
+            segments=[
+                # Backend re-emits the overlap segment from this
+                # chunk's perspective — same text, similar timestamp.
+                Segment(28.5, 30.0, "in overlap region"),  # dup
+                Segment(30.0, 32.0, "after seam"),
+            ]
+        ),
     ]
     windows = [(0.0, 30.0), (28.0, 58.0)]
     out = _stitch(chunks, chunk_windows=windows, overlap_s=2.0)
@@ -232,7 +236,9 @@ def test_progress_callback_fires_per_chunk(tmp_path: Path):
 
     progress_log: list[tuple[int, int]] = []
     transcribe_track(
-        wav, cfg=cfg, backend=backend,
+        wav,
+        cfg=cfg,
+        backend=backend,
         progress=lambda i, n: progress_log.append((i, n)),
     )
     # 4 chunks → progress fires (1,4), (2,4), (3,4), (4,4).
@@ -248,7 +254,9 @@ def test_progress_callback_for_single_chunk(tmp_path: Path):
 
     progress_log: list[tuple[int, int]] = []
     transcribe_track(
-        wav, cfg=cfg, backend=backend,
+        wav,
+        cfg=cfg,
+        backend=backend,
         progress=lambda i, n: progress_log.append((i, n)),
     )
     assert progress_log == [(1, 1)]

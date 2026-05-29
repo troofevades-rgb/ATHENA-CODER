@@ -33,6 +33,7 @@ def _safe_walk(root: Path) -> Iterator[Path]:
     broken symlinks). Per-entry failures are swallowed silently so one
     bad node doesn't tank the whole search.
     """
+
     # os.walk's onerror is called once per failing scandir — we want to
     # swallow them all, not propagate.
     def _skip(_err: OSError) -> None:
@@ -216,7 +217,8 @@ def Grep(
     elif glob:
         # Filter by the caller's glob (e.g. "*.py", "src/**/*.ts").
         files = [
-            p for p in _safe_walk(target)
+            p
+            for p in _safe_walk(target)
             if _match_glob_pattern(p.relative_to(target).as_posix(), glob)
         ]
     else:

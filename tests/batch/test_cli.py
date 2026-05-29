@@ -20,8 +20,12 @@ from athena.headless.result import RunResult
 
 
 def _build_run_result(
-    *, task: str, run_id: str, workspace: Any,
-    status: str = "ok", error: str | None = None,
+    *,
+    task: str,
+    run_id: str,
+    workspace: Any,
+    status: str = "ok",
+    error: str | None = None,
 ):
     return RunResult(
         run_id=run_id,
@@ -35,8 +39,7 @@ def _build_run_result(
         profile="default",
         session_id="s-stub-1",
         tool_calls=[],
-        tokens={"prompt": 0, "completion": 0,
-                "cache_read": 0, "cache_creation": 0},
+        tokens={"prompt": 0, "completion": 0, "cache_read": 0, "cache_creation": 0},
         cost_est=0.0,
         assistant_text=f"answer for: {task}",
         error=error,
@@ -51,11 +54,21 @@ def stub_runner(monkeypatch, tmp_path: Path):
     import athena.headless as headless_pkg
     import athena.headless.runner as runner_mod
 
-    def _stub(task, *, cfg, workspace, model=None, run_id=None,
-              timeout_s=None, on_info=None, agent=None,
-              _agent_factory=None):
+    def _stub(
+        task,
+        *,
+        cfg,
+        workspace,
+        model=None,
+        run_id=None,
+        timeout_s=None,
+        on_info=None,
+        agent=None,
+        _agent_factory=None,
+    ):
         return _build_run_result(
-            task=task, run_id=run_id or "r-auto",
+            task=task,
+            run_id=run_id or "r-auto",
             workspace=workspace,
         )
 
@@ -63,11 +76,13 @@ def stub_runner(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(headless_pkg, "run_headless", _stub)
     # Also patch the CLI's direct import of run_headless
     import athena.cli.batch as batch_cli
+
     monkeypatch.setattr(batch_cli, "_run_one", _wrap_run_one(_stub, batch_cli))
 
     # Make config + profile_dir predictable.
     monkeypatch.setattr(
-        batch_cli, "profile_dir",
+        batch_cli,
+        "profile_dir",
         lambda profile="default": tmp_path,
     )
     return _stub
@@ -77,24 +92,26 @@ def _wrap_run_one(stub, batch_cli):
     """The CLI's _run_one imports run_headless internally; we
     wrap it to use our stub so the batch CLI path doesn't
     accidentally hit the real one."""
-    from athena.batch.runner import _safe_filename
     from athena.batch.manifest import ManifestEntry
+    from athena.batch.runner import _safe_filename
 
     def _run_one(*, entry, cfg, workspace_default, output_dir, force):
         envelope_path = output_dir / f"{_safe_filename(entry.run_id)}.json"
         if envelope_path.exists() and not force:
             existing = json.loads(envelope_path.read_text())
             return ManifestEntry.from_run_result(
-                envelope=existing, envelope_path=envelope_path,
+                envelope=existing,
+                envelope_path=envelope_path,
             ), existing
         from pathlib import Path as _P
-        workspace = (
-            _P(entry.cwd).expanduser().resolve()
-            if entry.cwd else workspace_default
-        )
+
+        workspace = _P(entry.cwd).expanduser().resolve() if entry.cwd else workspace_default
         result = stub(
-            entry.task, cfg=cfg, workspace=workspace,
-            model=entry.model, run_id=entry.run_id,
+            entry.task,
+            cfg=cfg,
+            workspace=workspace,
+            model=entry.model,
+            run_id=entry.run_id,
             timeout_s=entry.timeout_s,
         )
         envelope = result.to_dict()
@@ -103,7 +120,8 @@ def _wrap_run_one(stub, batch_cli):
             encoding="utf-8",
         )
         return ManifestEntry.from_run_result(
-            envelope=envelope, envelope_path=envelope_path,
+            envelope=envelope,
+            envelope_path=envelope_path,
         ), envelope
 
     return _run_one
@@ -113,6 +131,7 @@ def _run_cli(argv: list[str], capsys) -> tuple[int, str, str]:
     """Call the batch CLI's main(argv) directly. Capture
     stdout + stderr."""
     from athena.cli.batch import main
+
     exit_code = main(argv)
     captured = capsys.readouterr()
     return exit_code, captured.out, captured.err
@@ -161,10 +180,13 @@ def test_empty_tasks_file_exits_0(stub_runner, capsys, tmp_path: Path):
 
 def test_serial_run_writes_envelopes_and_manifest(stub_runner, capsys, tmp_path: Path):
     out_dir = tmp_path / "out"
-    tasks_file = _write_tasks(tmp_path, [
-        {"task": "first", "run_id": "r-001"},
-        {"task": "second", "run_id": "r-002"},
-    ])
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "first", "run_id": "r-001"},
+            {"task": "second", "run_id": "r-002"},
+        ],
+    )
     code, _stdout, _stderr = _run_cli(
         [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--quiet"],
         capsys,
@@ -204,8 +226,7 @@ def test_json_mode_writes_manifest_to_stdout(stub_runner, capsys, tmp_path: Path
     out_dir = tmp_path / "out"
     tasks_file = _write_tasks(tmp_path, [{"task": "x", "run_id": "r-001"}])
     code, out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--json", "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--json", "--quiet"],
         capsys,
     )
     assert code == 0
@@ -226,18 +247,26 @@ def test_resume_skips_existing(stub_runner, capsys, tmp_path: Path):
     out_dir = tmp_path / "out"
     out_dir.mkdir()
     (out_dir / "r-existing.json").write_text(
-        json.dumps({
-            "run_id": "r-existing", "status": "ok", "exit_code": 0,
-            "duration_s": 0.0, "task": "old-task", "error": None,
-        }),
+        json.dumps(
+            {
+                "run_id": "r-existing",
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 0.0,
+                "task": "old-task",
+                "error": None,
+            }
+        ),
         encoding="utf-8",
     )
-    tasks_file = _write_tasks(tmp_path, [
-        {"task": "new-task", "run_id": "r-existing"},
-    ])
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "new-task", "run_id": "r-existing"},
+        ],
+    )
     code, _out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--quiet"],
         capsys,
     )
     assert code == 0
@@ -250,18 +279,26 @@ def test_force_reruns_existing(stub_runner, capsys, tmp_path: Path):
     out_dir = tmp_path / "out"
     out_dir.mkdir()
     (out_dir / "r-existing.json").write_text(
-        json.dumps({
-            "run_id": "r-existing", "status": "ok", "exit_code": 0,
-            "duration_s": 0.0, "task": "old-task", "error": None,
-        }),
+        json.dumps(
+            {
+                "run_id": "r-existing",
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 0.0,
+                "task": "old-task",
+                "error": None,
+            }
+        ),
         encoding="utf-8",
     )
-    tasks_file = _write_tasks(tmp_path, [
-        {"task": "new-task", "run_id": "r-existing"},
-    ])
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "new-task", "run_id": "r-existing"},
+        ],
+    )
     code, _out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--force", "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--force", "--quiet"],
         capsys,
     )
     assert code == 0
@@ -276,7 +313,9 @@ def test_force_reruns_existing(stub_runner, capsys, tmp_path: Path):
 
 
 def test_exit_1_when_any_entry_failed(
-    monkeypatch, capsys, tmp_path: Path,
+    monkeypatch,
+    capsys,
+    tmp_path: Path,
 ):
     """An entry that returns status=error → batch exit code 1
     (so a CI runner gates on it)."""
@@ -284,13 +323,24 @@ def test_exit_1_when_any_entry_failed(
     import athena.headless as headless_pkg
     import athena.headless.runner as runner_mod
 
-    def _failing_stub(task, *, cfg, workspace, model=None, run_id=None,
-                      timeout_s=None, on_info=None, agent=None,
-                      _agent_factory=None):
+    def _failing_stub(
+        task,
+        *,
+        cfg,
+        workspace,
+        model=None,
+        run_id=None,
+        timeout_s=None,
+        on_info=None,
+        agent=None,
+        _agent_factory=None,
+    ):
         return _build_run_result(
-            task=task, run_id=run_id or "r-auto",
+            task=task,
+            run_id=run_id or "r-auto",
             workspace=workspace,
-            status="error", error="boom",
+            status="error",
+            error="boom",
         )
 
     # Patch BOTH locations: runner_mod (the function), and the
@@ -298,16 +348,13 @@ def test_exit_1_when_any_entry_failed(
     # `from ..headless import run_headless`.
     monkeypatch.setattr(runner_mod, "run_headless", _failing_stub)
     monkeypatch.setattr(headless_pkg, "run_headless", _failing_stub)
-    monkeypatch.setattr(batch_cli, "_run_one",
-                        _wrap_run_one(_failing_stub, batch_cli))
-    monkeypatch.setattr(batch_cli, "profile_dir",
-                        lambda profile="default": tmp_path)
+    monkeypatch.setattr(batch_cli, "_run_one", _wrap_run_one(_failing_stub, batch_cli))
+    monkeypatch.setattr(batch_cli, "profile_dir", lambda profile="default": tmp_path)
 
     out_dir = tmp_path / "out"
     tasks_file = _write_tasks(tmp_path, [{"task": "x", "run_id": "r-001"}])
     code, _out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--quiet"],
         capsys,
     )
     assert code == 1
@@ -320,19 +367,27 @@ def test_exit_0_when_all_skipped(stub_runner, capsys, tmp_path: Path):
     out_dir.mkdir()
     for rid in ("r-001", "r-002"):
         (out_dir / f"{rid}.json").write_text(
-            json.dumps({
-                "run_id": rid, "status": "ok", "exit_code": 0,
-                "duration_s": 0.0, "task": "done", "error": None,
-            }),
+            json.dumps(
+                {
+                    "run_id": rid,
+                    "status": "ok",
+                    "exit_code": 0,
+                    "duration_s": 0.0,
+                    "task": "done",
+                    "error": None,
+                }
+            ),
             encoding="utf-8",
         )
-    tasks_file = _write_tasks(tmp_path, [
-        {"task": "x", "run_id": "r-001"},
-        {"task": "y", "run_id": "r-002"},
-    ])
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "x", "run_id": "r-001"},
+            {"task": "y", "run_id": "r-002"},
+        ],
+    )
     code, _out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--quiet"],
         capsys,
     )
     assert code == 0
@@ -344,7 +399,9 @@ def test_exit_0_when_all_skipped(stub_runner, capsys, tmp_path: Path):
 
 
 def test_parallel_runs_complete_in_input_order(
-    stub_runner, capsys, tmp_path: Path,
+    stub_runner,
+    capsys,
+    tmp_path: Path,
 ):
     """With --parallel 4 over 10 entries, the manifest's
     entries list still reflects the input JSONL line ordering
@@ -354,8 +411,7 @@ def test_parallel_runs_complete_in_input_order(
     entries = [{"task": f"task-{i}", "run_id": f"r-{i:03d}"} for i in range(10)]
     tasks_file = _write_tasks(tmp_path, entries)
     code, _out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--parallel", "4", "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--parallel", "4", "--quiet"],
         capsys,
     )
     assert code == 0
@@ -370,8 +426,7 @@ def test_parallel_writes_all_envelopes(stub_runner, capsys, tmp_path: Path):
     entries = [{"task": f"t{i}", "run_id": f"r-{i:03d}"} for i in range(5)]
     tasks_file = _write_tasks(tmp_path, entries)
     code, _out, _err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--parallel", "2", "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--parallel", "2", "--quiet"],
         capsys,
     )
     assert code == 0
@@ -385,16 +440,20 @@ def test_parallel_writes_all_envelopes(stub_runner, capsys, tmp_path: Path):
 
 
 def test_progress_lines_emitted_to_stderr_by_default(
-    stub_runner, capsys, tmp_path: Path,
+    stub_runner,
+    capsys,
+    tmp_path: Path,
 ):
     out_dir = tmp_path / "out"
-    tasks_file = _write_tasks(tmp_path, [
-        {"task": "t1", "run_id": "r-001"},
-        {"task": "t2", "run_id": "r-002"},
-    ])
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "t1", "run_id": "r-001"},
+            {"task": "t2", "run_id": "r-002"},
+        ],
+    )
     code, out, err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path)],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path)],
         capsys,
     )
     assert code == 0
@@ -410,12 +469,14 @@ def test_progress_lines_emitted_to_stderr_by_default(
 
 def test_quiet_suppresses_progress(stub_runner, capsys, tmp_path: Path):
     out_dir = tmp_path / "out"
-    tasks_file = _write_tasks(tmp_path, [
-        {"task": "t1", "run_id": "r-001"},
-    ])
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "t1", "run_id": "r-001"},
+        ],
+    )
     code, _out, err = _run_cli(
-        [str(tasks_file), "-o", str(out_dir),
-         "-C", str(tmp_path), "--quiet"],
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--quiet"],
         capsys,
     )
     assert code == 0

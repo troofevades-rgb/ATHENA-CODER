@@ -137,7 +137,10 @@ _SUBCOMMANDS = {
 
 
 def _json_invalid_envelope(
-    error: str, args: Any, cfg: Any, workspace: Path,
+    error: str,
+    args: Any,
+    cfg: Any,
+    workspace: Path,
 ) -> str:
     """Build a status='invalid' RunResult JSON for the early
     validation paths in main() (before run_headless is called).
@@ -145,26 +148,25 @@ def _json_invalid_envelope(
     parsing --json output always gets a valid envelope, even
     on failures upstream of the runner.
     """
-    from .headless.result import RunResult, mint_run_id
     import datetime
-    now = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
-    rid = (getattr(args, "run_id", None) or mint_run_id())
+
+    from .headless.result import RunResult, mint_run_id
+
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    rid = getattr(args, "run_id", None) or mint_run_id()
     return RunResult(
         run_id=rid,
         status="invalid",
-        started_at=now, finished_at=now, duration_s=0.0,
-        task=(getattr(args, "prompt", None) or "") or (
-            getattr(args, "task", None) or ""
-        ),
+        started_at=now,
+        finished_at=now,
+        duration_s=0.0,
+        task=(getattr(args, "prompt", None) or "") or (getattr(args, "task", None) or ""),
         workspace=str(workspace),
         model=getattr(args, "model", None) or getattr(cfg, "model", "") or "",
         profile=getattr(cfg, "profile", "") or "default",
         session_id=None,
         tool_calls=[],
-        tokens={"prompt": 0, "completion": 0,
-                "cache_read": 0, "cache_creation": 0},
+        tokens={"prompt": 0, "completion": 0, "cache_read": 0, "cache_creation": 0},
         cost_est=0.0,
         assistant_text="",
         error=error,
@@ -179,11 +181,23 @@ def main() -> int:
         from .profiles.migration import maybe_run_migration
 
         maybe_run_migration()
-    except Exception:
+    except Exception as e:  # noqa: BLE001
         # A migration failure must never block startup; the user's
         # legacy items stay in place and the rest of the app still
-        # runs. Logged in migration.py.
-        pass
+        # runs. The prior implementation swallowed the exception with
+        # an inaccurate "logged in migration.py" comment -- only
+        # per-item shutil.move failures actually log inside
+        # run_migration; an ImportError on the migration module
+        # itself, an ensure_profile failure, or anything in
+        # migration_needed flowed through pass with zero indication.
+        # Surface a one-liner so the operator at least knows the
+        # migration didn't complete and can re-run manually.
+        import sys as _sys
+
+        _sys.stderr.write(
+            f"warning: legacy-profile migration skipped ({type(e).__name__}: {e}). "
+            "Run `athena profiles migrate` to retry.\n"
+        )
 
     # Subcommands short-circuit the interactive parser. argv[1] is the verb.
     if len(sys.argv) >= 2 and sys.argv[1] in _SUBCOMMANDS:
@@ -367,7 +381,9 @@ def main() -> int:
         # UI callback for progress chatter. In JSON mode it goes
         # to stderr so stdout remains parser-friendly.
         if args.json:
-            on_info = lambda m: print(m, file=sys.stderr)
+
+            def on_info(m):
+                return print(m, file=sys.stderr)
         else:
             on_info = ui.info
 
@@ -440,17 +456,14 @@ def _run_interactive_repl(agent: Agent, cfg: Any, workspace: Path) -> int:
             tool_counts = getattr(stats, "tool_call_counts", None) if stats else None
             tool_summary: str | None = None
             if tool_counts:
-                top = sorted(
-                    tool_counts.items(), key=lambda kv: -kv[1]
-                )[:3]
-                tool_summary = " / ".join(
-                    f"{name} {n}" for name, n in top if n > 0
-                )
+                top = sorted(tool_counts.items(), key=lambda kv: -kv[1])[:3]
+                tool_summary = " / ".join(f"{name} {n}" for name, n in top if n > 0)
             # Plan mode is global agent state; read it fresh each
             # push so a tool-driven Enter/ExitPlanMode immediately
             # shows up in the TUI.
             try:
                 from .tools import plan as _plan
+
                 in_plan = _plan.is_plan_mode()
             except Exception:  # noqa: BLE001
                 in_plan = False
@@ -474,6 +487,7 @@ def _run_interactive_repl(agent: Agent, cfg: Any, workspace: Path) -> int:
     # the next natural _push_status between turns).
     try:
         from .tools import plan as _plan_mod
+
         _plan_mod.register_plan_mode_listener(lambda _: _push_status())
     except Exception:  # noqa: BLE001 — registration is best-effort
         pass
@@ -483,9 +497,7 @@ def _run_interactive_repl(agent: Agent, cfg: Any, workspace: Path) -> int:
         gateway.start()
     except FileNotFoundError as e:
         sys.stderr.write(f"athena: {e}\n")
-        sys.stderr.write(
-            "  Build the bundle with: cd ui-tui && bun run build\n"
-        )
+        sys.stderr.write("  Build the bundle with: cd ui-tui && bun run build\n")
         return 2
     except RuntimeError as e:
         sys.stderr.write(f"athena: TUI did not start — {e}\n")
@@ -493,9 +505,7 @@ def _run_interactive_repl(agent: Agent, cfg: Any, workspace: Path) -> int:
 
     ui.set_gateway(gateway)
     try:
-        gateway.send_event(
-            build_banner(model=agent.model, cwd=workspace, cfg=cfg)
-        )
+        gateway.send_event(build_banner(model=agent.model, cwd=workspace, cfg=cfg))
         _push_status()
         while True:
             cmd = gateway.recv_command()
@@ -539,9 +549,7 @@ def _run_interactive_repl(agent: Agent, cfg: Any, workspace: Path) -> int:
             # commands don't echo since their handlers emit
             # their own user-visible output.
             if not line.startswith("/"):
-                gateway.send_event(
-                    MessageAppendEvent(role="user", content=line)
-                )
+                gateway.send_event(MessageAppendEvent(role="user", content=line))
             if line.startswith("/"):
                 # Slash commands print user-facing output via
                 # ``console.print``. The bridge only routes

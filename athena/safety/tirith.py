@@ -112,7 +112,8 @@ def check_command_security(
 
     if not getattr(cfg, "tirith_enabled", True):
         return Verdict(
-            action="allow", findings=[],
+            action="allow",
+            findings=[],
             summary="tirith disabled by config",
             available=False,
         )
@@ -124,8 +125,7 @@ def check_command_security(
             findings=[],
             summary=(
                 "tirith not installed on this host "
-                f"(platform={platform.system()}); "
-                + ("fail-open" if fail_open else "fail-closed")
+                f"(platform={platform.system()}); " + ("fail-open" if fail_open else "fail-closed")
             ),
             available=False,
         )
@@ -133,32 +133,38 @@ def check_command_security(
     binary = _resolve_binary(cfg)
     if binary is None:  # mypy-style narrow; checked above too
         return Verdict(
-            action="allow", findings=[],
+            action="allow",
+            findings=[],
             summary="tirith binary not found",
             available=False,
         )
 
-    to_s = (
-        timeout_s if timeout_s is not None
-        else float(getattr(cfg, "tirith_timeout_s", 5.0))
-    )
+    to_s = timeout_s if timeout_s is not None else float(getattr(cfg, "tirith_timeout_s", 5.0))
     sh = shell or getattr(cfg, "tirith_shell", "posix")
 
     try:
         proc = subprocess.run(
             [
-                str(binary), "check",
-                "--json", "--non-interactive",
-                "--shell", str(sh),
-                "--", str(command),
+                str(binary),
+                "check",
+                "--json",
+                "--non-interactive",
+                "--shell",
+                str(sh),
+                "--",
+                str(command),
             ],
-            capture_output=True, text=True, timeout=to_s,
+            capture_output=True,
+            text=True,
+            timeout=to_s,
         )
     except subprocess.TimeoutExpired:
         fail_open = bool(getattr(cfg, "tirith_fail_open", True))
         logger.warning(
             "tirith timed out after %.1fs on command (len=%d); %s",
-            to_s, len(command), "allowing" if fail_open else "blocking",
+            to_s,
+            len(command),
+            "allowing" if fail_open else "blocking",
         )
         return Verdict(
             action="allow" if fail_open else "block",
@@ -169,7 +175,8 @@ def check_command_security(
     except (OSError, FileNotFoundError) as e:
         logger.warning("tirith spawn failed: %s", e)
         return Verdict(
-            action="allow", findings=[],
+            action="allow",
+            findings=[],
             summary=f"tirith spawn failed: {e}",
             available=False,
         )
@@ -230,9 +237,7 @@ def _verdict_from_proc(
             if isinstance(data, dict):
                 f = data.get("findings")
                 if isinstance(f, list):
-                    findings = [
-                        x for x in f if isinstance(x, dict)
-                    ]
+                    findings = [x for x in f if isinstance(x, dict)]
                 s = data.get("summary")
                 if isinstance(s, str) and s.strip():
                     summary = s.strip()
@@ -253,4 +258,5 @@ def _load_cfg():
     """Module-level cfg load for the no-arg public-API form.
     Tests override by passing cfg= directly."""
     from ..config import load_config
+
     return load_config()

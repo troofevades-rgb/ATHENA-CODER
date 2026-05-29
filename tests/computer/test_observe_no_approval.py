@@ -39,7 +39,6 @@ from athena.safety.approval_callback import (
 )
 from athena.safety.approval_guard import current_grants
 
-
 # ----- stub backend -----
 
 
@@ -70,14 +69,39 @@ class _StubBackend:
 
 
 def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
-    base = dict(
-        computer_use_enabled=True,
-        computer_audit_path=str(tmp_path / "audit.jsonl"),
-        computer_screenshots_dir=str(tmp_path / "shots"),
-        profile="default",
+    """Stub Config shaped for post-R4 nested ``cfg.computer.*`` reads."""
+    legacy_to_nested = {
+        "computer_use_enabled": "use_enabled",
+        "computer_audit_path": "audit_path",
+        "computer_screenshots_dir": "screenshots_dir",
+        "computer_permission_mode": "permission_mode",
+    }
+    computer_defaults = dict(
+        use_enabled=True,
+        permission_mode="observe_only",
+        app_allowlist=[],
+        app_denylist=[],
+        kill_hotkey="ctrl+alt+k",
+        max_actions_per_task=40,
+        max_actions_per_sec=2.0,
+        backend="auto",
+        dry_run=False,
+        audit_path=str(tmp_path / "audit.jsonl"),
+        screenshots_dir=str(tmp_path / "shots"),
+        deny_during_goal_loop=True,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top_defaults: dict = {"profile": "default"}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            computer_defaults[legacy_to_nested[k]] = v
+        elif k in computer_defaults:
+            computer_defaults[k] = v
+        else:
+            top_defaults[k] = v
+    return SimpleNamespace(
+        computer=SimpleNamespace(**computer_defaults),
+        **top_defaults,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -85,9 +109,7 @@ def _stub_backend(monkeypatch, tmp_path):
     """Plug the stub backend in for the duration of every test
     so the OS is never touched."""
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
     yield
 
 
@@ -124,6 +146,7 @@ def test_observe_succeeds_in_curator_origin(monkeypatch):
     # is intentionally optional — we're testing the gate, not
     # the vision routing here.
     import athena.media.registry as media_reg
+
     monkeypatch.setattr(media_reg, "_REGISTRY", {})
 
     token = set_current_write_origin(CURATOR)
@@ -154,7 +177,8 @@ def test_observe_disabled_short_circuits_without_approval(monkeypatch, tmp_path)
     consulted. Pinned by setting AUTO_DENY and asserting the
     callback was never invoked."""
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, computer_use_enabled=False),
     )
 
