@@ -148,8 +148,10 @@ def _detect_truecolor() -> bool:
         return True
     # Assume yes on the common terminals we already detected
     if (
-        _detect_kitty() or _detect_iterm2()
-        or _env("WT_SESSION") or _env("TERM_PROGRAM") == "WezTerm"
+        _detect_kitty()
+        or _detect_iterm2()
+        or _env("WT_SESSION")
+        or _env("TERM_PROGRAM") == "WezTerm"
     ):
         return True
     return False

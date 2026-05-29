@@ -176,9 +176,7 @@ def test_user_timeline_returns_normalised_posts(tmp_path):
                     "public_metrics": {"like_count": 25, "retweet_count": 5},
                 },
             ],
-            "includes": {
-                "users": [{"id": "12345", "username": "testuser"}]
-            },
+            "includes": {"users": [{"id": "12345", "username": "testuser"}]},
         }
 
     sp = SocialProvider(cfg=cfg, oauth=_OAuthForbidden(), transport=_transport)
@@ -245,7 +243,12 @@ def test_user_timeline_respects_max_results(tmp_path):
     def _transport(url: str, access_token: str) -> dict:
         return {
             "data": [
-                {"id": str(i), "text": f"post {i}", "author_id": "1", "created_at": "2026-01-01T00:00:00Z"}
+                {
+                    "id": str(i),
+                    "text": f"post {i}",
+                    "author_id": "1",
+                    "created_at": "2026-01-01T00:00:00Z",
+                }
                 for i in range(20)
             ],
             "includes": {"users": [{"id": "1", "username": "u"}]},
@@ -340,7 +343,12 @@ def test_user_timeline_stops_when_total_reached(tmp_path):
         call_count += 1
         return {
             "data": [
-                {"id": str(i), "text": f"p{i}", "author_id": "1", "created_at": "2026-01-01T00:00:00Z"}
+                {
+                    "id": str(i),
+                    "text": f"p{i}",
+                    "author_id": "1",
+                    "created_at": "2026-01-01T00:00:00Z",
+                }
                 for i in range(3)
             ],
             "includes": {"users": [{"id": "1", "username": "u"}]},
@@ -423,7 +431,12 @@ def test_lookup_x_user_with_pagination(tmp_path, monkeypatch):
         has_more = page_calls < 2
         return {
             "data": [
-                {"id": f"{page_calls}0", "text": f"page {page_calls}", "author_id": "42", "created_at": "2026-01-01T00:00:00Z"}
+                {
+                    "id": f"{page_calls}0",
+                    "text": f"page {page_calls}",
+                    "author_id": "42",
+                    "created_at": "2026-01-01T00:00:00Z",
+                }
             ],
             "includes": {"users": [{"id": "42", "username": "u"}]},
             "meta": {"next_token": "next"} if has_more else {},
@@ -451,7 +464,9 @@ def test_lookup_x_user_surfaces_next_token(tmp_path, monkeypatch):
         if "by/username" in url:
             return {"data": {"id": "1", "username": "u"}}
         return {
-            "data": [{"id": "1", "text": "p", "author_id": "1", "created_at": "2026-01-01T00:00:00Z"}],
+            "data": [
+                {"id": "1", "text": "p", "author_id": "1", "created_at": "2026-01-01T00:00:00Z"}
+            ],
             "includes": {"users": [{"id": "1", "username": "u"}]},
             "meta": {"next_token": "resume-here"},
         }

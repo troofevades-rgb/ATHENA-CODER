@@ -96,6 +96,7 @@ def _normalize_vision_messages(
         out.append(new_msg)
     return out
 
+
 # Substring patterns for known vision-capable Ollama model tags.
 # Matching is case-insensitive; users typically pull the tag
 # (``llava:13b`` etc.).

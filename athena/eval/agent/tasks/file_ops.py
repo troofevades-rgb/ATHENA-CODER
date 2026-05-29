@@ -49,8 +49,7 @@ def _verify_create_hello(ctx: VerifyContext) -> bool:
 _create_hello = EvalTask(
     id="file_ops.create_hello",
     prompt=(
-        "Create a file named hello.txt in the current workspace "
-        "containing exactly: Hello, athena"
+        "Create a file named hello.txt in the current workspace containing exactly: Hello, athena"
     ),
     setup_fn=_setup_empty,
     verify_fn=_verify_create_hello,
@@ -79,10 +78,7 @@ def _verify_rename(ctx: VerifyContext) -> bool:
 
 _rename_file = EvalTask(
     id="file_ops.rename_file",
-    prompt=(
-        "Rename old_name.txt to new_name.txt in the current workspace. "
-        "Preserve its contents."
-    ),
+    prompt=("Rename old_name.txt to new_name.txt in the current workspace. Preserve its contents."),
     setup_fn=_setup_for_rename,
     verify_fn=_verify_rename,
     bucket=_BUCKET,
@@ -123,9 +119,7 @@ _append_line = EvalTask(
 
 
 def _setup_for_replace(ws: Path) -> None:
-    (ws / "greeting.py").write_text(
-        'def greet():\n    return "hello world"\n', encoding="utf-8"
-    )
+    (ws / "greeting.py").write_text('def greet():\n    return "hello world"\n', encoding="utf-8")
 
 
 def _verify_replace(ctx: VerifyContext) -> bool:
@@ -136,8 +130,8 @@ def _verify_replace(ctx: VerifyContext) -> bool:
 _replace_string = EvalTask(
     id="file_ops.replace_string",
     prompt=(
-        "In greeting.py, change the string \"hello world\" to "
-        "\"hello athena\". Don't change anything else in the file."
+        'In greeting.py, change the string "hello world" to '
+        '"hello athena". Don\'t change anything else in the file.'
     ),
     setup_fn=_setup_for_replace,
     verify_fn=_verify_replace,
@@ -158,18 +152,12 @@ def _setup_for_delete(ws: Path) -> None:
 
 def _verify_delete(ctx: VerifyContext) -> bool:
     ws = ctx.workspace
-    return (
-        not (ws / "trash.txt").exists()
-        and (ws / "keep.txt").exists()
-    )
+    return not (ws / "trash.txt").exists() and (ws / "keep.txt").exists()
 
 
 _delete_file = EvalTask(
     id="file_ops.delete_file",
-    prompt=(
-        "Delete trash.txt from the current workspace. Do not touch "
-        "keep.txt."
-    ),
+    prompt=("Delete trash.txt from the current workspace. Do not touch keep.txt."),
     setup_fn=_setup_for_delete,
     verify_fn=_verify_delete,
     bucket=_BUCKET,
@@ -207,12 +195,8 @@ _create_nested = EvalTask(
 
 
 def _setup_for_find_and_modify(ws: Path) -> None:
-    (ws / "math_a.py").write_text(
-        "def add(a, b):\n    return a + b\n", encoding="utf-8"
-    )
-    (ws / "math_b.py").write_text(
-        "def multiply(a, b):\n    return a * b\n", encoding="utf-8"
-    )
+    (ws / "math_a.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    (ws / "math_b.py").write_text("def multiply(a, b):\n    return a * b\n", encoding="utf-8")
 
 
 def _verify_find_and_modify(ctx: VerifyContext) -> bool:
@@ -220,9 +204,7 @@ def _verify_find_and_modify(ctx: VerifyContext) -> bool:
     b = _read(ctx.workspace / "math_b.py")
     # add() must now have a docstring; multiply() must NOT be modified.
     add_has_doc = '"""' in a and "def add" in a
-    multiply_unchanged = (
-        "def multiply" in b and '"""' not in b
-    )
+    multiply_unchanged = "def multiply" in b and '"""' not in b
     return add_has_doc and multiply_unchanged
 
 
@@ -278,9 +260,7 @@ _move_file = EvalTask(
 
 
 def _setup_for_import(ws: Path) -> None:
-    (ws / "script.py").write_text(
-        "def now_ts():\n    return time.time()\n", encoding="utf-8"
-    )
+    (ws / "script.py").write_text("def now_ts():\n    return time.time()\n", encoding="utf-8")
 
 
 def _verify_import(ctx: VerifyContext) -> bool:
@@ -365,13 +345,12 @@ _add_trailing_newline = EvalTask(
 
 
 def _setup_for_json_value(ws: Path) -> None:
-    (ws / "config.json").write_text(
-        '{\n  "name": "old",\n  "version": 1\n}\n', encoding="utf-8"
-    )
+    (ws / "config.json").write_text('{\n  "name": "old",\n  "version": 1\n}\n', encoding="utf-8")
 
 
 def _verify_json_value(ctx: VerifyContext) -> bool:
     import json as _json
+
     try:
         data = _json.loads(_read(ctx.workspace / "config.json"))
     except _json.JSONDecodeError:
@@ -400,9 +379,7 @@ _update_json_value = EvalTask(
 
 def _setup_for_comment_out(ws: Path) -> None:
     (ws / "buggy.py").write_text(
-        "x = 1\n"
-        "print('debug:', x)\n"
-        "y = x * 2\n",
+        "x = 1\nprint('debug:', x)\ny = x * 2\n",
         encoding="utf-8",
     )
 
@@ -410,9 +387,7 @@ def _setup_for_comment_out(ws: Path) -> None:
 def _verify_comment_out(ctx: VerifyContext) -> bool:
     lines = _read(ctx.workspace / "buggy.py").splitlines()
     # The print line should be commented out (starts with #).
-    has_commented_print = any(
-        l.strip().startswith("#") and "print" in l for l in lines
-    )
+    has_commented_print = any(l.strip().startswith("#") and "print" in l for l in lines)
     # The other lines should still be there.
     has_x = any("x = 1" in l and not l.strip().startswith("#") for l in lines)
     has_y = any("y = x * 2" in l and not l.strip().startswith("#") for l in lines)
@@ -421,10 +396,7 @@ def _verify_comment_out(ctx: VerifyContext) -> bool:
 
 _comment_out_line = EvalTask(
     id="file_ops.comment_out_line",
-    prompt=(
-        "In buggy.py, comment out the line that calls print(). "
-        "Leave every other line as-is."
-    ),
+    prompt=("In buggy.py, comment out the line that calls print(). Leave every other line as-is."),
     setup_fn=_setup_for_comment_out,
     verify_fn=_verify_comment_out,
     bucket=_BUCKET,
@@ -467,13 +439,7 @@ _create_five_lines = EvalTask(
 
 def _setup_for_sort_imports(ws: Path) -> None:
     (ws / "messy.py").write_text(
-        "import zlib\n"
-        "import os\n"
-        "import json\n"
-        "import sys\n"
-        "\n"
-        "def run():\n"
-        "    pass\n",
+        "import zlib\nimport os\nimport json\nimport sys\n\ndef run():\n    pass\n",
         encoding="utf-8",
     )
 

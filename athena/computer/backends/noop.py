@@ -31,10 +31,10 @@ class NoOpBackend:
     def screenshot(self) -> Screenshot:
         raise RuntimeError("noop backend cannot capture the screen")
 
-    def active_app(self) -> Optional[str]:
+    def active_app(self) -> str | None:
         return None
 
-    def accessibility_tree(self) -> Optional[dict]:
+    def accessibility_tree(self) -> dict | None:
         return None
 
     def perform(self, action: Action) -> None:

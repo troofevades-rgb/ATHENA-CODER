@@ -151,6 +151,4 @@ def query(
     workspace: Path | None = None,
     provider_name: str = "builtin_file",
 ) -> list[MemoryEntry]:
-    return get_provider(provider_name).query(
-        profile, query=query, k=k, workspace=workspace
-    )
+    return get_provider(provider_name).query(profile, query=query, k=k, workspace=workspace)

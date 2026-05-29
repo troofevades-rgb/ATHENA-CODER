@@ -65,9 +65,7 @@ def get_task_set(name: str) -> list[EvalTask]:
     if name in user:
         return user[name]
     available = sorted(BUCKETS) + sorted(user)
-    raise KeyError(
-        f"unknown task set {name!r}. Available: {', '.join(available)}"
-    )
+    raise KeyError(f"unknown task set {name!r}. Available: {', '.join(available)}")
 
 
 # ---------------------------------------------------------------------------
@@ -110,9 +108,7 @@ def discover_user_tasks() -> dict[str, list[EvalTask]]:
             spec.loader.exec_module(module)
             tasks = getattr(module, "TASKS", None)
             if not isinstance(tasks, list):
-                logger.warning(
-                    "user eval-task module %s has no TASKS list", py
-                )
+                logger.warning("user eval-task module %s has no TASKS list", py)
                 continue
             # Reject anything that isn't actually an EvalTask.
             valid = [t for t in tasks if isinstance(t, EvalTask)]
@@ -123,9 +119,7 @@ def discover_user_tasks() -> dict[str, list[EvalTask]]:
                     "user eval-task module %s exports TASKS but no entries are EvalTask", py
                 )
         except Exception as e:  # noqa: BLE001
-            logger.warning(
-                "user eval-task module %s failed to import: %s", py, e
-            )
+            logger.warning("user eval-task module %s failed to import: %s", py, e)
             continue
     return out
 

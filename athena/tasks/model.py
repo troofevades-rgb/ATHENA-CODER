@@ -40,8 +40,9 @@ import logging
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator, Literal, Optional
+from typing import Any, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +88,11 @@ class Task:
     title: str
     status: Status = "todo"
     order: int = 0
-    parent_id: Optional[str] = None
-    goal_id: Optional[str] = None
-    session_id: Optional[str] = None
-    workspace: Optional[str] = None
-    note: Optional[str] = None
+    parent_id: str | None = None
+    goal_id: str | None = None
+    session_id: str | None = None
+    workspace: str | None = None
+    note: str | None = None
     created_at: float = dataclasses.field(default_factory=time.time)
     updated_at: float = dataclasses.field(default_factory=time.time)
 
@@ -151,7 +152,7 @@ class TaskStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._tasks: dict[str, Task] = self._load()
         self._archived: list[Task] = []  # in-memory archive for
-                                          # archive_done()
+        # archive_done()
 
     # ------------------------------------------------------------------
     # Mutations
@@ -162,11 +163,11 @@ class TaskStore:
         title: str,
         *,
         status: Status = "todo",
-        goal_id: Optional[str] = None,
-        parent_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        workspace: Optional[str] = None,
-        note: Optional[str] = None,
+        goal_id: str | None = None,
+        parent_id: str | None = None,
+        session_id: str | None = None,
+        workspace: str | None = None,
+        note: str | None = None,
     ) -> Task:
         """Create a task at the end of its column's order."""
         if not title or not str(title).strip():
@@ -194,12 +195,12 @@ class TaskStore:
         self,
         task_id: str,
         *,
-        status: Optional[Status] = None,
-        title: Optional[str] = None,
-        order: Optional[int] = None,
-        note: Optional[str] = None,
-        parent_id: Optional[str] = None,
-        goal_id: Optional[str] = None,
+        status: Status | None = None,
+        title: str | None = None,
+        order: int | None = None,
+        note: str | None = None,
+        parent_id: str | None = None,
+        goal_id: str | None = None,
     ) -> Task:
         """Mutate the named task. Raises ``KeyError`` if it
         doesn't exist — the caller (tool path) maps to a
@@ -250,15 +251,15 @@ class TaskStore:
     # Queries
     # ------------------------------------------------------------------
 
-    def get(self, task_id: str) -> Optional[Task]:
+    def get(self, task_id: str) -> Task | None:
         return self._tasks.get(task_id)
 
     def list(
         self,
         *,
-        workspace: Optional[str] = None,
-        goal_id: Optional[str] = None,
-        status: Optional[Status] = None,
+        workspace: str | None = None,
+        goal_id: str | None = None,
+        status: Status | None = None,
         include_archived: bool = False,
     ) -> list[Task]:
         """Filtered listing.
@@ -283,7 +284,8 @@ class TaskStore:
                 out.append(t)
             if include_archived:
                 out.extend(
-                    t for t in self._archived
+                    t
+                    for t in self._archived
                     if (workspace is None or t.workspace == workspace)
                     and (goal_id is None or t.goal_id == goal_id)
                     and (status is None or t.status == status)
@@ -318,8 +320,7 @@ class TaskStore:
         cutoff = time.time() - (older_than_days * 86400.0)
         with self._lock:
             to_archive = [
-                t for t in self._tasks.values()
-                if t.status == "done" and t.updated_at < cutoff
+                t for t in self._tasks.values() if t.status == "done" and t.updated_at < cutoff
             ]
             for t in to_archive:
                 self._tasks.pop(t.id, None)
@@ -354,19 +355,20 @@ class TaskStore:
             # The .corrupt.<ts> sidecar lets the user recover
             # manually; we log loudly because silent data loss is
             # the failure mode this guard exists to prevent.
-            backup = self.path.with_suffix(
-                self.path.suffix + f".corrupt.{int(time.time())}"
-            )
+            backup = self.path.with_suffix(self.path.suffix + f".corrupt.{int(time.time())}")
             try:
                 self.path.rename(backup)
                 logger.error(
                     "task store unreadable at %s: %s -- moved aside to %s",
-                    self.path, e, backup,
+                    self.path,
+                    e,
+                    backup,
                 )
             except OSError:
                 logger.error(
                     "task store unreadable at %s: %s (and could not move aside)",
-                    self.path, e,
+                    self.path,
+                    e,
                 )
             return {}
         out: dict[str, Task] = {}
@@ -396,8 +398,8 @@ class TaskStore:
         self,
         status: Status,
         *,
-        workspace: Optional[str],
-        goal_id: Optional[str],
+        workspace: str | None,
+        goal_id: str | None,
     ) -> int:
         """Compute the next order number for a column / scope.
 

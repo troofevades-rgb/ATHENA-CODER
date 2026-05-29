@@ -65,9 +65,7 @@ def sha256_file(path: Path | str, *, chunk_size: int = 1 << 20) -> str:
 def _now_iso() -> str:
     """ISO-8601 UTC with microsecond precision and trailing 'Z' —
     matches :mod:`athena.computer.audit`."""
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 @dataclasses.dataclass

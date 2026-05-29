@@ -79,9 +79,10 @@ class Theme:
 # hardcoded dict. Bundled palettes live at athena/tui_gateway/themes/.
 # Users can drop their own at ~/.athena/themes/<name>.toml — user
 # themes override bundled ones with the same name.
-def _load_themes() -> dict[str, "Theme"]:
+def _load_themes() -> dict[str, Theme]:
     """Walk bundled + user theme dirs, load each .toml into a Theme."""
     import os
+
     try:
         import tomllib  # py311+
     except ImportError:
@@ -109,8 +110,11 @@ def _load_themes() -> dict[str, "Theme"]:
                 themes[t.name] = t  # user-dir overrides bundled
             except Exception as e:  # noqa: BLE001
                 import logging as _logging
+
                 _logging.getLogger(__name__).warning(
-                    "failed to load theme %s: %s", entry, e,
+                    "failed to load theme %s: %s",
+                    entry,
+                    e,
                 )
 
     bundled_dir = Path(__file__).resolve().parent / "tui_gateway" / "themes"
@@ -122,9 +126,11 @@ def _load_themes() -> dict[str, "Theme"]:
     # minimal default so the TUI doesn't crash on missing theme.
     if not themes:
         import logging as _logging
+
         _logging.getLogger(__name__).warning(
             "no themes loaded from %s or %s — using built-in fallback",
-            bundled_dir, user_dir,
+            bundled_dir,
+            user_dir,
         )
         themes["phosphor"] = Theme(
             name="phosphor",
@@ -455,6 +461,7 @@ def tool_round_header() -> None:
     visually section the transcript without competing with content.
     """
     from datetime import datetime
+
     ts = datetime.now().strftime("%H:%M:%S")
     content = f"─── {ts} ───"
     if _emit_message("separator", content):
@@ -521,6 +528,7 @@ def _maybe_pretty_json(output: str) -> str:
         return output
     try:
         import json
+
         parsed = json.loads(s)
     except (ValueError, RecursionError):
         return output
@@ -600,7 +608,7 @@ def _summarize_skill_md(output: str) -> str:
         header_bits.append(desc)
     header = " · ".join(header_bits) if header_bits else "(skill)"
     # Body: skip the close-marker, drop leading blank lines
-    body = lines[fm_close + 1:]
+    body = lines[fm_close + 1 :]
     while body and not body[0].strip():
         body.pop(0)
     body_shown = body[:5]
@@ -684,11 +692,7 @@ def show_diff(path: str, old: str, new: str) -> None:
             try:
                 from .tui_gateway.events import MessageAppendEvent
 
-                gw.send_event(
-                    MessageAppendEvent(
-                        role="system", content=f"(no changes to {path})"
-                    )
-                )
+                gw.send_event(MessageAppendEvent(role="system", content=f"(no changes to {path})"))
                 return
             except Exception:  # noqa: BLE001
                 pass
@@ -743,7 +747,10 @@ def _strip_think_blocks(text: str) -> str:
     import re as _re
 
     out = _re.sub(
-        r"<think>.*?</think>\s*", "_(thought collapsed)_\n\n", text, flags=_re.DOTALL,
+        r"<think>.*?</think>\s*",
+        "_(thought collapsed)_\n\n",
+        text,
+        flags=_re.DOTALL,
     )
     # Drop any trailing unclosed <think> block.
     idx = out.find("<think>")
@@ -800,7 +807,7 @@ class TypewriterStream:
         self._append_with_think_collapse(text, body)
         return text
 
-    def _append_with_think_collapse(self, text: "Text", body: str) -> None:
+    def _append_with_think_collapse(self, text: Text, body: str) -> None:
         """Append ``body`` to ``text``, collapsing ``<think>...</think>``
         blocks (qwen / reasoning-model CoT) into a dim marker.
 
@@ -847,9 +854,7 @@ class TypewriterStream:
             try:
                 from .tui_gateway.events import StreamStartEvent
 
-                gw.send_event(
-                    StreamStartEvent(stream_id=self._stream_id)
-                )
+                gw.send_event(StreamStartEvent(stream_id=self._stream_id))
                 return
             except Exception:  # noqa: BLE001 — fall back to Rich
                 self._gateway = None
@@ -865,20 +870,14 @@ class TypewriterStream:
         self._live.__enter__()
 
     def feed(self, chunk: str) -> None:
-        if (
-            self._live is None
-            and self._stream_id is None
-            and not self._closed
-        ):
+        if self._live is None and self._stream_id is None and not self._closed:
             self.start()
         self._buf += chunk
         if self._stream_id is not None and self._gateway is not None:
             try:
                 from .tui_gateway.events import StreamDeltaEvent
 
-                self._gateway.send_event(
-                    StreamDeltaEvent(stream_id=self._stream_id, text=chunk)
-                )
+                self._gateway.send_event(StreamDeltaEvent(stream_id=self._stream_id, text=chunk))
                 return
             except Exception:  # noqa: BLE001 — let next feed retry or finalize close
                 pass
@@ -900,9 +899,7 @@ class TypewriterStream:
             try:
                 from .tui_gateway.events import StreamEndEvent
 
-                self._gateway.send_event(
-                    StreamEndEvent(stream_id=self._stream_id)
-                )
+                self._gateway.send_event(StreamEndEvent(stream_id=self._stream_id))
             except Exception:  # noqa: BLE001
                 pass
             self._stream_id = None
@@ -934,7 +931,8 @@ _TPS_HISTORY_MAX = 30
 
 
 def confirm(
-    prompt: str, default: bool = False,
+    prompt: str,
+    default: bool = False,
     *,
     tool_name: str | None = None,
     preview: str | None = None,
@@ -953,8 +951,12 @@ def confirm(
     gw = _active_gateway
     if gw is not None:
         return _confirm_via_gateway(
-            gw, prompt, default,
-            tool_name=tool_name, preview=preview, preview_kind=preview_kind,
+            gw,
+            prompt,
+            default,
+            tool_name=tool_name,
+            preview=preview,
+            preview_kind=preview_kind,
         )
     # Legacy Rich path — direct stdin read. Print the preview here
     # too so non-TUI users still see what they're approving.
@@ -976,7 +978,9 @@ def confirm(
 
 
 def _confirm_via_gateway(
-    gw: Any, prompt: str, default: bool,
+    gw: Any,
+    prompt: str,
+    default: bool,
     *,
     tool_name: str | None = None,
     preview: str | None = None,
@@ -997,8 +1001,12 @@ def _confirm_via_gateway(
 
         gw.send_event(
             ConfirmRequestEvent(
-                request_id=request_id, prompt=prompt, default=default,
-                tool_name=tool_name, preview=preview, preview_kind=preview_kind,
+                request_id=request_id,
+                prompt=prompt,
+                default=default,
+                tool_name=tool_name,
+                preview=preview,
+                preview_kind=preview_kind,
             )
         )
     except Exception:  # noqa: BLE001

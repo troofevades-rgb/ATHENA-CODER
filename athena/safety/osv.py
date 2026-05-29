@@ -47,12 +47,27 @@ logger = logging.getLogger(__name__)
 #   Debian / Ubuntu / Alpine / Rocky Linux / etc.  (distros)
 # We don't enumerate them all in code — OSV accepts the
 # string; if it's unknown they return [] with a 400.
-_KNOWN_ECOSYSTEMS = frozenset({
-    "PyPI", "npm", "crates.io", "Go", "Maven", "NuGet",
-    "RubyGems", "Packagist", "Hex", "Pub", "GitHub Actions",
-    "Debian", "Ubuntu", "Alpine", "Rocky Linux",
-    "Linux", "OSS-Fuzz",
-})
+_KNOWN_ECOSYSTEMS = frozenset(
+    {
+        "PyPI",
+        "npm",
+        "crates.io",
+        "Go",
+        "Maven",
+        "NuGet",
+        "RubyGems",
+        "Packagist",
+        "Hex",
+        "Pub",
+        "GitHub Actions",
+        "Debian",
+        "Ubuntu",
+        "Alpine",
+        "Rocky Linux",
+        "Linux",
+        "OSS-Fuzz",
+    }
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -65,12 +80,12 @@ class Vulnerability:
     payload is in ``raw`` for callers that want more.
     """
 
-    id: str                # OSV ID, e.g. "GHSA-1234-..." or "PYSEC-2024-..."
+    id: str  # OSV ID, e.g. "GHSA-1234-..." or "PYSEC-2024-..."
     summary: str
-    severity: str          # "LOW" | "MODERATE" | "HIGH" | "CRITICAL" | "UNKNOWN"
-    aliases: list[str]     # CVE-2024-... + other DB IDs
+    severity: str  # "LOW" | "MODERATE" | "HIGH" | "CRITICAL" | "UNKNOWN"
+    aliases: list[str]  # CVE-2024-... + other DB IDs
     references: list[str]  # URLs from the entry
-    raw: dict[str, Any]    # full OSV record for advanced callers
+    raw: dict[str, Any]  # full OSV record for advanced callers
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,20 +117,18 @@ def query(
     if not package_name or not version or not ecosystem:
         return [], "package_name, version, and ecosystem all required"
 
-    url = (
-        getattr(cfg, "osv_api_url", None)
-        if cfg else None
-    ) or "https://api.osv.dev/v1/query"
-    timeout_s = float(
-        getattr(cfg, "osv_timeout_s", 10.0) if cfg else 10.0
-    )
+    url = (getattr(cfg, "osv_api_url", None) if cfg else None) or "https://api.osv.dev/v1/query"
+    timeout_s = float(getattr(cfg, "osv_timeout_s", 10.0) if cfg else 10.0)
 
-    body = json.dumps({
-        "package": {"name": package_name, "ecosystem": ecosystem},
-        "version": version,
-    }).encode("utf-8")
+    body = json.dumps(
+        {
+            "package": {"name": package_name, "ecosystem": ecosystem},
+            "version": version,
+        }
+    ).encode("utf-8")
     req = urllib.request.Request(
-        url, data=body,
+        url,
+        data=body,
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -134,7 +147,10 @@ def query(
         except Exception:  # noqa: BLE001
             pass
         logger.warning(
-            "osv: HTTP %s on %s — %s", e.code, url, body_text or "(no body)",
+            "osv: HTTP %s on %s — %s",
+            e.code,
+            url,
+            body_text or "(no body)",
         )
         return [], f"HTTP {e.code} from OSV"
     except (urllib.error.URLError, TimeoutError, OSError) as e:

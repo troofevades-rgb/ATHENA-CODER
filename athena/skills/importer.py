@@ -84,8 +84,7 @@ def _resolve_source_dir(source: Path) -> Path:
     if len(candidates) == 0:
         raise ValueError(f"no SKILL.md found in {source} or any immediate subdir")
     raise ValueError(
-        f"{source} contains multiple skill subdirs ({len(candidates)}); "
-        "extract them individually"
+        f"{source} contains multiple skill subdirs ({len(candidates)}); extract them individually"
     )
 
 
@@ -131,12 +130,16 @@ def import_skill(
         parsed = parse_frontmatter(src_dir / "SKILL.md")
     except FrontmatterError as e:
         return ImportResult(
-            status="rejected", dest=None, name="",
+            status="rejected",
+            dest=None,
+            name="",
             errors=[f"frontmatter: {e}"],
         )
     if parsed is None:
         return ImportResult(
-            status="rejected", dest=None, name="",
+            status="rejected",
+            dest=None,
+            name="",
             errors=[f"could not parse frontmatter at {src_dir / 'SKILL.md'}"],
         )
     fm, _ = parsed
@@ -148,7 +151,9 @@ def import_skill(
     if dest.exists():
         if on_conflict == "abort":
             return ImportResult(
-                status="skipped", dest=dest, name=name,
+                status="skipped",
+                dest=dest,
+                name=name,
                 warnings=[f"skill {name!r} already exists at {dest}; aborting"],
             )
         if on_conflict == "overwrite":
@@ -171,6 +176,7 @@ def import_skill(
     # later use), so invalidate broadly by clearing all matching
     # entries.
     from . import loader as _loader
+
     for key in list(_loader._BODY_CACHE):
         if key[1] == name:
             _loader._BODY_CACHE.pop(key, None)
@@ -196,7 +202,9 @@ def import_archive(
     is_zip = archive.suffix.lower() == ".zip"
     if not (is_tar or is_zip):
         return ImportResult(
-            status="rejected", dest=None, name="",
+            status="rejected",
+            dest=None,
+            name="",
             errors=[f"unsupported archive type: {archive.name}"],
         )
 
@@ -208,7 +216,9 @@ def import_archive(
                     for info in zf.infolist():
                         if Path(info.filename).is_absolute() or ".." in Path(info.filename).parts:
                             return ImportResult(
-                                status="rejected", dest=None, name="",
+                                status="rejected",
+                                dest=None,
+                                name="",
                                 errors=[f"archive contains unsafe member: {info.filename}"],
                             )
                     zf.extractall(extract_root)
@@ -217,7 +227,9 @@ def import_archive(
                     for m in tf.getmembers():
                         if Path(m.name).is_absolute() or ".." in Path(m.name).parts:
                             return ImportResult(
-                                status="rejected", dest=None, name="",
+                                status="rejected",
+                                dest=None,
+                                name="",
                                 errors=[f"archive contains unsafe member: {m.name}"],
                             )
                     # Python 3.12+: filter="data" hardens extraction.
@@ -227,7 +239,9 @@ def import_archive(
                         tf.extractall(extract_root)
         except (zipfile.BadZipFile, tarfile.TarError, OSError) as e:
             return ImportResult(
-                status="rejected", dest=None, name="",
+                status="rejected",
+                dest=None,
+                name="",
                 errors=[f"failed to extract {archive.name}: {e}"],
             )
 

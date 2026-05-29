@@ -54,9 +54,7 @@ class AgentGoalIntegration:
         _last_assistant_text: str
         _goal_loop_tokens_used: int
 
-    def _consult_goal_continuation(
-        self, *, tokens_at_loop_start: int
-    ) -> str | None:
+    def _consult_goal_continuation(self, *, tokens_at_loop_start: int) -> str | None:
         """T5-07 hook called after each real assistant turn.
 
         Returns the synthetic prompt to inject for the next
@@ -81,17 +79,13 @@ class AgentGoalIntegration:
         if self._last_turn_interrupted:
             self.goal_state.status = "paused"
             self._persist_goal_state()
-            ui.warn(
-                "goal paused (interrupt detected) — /goal resume to continue"
-            )
+            ui.warn("goal paused (interrupt detected) — /goal resume to continue")
             return None
 
         # Token-cap check. The cap counts tokens consumed since
         # run_turn entered THIS loop (so /goal set + user turn
         # don't pre-consume the budget).
-        used_this_loop = (
-            self.stats.prompt_tokens + self.stats.eval_tokens
-        ) - tokens_at_loop_start
+        used_this_loop = (self.stats.prompt_tokens + self.stats.eval_tokens) - tokens_at_loop_start
         self._goal_loop_tokens_used = used_this_loop
         token_cap = int(getattr(self.cfg, "goal_max_tokens", 200_000))
         if token_cap > 0 and used_this_loop > token_cap:
@@ -127,9 +121,7 @@ class AgentGoalIntegration:
             # model said done, we believed it). This matters because a
             # silent "Goal achieved" with no verifier looks identical to
             # a properly-checked completion, masking the gap.
-            verifier_configured = bool(
-                getattr(self.cfg, "goal_verifier_command", None)
-            )
+            verifier_configured = bool(getattr(self.cfg, "goal_verifier_command", None))
             if verifier_configured:
                 ui.console.print(
                     f"[bold green]Goal achieved[/] in "
@@ -144,10 +136,7 @@ class AgentGoalIntegration:
                     "set cfg.goal_verifier_command to gate this)[/]"
                 )
         elif decision.stop_reason == "blocked":
-            ui.warn(
-                f"goal blocked: {decision.blocked_reason}. "
-                "/goal resume when ready."
-            )
+            ui.warn(f"goal blocked: {decision.blocked_reason}. /goal resume when ready.")
         elif decision.stop_reason == "exhausted":
             ui.warn(
                 f"goal not completed after {self.goal_state.max_turns} "
@@ -169,6 +158,4 @@ class AgentGoalIntegration:
 
             save_state(self._profile_dir(), self.goal_state)
         except Exception:  # noqa: BLE001
-            logger.debug(
-                "could not persist goal state on stop", exc_info=True
-            )
+            logger.debug("could not persist goal state on stop", exc_info=True)

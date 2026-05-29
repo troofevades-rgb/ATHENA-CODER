@@ -52,7 +52,7 @@ def test_parse_strips_single_quotes():
 
 def test_parse_mismatched_quotes_preserved():
     """``FOO='bar"`` is suspect — leave it as-is rather than guessing."""
-    assert env_mod._parse('FOO=\'bar"\n') == {"FOO": '\'bar"'}
+    assert env_mod._parse("FOO='bar\"\n") == {"FOO": "'bar\""}
 
 
 def test_parse_handles_equals_in_value():
@@ -123,9 +123,13 @@ def test_get_credential_falls_back_to_file_path(tmp_path: Path):
     """Legacy ``*_path`` style — keep working."""
     legacy = tmp_path / "legacy_token.txt"
     legacy.write_text("legacy-token-value\n", encoding="utf-8")
-    assert env_mod.get_credential(
-        "ATHENA_LEGACY", fallback_path=str(legacy),
-    ) == "legacy-token-value"
+    assert (
+        env_mod.get_credential(
+            "ATHENA_LEGACY",
+            fallback_path=str(legacy),
+        )
+        == "legacy-token-value"
+    )
 
 
 def test_get_credential_returns_default_when_all_miss():
@@ -145,6 +149,10 @@ def test_get_credential_empty_dotenv_value_falls_through(tmp_path: Path, monkeyp
 
 def test_get_credential_nonexistent_fallback_path_safe(tmp_path: Path):
     """A missing fallback file shouldn't crash — return None."""
-    assert env_mod.get_credential(
-        "ATHENA_NOPE", fallback_path=str(tmp_path / "does_not_exist"),
-    ) is None
+    assert (
+        env_mod.get_credential(
+            "ATHENA_NOPE",
+            fallback_path=str(tmp_path / "does_not_exist"),
+        )
+        is None
+    )

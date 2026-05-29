@@ -34,12 +34,18 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          # Install the gateway + observability extras alongside [dev]
-          # because the test suite imports discord / aiohttp /
-          # aiosmtplib / opentelemetry at collection time. Without
+          # Install gateway, observability, vision, and browser
+          # extras alongside [dev] because the test suite (and
+          # tools/__init__.py's side-effect import chain) reaches
+          # them at collection time: discord/aiohttp/aiosmtplib
+          # (gateway), opentelemetry (observability), Pillow +
+          # imagehash (vision -- pulled in by vision/imageops.py
+          # which tools/__init__.py registers), playwright
+          # (browser -- pulled in by browser/session.py which
+          # Agent.__init__ binds for /browser tools). Without
           # them, pytest 400's during collection with
           # ModuleNotFoundError before a single test runs.
-          pip install -e ".[dev,gateway,observability]"
+          pip install -e ".[dev,gateway,observability,vision,browser]"
       - name: Test
         env:
           PYTHONDONTWRITEBYTECODE: "1"

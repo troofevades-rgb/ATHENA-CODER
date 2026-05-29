@@ -27,9 +27,14 @@ def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> None:
     one test's setup doesn't leak into another via the real shell
     env (CI variability)."""
     for name in (
-        "KITTY_WINDOW_ID", "TERM_PROGRAM", "GHOSTTY_RESOURCES_DIR",
-        "LC_TERMINAL", "ATHENA_FORCE_SIXEL", "WT_SESSION",
-        "COLORTERM", "TERM",
+        "KITTY_WINDOW_ID",
+        "TERM_PROGRAM",
+        "GHOSTTY_RESOURCES_DIR",
+        "LC_TERMINAL",
+        "ATHENA_FORCE_SIXEL",
+        "WT_SESSION",
+        "COLORTERM",
+        "TERM",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -42,19 +47,28 @@ def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_priority_kitty_over_iterm2_over_sixel() -> None:
     """When multiple protocols are supported, pick Kitty > iterm2 > sixel."""
     caps = TerminalCaps(
-        kitty=True, iterm2=True, sixel=True, truecolor=True,
+        kitty=True,
+        iterm2=True,
+        sixel=True,
+        truecolor=True,
         terminal_id="multi",
     )
     assert caps.best_image_protocol() == "kitty"
 
     caps = TerminalCaps(
-        kitty=False, iterm2=True, sixel=True, truecolor=True,
+        kitty=False,
+        iterm2=True,
+        sixel=True,
+        truecolor=True,
         terminal_id="multi-no-kitty",
     )
     assert caps.best_image_protocol() == "iterm2"
 
     caps = TerminalCaps(
-        kitty=False, iterm2=False, sixel=True, truecolor=True,
+        kitty=False,
+        iterm2=False,
+        sixel=True,
+        truecolor=True,
         terminal_id="sixel-only",
     )
     assert caps.best_image_protocol() == "sixel"
@@ -65,7 +79,10 @@ def test_no_protocols_returns_none_string() -> None:
     Caller code may concatenate it into a log message and a None
     would raise TypeError."""
     caps = TerminalCaps(
-        kitty=False, iterm2=False, sixel=False, truecolor=False,
+        kitty=False,
+        iterm2=False,
+        sixel=False,
+        truecolor=False,
         terminal_id="plain",
     )
     assert caps.best_image_protocol() == "none"
@@ -243,8 +260,11 @@ def test_is_a_tty_handles_mocked_stdout(
     import sys
 
     class _NoIsAtty:
-        def write(self, s): pass
-        def flush(self): pass
+        def write(self, s):
+            pass
+
+        def flush(self):
+            pass
 
     monkeypatch.setattr(sys, "stdout", _NoIsAtty())
     assert is_a_tty() is False
@@ -258,9 +278,14 @@ def test_is_a_tty_handles_isatty_raising(
     import sys
 
     class _ThrowsOnIsAtty:
-        def isatty(self): raise OSError("not allowed")
-        def write(self, s): pass
-        def flush(self): pass
+        def isatty(self):
+            raise OSError("not allowed")
+
+        def write(self, s):
+            pass
+
+        def flush(self):
+            pass
 
     monkeypatch.setattr(sys, "stdout", _ThrowsOnIsAtty())
     assert is_a_tty() is False
@@ -271,5 +296,6 @@ def test_is_a_tty_handles_none_stdout(
 ) -> None:
     """sys.stdout=None happens in some daemonization contexts."""
     import sys
+
     monkeypatch.setattr(sys, "stdout", None)
     assert is_a_tty() is False

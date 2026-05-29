@@ -18,7 +18,6 @@ from athena.agent.core import Agent
 from athena.cache.cross_session import CrossSessionCache
 from athena.providers.base import Capabilities, Provider
 
-
 # ---------------------------------------------------------------------------
 # Synthetic provider with declared caching capability
 # ---------------------------------------------------------------------------
@@ -50,9 +49,7 @@ def _provider_no_caching(name: str) -> type[Provider]:
         pass
 
     _P.name = name
-    _P.static_capabilities = classmethod(
-        lambda cls, model=None: Capabilities()
-    )  # type: ignore[method-assign]
+    _P.static_capabilities = classmethod(lambda cls, model=None: Capabilities())  # type: ignore[method-assign]
     return _P
 
 
@@ -95,9 +92,7 @@ def test_session_start_records_on_miss(tmp_path, patched_registry):
     agent._init_cross_session_cache()
     # An entry was created on this session's record.
     assert agent.cross_session_cache_entry is not None
-    cache = CrossSessionCache(
-        index_path=Path(tmp_path / "ci.json"), cfg=agent.cfg
-    )
+    cache = CrossSessionCache(index_path=Path(tmp_path / "ci.json"), cfg=agent.cfg)
     assert len(cache.all()) == 1
 
 

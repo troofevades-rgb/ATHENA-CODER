@@ -44,6 +44,7 @@ def _profile_cron_paths() -> tuple[Path, Path]:
     runner/watchdog so APScheduler-side dispatch agrees with the CLI."""
     try:
         from ..config import load_config, profile_dir
+
         cfg = load_config()
         profile = getattr(cfg, "profile", None) or "default"
         pdir = profile_dir(profile)

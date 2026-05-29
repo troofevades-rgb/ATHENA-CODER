@@ -32,8 +32,9 @@ import dataclasses
 import json
 import logging
 import math
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

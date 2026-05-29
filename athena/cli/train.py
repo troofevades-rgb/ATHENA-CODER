@@ -41,6 +41,8 @@ from ..transform.review import ReviewSession, default_prompt, load_labels
 from ..transform.run_state import (
     RunState,
     find_latest_checkpoint,
+)
+from ..transform.run_state import (
     load as load_run_state,
 )
 from ..transform.runner import (
@@ -214,6 +216,7 @@ def _cmd_build_dataset(args) -> int:
         # whether the dataset is dominated by one kind of error (which
         # would skew DPO toward fixing only that pattern).
         from collections import Counter
+
         modes = Counter(ex["metadata"].get("failure_mode", "other") for ex in dpo)
         breakdown = ", ".join(f"{m}={n}" for m, n in modes.most_common())
         print(f"  failure modes: {breakdown}")
@@ -268,8 +271,7 @@ def _cmd_run(args) -> int:
     if state is None:
         # Resume requested but no state file found.
         print(
-            f"error: --resume requested but no state file at "
-            f"{output_dir}/.athena_train_state.json",
+            f"error: --resume requested but no state file at {output_dir}/.athena_train_state.json",
             file=sys.stderr,
         )
         return 2
@@ -664,15 +666,25 @@ def _build_parser() -> argparse.ArgumentParser:
             "--output-dir <inferred>`). Rehydrates CLI args from the state file."
         ),
     )
-    p_resume.add_argument("output_name", help="The run's output_name (e.g. 'qwen2.5-coder-14b-athena-1').")
-    p_resume.add_argument("--output-dir", default=None,
-                          help="Explicit path; overrides the inferred 'transform/output/<output_name>' location.")
-    p_resume.add_argument("--base-model", default=None,
-                          help="Override the base model recorded in the state file.")
-    p_resume.add_argument("--sft-dataset", default=None,
-                          help="Override the SFT dataset path recorded in the state file.")
-    p_resume.add_argument("--dpo-dataset", default=None,
-                          help="Add or override a DPO dataset for this resume.")
+    p_resume.add_argument(
+        "output_name", help="The run's output_name (e.g. 'qwen2.5-coder-14b-athena-1')."
+    )
+    p_resume.add_argument(
+        "--output-dir",
+        default=None,
+        help="Explicit path; overrides the inferred 'transform/output/<output_name>' location.",
+    )
+    p_resume.add_argument(
+        "--base-model", default=None, help="Override the base model recorded in the state file."
+    )
+    p_resume.add_argument(
+        "--sft-dataset",
+        default=None,
+        help="Override the SFT dataset path recorded in the state file.",
+    )
+    p_resume.add_argument(
+        "--dpo-dataset", default=None, help="Add or override a DPO dataset for this resume."
+    )
 
     sub.add_parser("status", help="Show the last training run.")
     return ap

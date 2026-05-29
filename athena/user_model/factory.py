@@ -97,13 +97,9 @@ def get_user_model_backend(
         )
     if name == "honcho":
         raise NotImplementedError(
-            "Honcho backend is planned but not yet implemented. "
-            "Use backend = \"markdown\" for now."
+            'Honcho backend is planned but not yet implemented. Use backend = "markdown" for now.'
         )
-    raise ValueError(
-        f"unknown user_model backend {name!r}. "
-        "Available: markdown, honcho, none."
-    )
+    raise ValueError(f"unknown user_model backend {name!r}. Available: markdown, honcho, none.")
 
 
 async def _missing_llm_call(system: str, user: str) -> str:

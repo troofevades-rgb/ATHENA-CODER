@@ -11,7 +11,6 @@ from pathlib import Path
 
 import athena.commands as commands_pkg  # noqa: F401 — populates _COMMANDS
 
-
 # Commands that have a slash form AND are expected to be reachable
 # via ``/<name>`` at the REPL. The dict maps the expected slash
 # name to the module it lives in — kept explicit so a future
@@ -60,9 +59,7 @@ def test_every_expected_command_is_registered():
     """
     from athena.commands import get_command
 
-    missing = sorted(
-        name for name in EXPECTED_SLASH_COMMANDS if get_command(name) is None
-    )
+    missing = sorted(name for name in EXPECTED_SLASH_COMMANDS if get_command(name) is None)
     assert not missing, (
         "These slash commands are unreachable via the dispatcher — "
         "their modules need an entry in athena/commands/__init__.py: "
@@ -77,10 +74,7 @@ def test_help_text_mentions_every_registered_slash_command():
     during runbook §1.8."""
     from athena.commands.help import SLASH_HELP
 
-    missing = [
-        name for name in EXPECTED_SLASH_COMMANDS
-        if f"/{name}" not in SLASH_HELP
-    ]
+    missing = [name for name in EXPECTED_SLASH_COMMANDS if f"/{name}" not in SLASH_HELP]
     assert not missing, (
         f"These slash commands are registered but not mentioned in "
         f"SLASH_HELP: {missing}. Add a one-line description to "
@@ -91,20 +85,26 @@ def test_help_text_mentions_every_registered_slash_command():
 def test_help_does_not_advertise_unregistered_commands():
     """Inverse check: if SLASH_HELP names a command that isn't in
     the dispatcher, the doc lies. Catches drift the other way."""
-    from athena.commands import get_command
     import re
+
+    from athena.commands import get_command
 
     # Extract every ``/word`` token from the help text and verify
     # each resolves. Skip /exit / /quit since those are dispatched
     # inline in __main__.py, not via the @command decorator.
     inline_only = {"exit", "quit", "q", "plan-exit", "loop-stop"}
-    seen = set(re.findall(r"^/([\w-]+)", __import__(
-        "athena.commands.help", fromlist=["SLASH_HELP"],
-    ).SLASH_HELP, re.MULTILINE))
-    advertised = seen - inline_only
-    missing = sorted(
-        name for name in advertised if get_command(name) is None
+    seen = set(
+        re.findall(
+            r"^/([\w-]+)",
+            __import__(
+                "athena.commands.help",
+                fromlist=["SLASH_HELP"],
+            ).SLASH_HELP,
+            re.MULTILINE,
+        )
     )
+    advertised = seen - inline_only
+    missing = sorted(name for name in advertised if get_command(name) is None)
     assert not missing, (
         f"SLASH_HELP advertises commands that aren't registered: "
         f"{missing}. Either register them or remove from help."

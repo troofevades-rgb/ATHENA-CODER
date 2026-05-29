@@ -55,13 +55,15 @@ def make_pdf_with_outline(out: Path) -> Path:
         page = doc.new_page()
         page.insert_text((72, 72), t + "\n\nBody text for " + t, fontsize=12)
     # set_toc takes [[level, title, page_no_1indexed], ...]
-    doc.set_toc([
-        [1, "Introduction", 1],
-        [1, "Methods", 2],
-        [2, "Sub-method A", 2],
-        [1, "Results", 3],
-        [1, "Conclusion", 4],
-    ])
+    doc.set_toc(
+        [
+            [1, "Introduction", 1],
+            [1, "Methods", 2],
+            [2, "Sub-method A", 2],
+            [1, "Results", 3],
+            [1, "Conclusion", 4],
+        ]
+    )
     doc.save(str(out))
     doc.close()
     return out
@@ -127,17 +129,21 @@ def stub_ocr_recognize():
     calls: list[dict[str, Any]] = []
 
     def _fn(image_path: Path, *, languages: list[str] | None = None) -> dict:
-        calls.append({
-            "image_path": str(image_path),
-            "languages": list(languages) if languages else None,
-        })
+        calls.append(
+            {
+                "image_path": str(image_path),
+                "languages": list(languages) if languages else None,
+            }
+        )
         return {
             "text": f"OCR'd text from {Path(image_path).name}",
-            "blocks": [{
-                "text": f"OCR'd text from {Path(image_path).name}",
-                "bbox": [0, 0, 100, 30],
-                "confidence": 88.0,
-            }],
+            "blocks": [
+                {
+                    "text": f"OCR'd text from {Path(image_path).name}",
+                    "bbox": [0, 0, 100, 30],
+                    "confidence": 88.0,
+                }
+            ],
             "language": "eng",
         }
 

@@ -16,8 +16,9 @@ import datetime
 import logging
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..config import Config
 from .result import RunResult, mint_run_id
@@ -33,9 +34,7 @@ UIFn = Callable[[str], None]
 
 
 def _now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _estimate_cost(stats: Any, model: str) -> float:
@@ -44,11 +43,14 @@ def _estimate_cost(stats: Any, model: str) -> float:
     the envelope still ships, the cost field is just zero."""
     try:
         from ..ui import estimated_cost_usd
-        return float(estimated_cost_usd(
-            model=model,
-            prompt_tokens=getattr(stats, "prompt_tokens", 0) or 0,
-            eval_tokens=getattr(stats, "eval_tokens", 0) or 0,
-        ))
+
+        return float(
+            estimated_cost_usd(
+                model=model,
+                prompt_tokens=getattr(stats, "prompt_tokens", 0) or 0,
+                eval_tokens=getattr(stats, "eval_tokens", 0) or 0,
+            )
+        )
     except Exception:  # noqa: BLE001
         return 0.0
 
@@ -62,7 +64,8 @@ def _tool_calls_summary(stats: Any) -> list[dict[str, Any]]:
     return [
         {"name": name, "count": int(count)}
         for name, count in sorted(
-            counts.items(), key=lambda kv: (-kv[1], kv[0]),
+            counts.items(),
+            key=lambda kv: (-kv[1], kv[0]),
         )
     ]
 
@@ -124,24 +127,36 @@ def run_headless(
 
     if not task or not str(task).strip():
         return _invalid(
-            rid, started_iso, t0,
-            task=task or "", workspace=str(workspace),
-            model=model or cfg.model, profile=cfg.profile or "default",
+            rid,
+            started_iso,
+            t0,
+            task=task or "",
+            workspace=str(workspace),
+            model=model or cfg.model,
+            profile=cfg.profile or "default",
             error="task is empty",
         )
 
     if not workspace.exists():
         return _invalid(
-            rid, started_iso, t0,
-            task=task, workspace=str(workspace),
-            model=model or cfg.model, profile=cfg.profile or "default",
+            rid,
+            started_iso,
+            t0,
+            task=task,
+            workspace=str(workspace),
+            model=model or cfg.model,
+            profile=cfg.profile or "default",
             error=f"workspace does not exist: {workspace}",
         )
     if not workspace.is_dir():
         return _invalid(
-            rid, started_iso, t0,
-            task=task, workspace=str(workspace),
-            model=model or cfg.model, profile=cfg.profile or "default",
+            rid,
+            started_iso,
+            t0,
+            task=task,
+            workspace=str(workspace),
+            model=model or cfg.model,
+            profile=cfg.profile or "default",
             error=f"workspace is not a directory: {workspace}",
         )
 

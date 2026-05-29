@@ -42,9 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%S.%fZ"
-    )
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _domain(url: str) -> str:
@@ -64,9 +62,7 @@ class CaptureLogger:
     session's wait penalty).
     """
 
-    def __init__(self, path: Path | str, *,
-                 min_interval_s: float = 1.0,
-                 sleep_fn=time.sleep):
+    def __init__(self, path: Path | str, *, min_interval_s: float = 1.0, sleep_fn=time.sleep):
         self.path = Path(path)
         self.min_interval_s = float(min_interval_s)
         self._last_nav_by_domain: dict[str, float] = {}
@@ -129,7 +125,8 @@ class CaptureLogger:
             "screenshot_path": screenshot_path,
             "content_sha256": (
                 hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
-                if content else ""
+                if content
+                else ""
             ),
         }
         line = json.dumps(entry, separators=(",", ":"), ensure_ascii=False)

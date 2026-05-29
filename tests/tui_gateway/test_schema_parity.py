@@ -32,7 +32,6 @@ from athena.tui_gateway.schema import (
     load_protocol,
 )
 
-
 # ---- helpers -------------------------------------------------------------
 
 
@@ -96,9 +95,8 @@ def test_event_and_command_counts_match_known_surface():
 def test_event_has_matching_python_dataclass(type_literal):
     schema = event_schema(type_literal)
     cls = _dataclass_for_type_literal(type_literal, kind="event")
-    assert cls is not None, (
-        "no @dataclass in athena.tui_gateway.events with "
-        "type=" + repr(type_literal)
+    assert cls is not None, "no @dataclass in athena.tui_gateway.events with type=" + repr(
+        type_literal
     )
     schema_fields = _schema_field_names(schema)
     dc_fields = _dataclass_field_names(cls)
@@ -120,9 +118,8 @@ def test_event_has_matching_python_dataclass(type_literal):
 def test_command_has_matching_python_dataclass(type_literal):
     schema = command_schema(type_literal)
     cls = _dataclass_for_type_literal(type_literal, kind="command")
-    assert cls is not None, (
-        "no @dataclass in athena.tui_gateway.events with "
-        "type=" + repr(type_literal)
+    assert cls is not None, "no @dataclass in athena.tui_gateway.events with type=" + repr(
+        type_literal
     )
     schema_fields = _schema_field_names(schema)
     dc_fields = _dataclass_field_names(cls)
@@ -154,17 +151,13 @@ def test_no_dataclass_without_schema_entry():
             continue
         if isinstance(f.default, str) and f.default not in known:
             orphans.append((obj.__name__, f.default))
-    assert not orphans, (
-        "dataclasses with unknown type literals: " + repr(orphans)
-    )
+    assert not orphans, "dataclasses with unknown type literals: " + repr(orphans)
 
 
 # ---- typescript surface check (text-only smoke) -------------------------
 
 
-_TS_PATH = Path(__file__).resolve().parents[2] / (
-    "ui-tui/src/transport/protocol.ts"
-)
+_TS_PATH = Path(__file__).resolve().parents[2] / ("ui-tui/src/transport/protocol.ts")
 
 
 def _ts_source():
@@ -183,7 +176,4 @@ def test_ts_interface_mentions_type_literal(type_literal):
     the TS side' regression without a full TS parser."""
     src = _ts_source()
     quoted = chr(34) + type_literal + chr(34)
-    assert quoted in src, (
-        "protocol.ts does not contain type literal "
-        + repr(type_literal)
-    )
+    assert quoted in src, "protocol.ts does not contain type literal " + repr(type_literal)

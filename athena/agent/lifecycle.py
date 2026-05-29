@@ -185,6 +185,7 @@ class AgentLifecycle:
         # ``maybe_run_curator(agent, force=True)`` from curator unit
         # tests are unaffected; only the background spawn is gated.
         import os
+
         if os.environ.get("ATHENA_DISABLE_BACKGROUND_CURATOR") == "1":
             return
         try:
@@ -445,6 +446,7 @@ class AgentLifecycle:
         """
         try:
             from ..skills import loader as _skills_loader
+
             _skills_loader._BODY_CACHE.clear()
         except Exception:  # noqa: BLE001
             logger.debug("skill body cache invalidate failed", exc_info=True)
@@ -474,6 +476,7 @@ class AgentLifecycle:
         self.messages = [{"role": "system", "content": self._build_system()}]
         self.stats = Stats()
         ui.info("conversation cleared")
+
     def __init__(
         self,
         cfg: Config,
@@ -497,9 +500,7 @@ class AgentLifecycle:
         # turn. ``None`` config or ``policy = "heuristic"`` is the
         # default; ``policy = "static"`` opts back into the pre-
         # parseltongue static-defaults behaviour.
-        self._param_policy: ParamPolicy = policy_from_config(
-            getattr(cfg, "parseltongue", None)
-        )
+        self._param_policy: ParamPolicy = policy_from_config(getattr(cfg, "parseltongue", None))
         # Reset the per-process thrash buffer so a prior session's
         # repeat-call history doesn't bleed into this one.
         from ..tools import thrash as _thrash
@@ -768,9 +769,11 @@ class AgentLifecycle:
         self.browser_session = None
         try:
             from ..browser.session import BrowserSession, set_active_browser
+
             if self.session_id is not None and getattr(cfg, "browser_enabled", True):
                 self.browser_session = BrowserSession(
-                    session_id=self.session_id, cfg=cfg,
+                    session_id=self.session_id,
+                    cfg=cfg,
                 )
                 set_active_browser(self.browser_session)
         except Exception:  # noqa: BLE001
@@ -786,6 +789,7 @@ class AgentLifecycle:
         # does nothing; I have to kill the terminal."
         try:
             from .. import interrupt_hooks as _ih
+
             _ih.register_cancel_hook(self._cancel_in_flight)
         except Exception:  # noqa: BLE001
             logger.debug("cancel hook registration failed", exc_info=True)
@@ -818,6 +822,7 @@ class AgentLifecycle:
         # rotations the leak was the dominant memory consumer.
         try:
             from .. import interrupt_hooks as _ih
+
             _ih.unregister_cancel_hook(self._cancel_in_flight)
         except Exception:  # noqa: BLE001
             logger.debug("cancel hook unregistration failed", exc_info=True)
@@ -842,6 +847,7 @@ class AgentLifecycle:
             # cron) don't accumulate stale ints forever.
             try:
                 from ..review.nudge import reset as _nudge_reset
+
                 _nudge_reset(self.session_id)
             except Exception:
                 pass
@@ -872,6 +878,7 @@ class AgentLifecycle:
                 pass
             try:
                 from ..browser.session import set_active_browser
+
                 set_active_browser(None)
             except Exception:
                 pass

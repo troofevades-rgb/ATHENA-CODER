@@ -108,9 +108,7 @@ def test_full_turn_event_sequence(recorder):
     done = next(e for e in recorder.events if isinstance(e, ToolCompleteEvent))
     assert "200 lines" in done.result_preview
     # Stream deltas share a stream_id with the start.
-    stream_start = next(
-        e for e in recorder.events if isinstance(e, StreamStartEvent)
-    )
+    stream_start = next(e for e in recorder.events if isinstance(e, StreamStartEvent))
     deltas = [e for e in recorder.events if isinstance(e, StreamDeltaEvent)]
     end = next(e for e in recorder.events if isinstance(e, StreamEndEvent))
     assert all(d.stream_id == stream_start.stream_id for d in deltas)
@@ -178,18 +176,14 @@ def test_confirm_round_trip_denied(recorder):
     assert req.request_id not in ui._pending_confirms
 
 
-def _await_confirm_request(
-    recorder: _Recorder, *, timeout: float
-) -> ConfirmRequestEvent:
+def _await_confirm_request(recorder: _Recorder, *, timeout: float) -> ConfirmRequestEvent:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         for e in recorder.events:
             if isinstance(e, ConfirmRequestEvent):
                 return e
         time.sleep(0.01)
-    raise AssertionError(
-        "ConfirmRequestEvent never shipped — bridge isn't routing through gateway"
-    )
+    raise AssertionError("ConfirmRequestEvent never shipped — bridge isn't routing through gateway")
 
 
 # ---- Test 3: TUI death → Rich fallback --------------------------
@@ -300,7 +294,7 @@ def test_theme_set_during_stream_re_emits_banner_without_disrupting_stream(
     assert types == [
         "StreamStartEvent",
         "StreamDeltaEvent",
-        "BannerEvent",       # ← the refresh lands in the middle
+        "BannerEvent",  # ← the refresh lands in the middle
         "StreamDeltaEvent",
         "StreamEndEvent",
     ]

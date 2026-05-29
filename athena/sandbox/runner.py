@@ -88,9 +88,7 @@ def run(
     policy = ShellPolicy(denylist=tuple(DEFAULT_DENYLIST) + extras)
     decision = policy.evaluate_denylist_only(command)
     if not decision.allowed:
-        raise BlockedByPolicyError(
-            f"shell policy refused the command: {decision.reason}"
-        )
+        raise BlockedByPolicyError(f"shell policy refused the command: {decision.reason}")
 
     # 2/3. Sandbox decision
     sandbox_enabled = bool(getattr(cfg, "sandbox_enabled", False))
@@ -103,9 +101,7 @@ def run(
                 inner,
                 workspace=ws or ".",
                 allow_network=bool(getattr(cfg, "sandbox_allow_network", False)),
-                writable_paths=list(
-                    getattr(cfg, "sandbox_writable_paths", []) or []
-                ),
+                writable_paths=list(getattr(cfg, "sandbox_writable_paths", []) or []),
             )
             sandboxed = True
         else:
@@ -139,9 +135,7 @@ def run(
         return RunResult(
             exit_code=124,
             stdout=(e.stdout or "") if isinstance(e.stdout, str) else "",
-            stderr=(
-                (e.stderr or "") if isinstance(e.stderr, str) else ""
-            )
+            stderr=((e.stderr or "") if isinstance(e.stderr, str) else "")
             + f"\n[verify] command timed out after {timeout_s:.0f}s",
             command=command,
             sandboxed=sandboxed,

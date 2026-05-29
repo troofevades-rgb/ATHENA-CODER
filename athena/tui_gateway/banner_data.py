@@ -22,8 +22,14 @@ if TYPE_CHECKING:
 # ``athena/ui.py:_info_panel`` so the new TUI doesn't look like a
 # different product mid-migration.
 _PRIORITY_TOOLSETS = (
-    "file", "shell", "skills", "memory", "media", "recall",
-    "web", "core",
+    "file",
+    "shell",
+    "skills",
+    "memory",
+    "media",
+    "recall",
+    "web",
+    "core",
 )
 _MAX_VISIBLE_TOOLSETS = 8
 _MAX_TOOLS_PER_SET = 4
@@ -76,7 +82,7 @@ def build_banner(
     *,
     model: str,
     cwd: Path,
-    cfg: "Config",
+    cfg: Config,
     theme_name: str | None = None,
     term_cols: int | None = None,
     term_rows: int | None = None,
@@ -111,7 +117,8 @@ def build_banner(
 
     owl_art = _load_owl_art()
     photo_w, photo_h = _compute_photo_size(
-        term_cols=term_cols, term_rows=term_rows,
+        term_cols=term_cols,
+        term_rows=term_rows,
     )
     owl_pixels = render_owl_pixels(photo_w, photo_h)
     tools = _collect_tools()

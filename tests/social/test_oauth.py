@@ -26,7 +26,6 @@ from athena.social.oauth import (
     _redact_for_log,
 )
 
-
 _DEFAULT_CFG = dict(
     social_oauth_authorize_url="https://example.test/oauth/authorize",
     social_oauth_token_url="https://example.test/oauth/token",
@@ -145,9 +144,7 @@ def test_refresh_on_expired(tmp_path: Path):
     new = o.access_token()
     assert new == "new-tok"
     # Transport saw a refresh_token grant_type body.
-    assert any(
-        call[1].get("grant_type") == "refresh_token" for call in transport.calls
-    )
+    assert any(call[1].get("grant_type") == "refresh_token" for call in transport.calls)
 
 
 def test_refresh_failure_raises_runtime_error(tmp_path: Path):
@@ -158,8 +155,10 @@ def test_refresh_failure_raises_runtime_error(tmp_path: Path):
     from athena.safety.secure_files import secure_write_json
 
     expired = TokenStore(
-        access_token="old", refresh_token="ref-abc",
-        expires_at=time.time() - 1000, scope="tweet.read",
+        access_token="old",
+        refresh_token="ref-abc",
+        expires_at=time.time() - 1000,
+        scope="tweet.read",
     )
     secure_write_json(tmp_path / "social_token.json", expired.to_dict(), mode=0o600)
     with pytest.raises(RuntimeError):
@@ -174,8 +173,10 @@ def test_access_token_without_refresh_raises(tmp_path: Path):
     from athena.safety.secure_files import secure_write_json
 
     expired = TokenStore(
-        access_token="old", refresh_token=None,
-        expires_at=time.time() - 1000, scope="tweet.read",
+        access_token="old",
+        refresh_token=None,
+        expires_at=time.time() - 1000,
+        scope="tweet.read",
     )
     secure_write_json(tmp_path / "social_token.json", expired.to_dict(), mode=0o600)
     with pytest.raises(RuntimeError, match="re-run authorize"):
@@ -199,8 +200,10 @@ def test_has_valid_token_false_when_expired(tmp_path: Path):
     from athena.safety.secure_files import secure_write_json
 
     expired = TokenStore(
-        access_token="old", refresh_token="ref",
-        expires_at=time.time() - 100, scope="",
+        access_token="old",
+        refresh_token="ref",
+        expires_at=time.time() - 100,
+        scope="",
     )
     secure_write_json(tmp_path / "social_token.json", expired.to_dict(), mode=0o600)
     assert o.has_valid_token() is False
@@ -314,9 +317,13 @@ def test_redact_for_log_handles_no_token():
 
 
 def test_clear_removes_token(tmp_path: Path):
-    o = SocialOAuth(_cfg(), token_dir=tmp_path, transport=_StubTransport(
-        body={"access_token": "t", "refresh_token": "r", "expires_in": 1000}
-    ))
+    o = SocialOAuth(
+        _cfg(),
+        token_dir=tmp_path,
+        transport=_StubTransport(
+            body={"access_token": "t", "refresh_token": "r", "expires_in": 1000}
+        ),
+    )
     o.exchange("code")
     assert o.has_valid_token() is True
     assert o.clear() is True

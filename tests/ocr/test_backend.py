@@ -16,7 +16,6 @@ import pytest
 
 from athena.ocr.contract import OCRBlock, OCRResult
 
-
 # ---------------------------------------------------------------
 # Capability + manifest declaration
 # ---------------------------------------------------------------
@@ -24,6 +23,7 @@ from athena.ocr.contract import OCRBlock, OCRResult
 
 def test_capabilities_has_ocr_field():
     from athena.providers.base import Capabilities
+
     c = Capabilities()
     assert hasattr(c, "ocr")
     assert c.ocr is False  # safe default
@@ -31,6 +31,7 @@ def test_capabilities_has_ocr_field():
 
 def test_capabilities_supports_ocr_lookup():
     from athena.providers.base import Capabilities
+
     assert Capabilities(ocr=True).supports("ocr") is True
     assert Capabilities().supports("ocr") is False
 
@@ -43,6 +44,7 @@ def test_tesseract_backend_declares_capability():
     from athena.ocr.backends.tesseract_local import (
         TesseractLocalBackend,
     )
+
     caps = TesseractLocalBackend.static_capabilities()
     assert caps.ocr is True
     assert caps.is_local is True
@@ -56,11 +58,11 @@ def test_tesseract_backend_declares_capability():
 
 
 def test_media_registry_resolves_ocr_to_local():
+    from athena.media.registry import MediaRegistry
     from athena.ocr import backends  # noqa: F401 — register
     from athena.ocr.backends.tesseract_local import (
         TesseractLocalBackend,
     )
-    from athena.media.registry import MediaRegistry
 
     cfg = SimpleNamespace(media_backend_prefer="local")
     cls = MediaRegistry(cfg=cfg).backend_for("ocr")
@@ -68,8 +70,8 @@ def test_media_registry_resolves_ocr_to_local():
 
 
 def test_media_registry_can_ocr():
-    from athena.ocr import backends  # noqa: F401
     from athena.media.registry import MediaRegistry
+    from athena.ocr import backends  # noqa: F401
 
     cfg = SimpleNamespace(media_backend_prefer="local")
     assert MediaRegistry(cfg=cfg).can("ocr") is True
@@ -112,11 +114,13 @@ def test_ocrresult_to_dict_without_boxes_omits_blocks():
 
 
 def test_ocrresult_joined_text_skips_empty_blocks():
-    r = OCRResult(blocks=[
-        OCRBlock(text="hello", bbox=(0, 0, 1, 1), confidence=90.0),
-        OCRBlock(text="", bbox=(0, 0, 1, 1), confidence=20.0),
-        OCRBlock(text="world", bbox=(0, 0, 1, 1), confidence=90.0),
-    ])
+    r = OCRResult(
+        blocks=[
+            OCRBlock(text="hello", bbox=(0, 0, 1, 1), confidence=90.0),
+            OCRBlock(text="", bbox=(0, 0, 1, 1), confidence=20.0),
+            OCRBlock(text="world", bbox=(0, 0, 1, 1), confidence=90.0),
+        ]
+    )
     assert r.joined_text() == "hello\nworld"
 
 
@@ -166,6 +170,7 @@ def test_tesseract_backend_is_available_returns_bool():
     for tests — just confirm the call shape returns a bool
     (False is fine; the rest of the suite uses the stub)."""
     from athena.ocr.backends.tesseract_local import TesseractLocalBackend
+
     avail = TesseractLocalBackend().is_available()
     assert isinstance(avail, bool)
 
@@ -174,6 +179,7 @@ def test_tesseract_backend_chat_methods_raise():
     """Capability-only provider — chat methods must error,
     not silently no-op."""
     from athena.ocr.backends.tesseract_local import TesseractLocalBackend
+
     b = TesseractLocalBackend()
     with pytest.raises(NotImplementedError):
         b.stream_chat(model="x", messages=[])
@@ -194,16 +200,16 @@ def test_coalesce_blocks_groups_per_word_rows():
     # ("hello world" + "second line"), each with multi-word
     # rows at level 5.
     data = {
-        "level":     [1, 2, 5, 5, 2, 5, 5],
-        "page_num":  [1, 1, 1, 1, 1, 1, 1],
+        "level": [1, 2, 5, 5, 2, 5, 5],
+        "page_num": [1, 1, 1, 1, 1, 1, 1],
         "block_num": [0, 1, 1, 1, 2, 2, 2],
-        "par_num":   [0, 0, 0, 0, 0, 0, 0],
-        "text":      ["", "", "hello", "world", "", "second", "line"],
-        "conf":      [-1, -1, 90, 92, -1, 80, 75],
-        "left":      [0, 0, 10, 60, 0, 10, 80],
-        "top":       [0, 0, 10, 10, 0, 50, 50],
-        "width":     [0, 0, 40, 40, 0, 60, 30],
-        "height":    [0, 0, 20, 20, 0, 20, 20],
+        "par_num": [0, 0, 0, 0, 0, 0, 0],
+        "text": ["", "", "hello", "world", "", "second", "line"],
+        "conf": [-1, -1, 90, 92, -1, 80, 75],
+        "left": [0, 0, 10, 60, 0, 10, 80],
+        "top": [0, 0, 10, 10, 0, 50, 50],
+        "width": [0, 0, 40, 40, 0, 60, 30],
+        "height": [0, 0, 20, 20, 0, 20, 20],
     }
     blocks = _coalesce_blocks(data)
     assert len(blocks) == 2
@@ -221,16 +227,16 @@ def test_coalesce_blocks_skips_negative_confidence_rows():
     from athena.ocr.backends.tesseract_local import _coalesce_blocks
 
     data = {
-        "level":     [5, 5, 5],
-        "page_num":  [1, 1, 1],
+        "level": [5, 5, 5],
+        "page_num": [1, 1, 1],
         "block_num": [1, 1, 1],
-        "par_num":   [0, 0, 0],
-        "text":      ["good", "junk", "more"],
-        "conf":      [95, -1, 90],
-        "left":      [0, 0, 0],
-        "top":       [0, 0, 0],
-        "width":     [10, 10, 10],
-        "height":    [10, 10, 10],
+        "par_num": [0, 0, 0],
+        "text": ["good", "junk", "more"],
+        "conf": [95, -1, 90],
+        "left": [0, 0, 0],
+        "top": [0, 0, 0],
+        "width": [10, 10, 10],
+        "height": [10, 10, 10],
     }
     blocks = _coalesce_blocks(data)
     assert blocks[0].text == "good more"  # junk dropped

@@ -116,9 +116,7 @@ def test_intent_uses_last_user_message():
 
 def test_deep_tool_chain_drops_temperature():
     p = heuristic_policy()
-    out = p.params_for(
-        PolicyInput(messages=[_user("brainstorm ideas")], tool_calls_so_far=5)
-    )
+    out = p.params_for(PolicyInput(messages=[_user("brainstorm ideas")], tool_calls_so_far=5))
     # Even on a brainstorm prompt, the deep-chain modifier wins because
     # it's later in the rule order.
     assert out["temperature"] <= 0.15
@@ -178,8 +176,10 @@ def test_rules_can_specialize_without_clobbering():
 def test_failed_predicate_does_not_crash():
     """A buggy predicate must silently fail-closed (rule doesn't fire)
     rather than crashing the agent loop."""
+
     def broken(_inp):
         raise RuntimeError("oops")
+
     rules = [
         Rule(name="base", predicate=lambda _: True, params={"temperature": 0.5}),
         Rule(name="broken", predicate=broken, params={"temperature": 0.0}),
@@ -264,10 +264,16 @@ def test_buggy_rule_outputs_get_clamped():
 
 
 def test_user_rule_matches_pattern():
-    rules = user_rules_from_config([
-        {"name": "yolo", "when": "user_message_matches", "pattern": r"(?i)\byolo\b",
-         "params": {"temperature": 0.95}},
-    ])
+    rules = user_rules_from_config(
+        [
+            {
+                "name": "yolo",
+                "when": "user_message_matches",
+                "pattern": r"(?i)\byolo\b",
+                "params": {"temperature": 0.95},
+            },
+        ]
+    )
     assert len(rules) == 1
     inp_match = PolicyInput(messages=[_user("yolo mode engaged")])
     inp_miss = PolicyInput(messages=[_user("normal request")])
@@ -276,44 +282,57 @@ def test_user_rule_matches_pattern():
 
 
 def test_user_rule_always_fires():
-    rules = user_rules_from_config([
-        {"name": "always_low", "when": "always", "params": {"temperature": 0.1}},
-    ])
+    rules = user_rules_from_config(
+        [
+            {"name": "always_low", "when": "always", "params": {"temperature": 0.1}},
+        ]
+    )
     assert len(rules) == 1
     assert rules[0].applies_to(PolicyInput(messages=[])) is True
 
 
 def test_user_rule_tool_chain_threshold():
-    rules = user_rules_from_config([
-        {"name": "deep", "when": "tool_calls_at_least", "count": 3,
-         "params": {"temperature": 0.1}},
-    ])
+    rules = user_rules_from_config(
+        [
+            {
+                "name": "deep",
+                "when": "tool_calls_at_least",
+                "count": 3,
+                "params": {"temperature": 0.1},
+            },
+        ]
+    )
     assert rules[0].applies_to(PolicyInput(messages=[], tool_calls_so_far=2)) is False
     assert rules[0].applies_to(PolicyInput(messages=[], tool_calls_so_far=3)) is True
 
 
 def test_user_rule_bad_regex_is_dropped():
     """A regex that fails to compile drops the rule, doesn't crash."""
-    rules = user_rules_from_config([
-        {"name": "bad", "when": "user_message_matches", "pattern": "([unclosed",
-         "params": {}},
-    ])
+    rules = user_rules_from_config(
+        [
+            {"name": "bad", "when": "user_message_matches", "pattern": "([unclosed", "params": {}},
+        ]
+    )
     assert rules == []
 
 
 def test_user_rule_unknown_when_is_dropped():
-    rules = user_rules_from_config([
-        {"name": "huh", "when": "telepathy", "params": {}},
-    ])
+    rules = user_rules_from_config(
+        [
+            {"name": "huh", "when": "telepathy", "params": {}},
+        ]
+    )
     assert rules == []
 
 
 def test_user_rule_layers_after_builtins():
     """User rules in the config should fire after the built-in rules,
     so they can override defaults."""
-    user = user_rules_from_config([
-        {"name": "global_low", "when": "always", "params": {"temperature": 0.05}},
-    ])
+    user = user_rules_from_config(
+        [
+            {"name": "global_low", "when": "always", "params": {"temperature": 0.05}},
+        ]
+    )
     p = heuristic_policy(extra_rules=user)
     out = p.params_for(PolicyInput(messages=[_user("brainstorm ideas")]))
     # Brainstorm wanted 0.85; the user rule fires last and overrides.
@@ -368,13 +387,19 @@ def test_llm_classifier_policy_class_still_present():
 
 
 def test_policy_from_config_with_user_rules():
-    p = policy_from_config({
-        "policy": "heuristic",
-        "user_rules": [
-            {"name": "yolo", "when": "user_message_matches", "pattern": "yolo",
-             "params": {"temperature": 0.99}},
-        ],
-    })
+    p = policy_from_config(
+        {
+            "policy": "heuristic",
+            "user_rules": [
+                {
+                    "name": "yolo",
+                    "when": "user_message_matches",
+                    "pattern": "yolo",
+                    "params": {"temperature": 0.99},
+                },
+            ],
+        }
+    )
     out = p.params_for(PolicyInput(messages=[_user("yolo")]))
     # After clamping (max 2.0), 0.99 passes through unchanged.
     assert out["temperature"] == 0.99

@@ -148,6 +148,7 @@ class AgentPool:
         model was supposed to prevent.
         """
         import time as _time
+
         deadline = _time.monotonic() + max(0.0, drain_timeout_s)
         # Poll the pin counter in short steps. We can't reuse
         # asyncio.Event here because pins are bumped/dropped under
@@ -161,7 +162,9 @@ class AgentPool:
                 if remaining:
                     logger.warning(
                         "agent pool evict_all: %d pin(s) still held after "
-                        "%.1fs grace; force-closing", remaining, drain_timeout_s,
+                        "%.1fs grace; force-closing",
+                        remaining,
+                        drain_timeout_s,
                     )
                 break
             await asyncio.sleep(0.05)

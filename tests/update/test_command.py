@@ -18,7 +18,6 @@ from athena.commands import update as update_cmd
 from athena.update.apply import ApplyResult
 from athena.update.detect import InstallMethod
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -105,9 +104,7 @@ def test_check_only_installs_nothing(monkeypatch, tmp_path: Path):
     _patch_current_version(monkeypatch, "0.2.0")
     _patch_latest(monkeypatch, "0.3.0")
     _patch_changelog(monkeypatch, "## [0.3.0]\nthings")
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     rc = update_cmd.main(["--check"])
     assert rc == 0
@@ -136,9 +133,7 @@ def test_check_offline_returns_cleanly(monkeypatch, tmp_path: Path, capsys):
     _patch_detect(monkeypatch, InstallMethod.PIP)
     _patch_current_version(monkeypatch, "0.2.0")
     _patch_latest(monkeypatch, None)
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     rc = update_cmd.main(["--check"])
     out = capsys.readouterr().out
@@ -159,9 +154,7 @@ def test_offline_makes_no_changes(monkeypatch, tmp_path: Path, capsys):
     _patch_detect(monkeypatch, InstallMethod.PIP)
     _patch_current_version(monkeypatch, "0.2.0")
     _patch_latest(monkeypatch, None)
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     rc = update_cmd.main([])
     out = capsys.readouterr().out
@@ -176,9 +169,7 @@ def test_up_to_date_no_action(monkeypatch, tmp_path: Path, capsys):
     _patch_detect(monkeypatch, InstallMethod.PIP)
     _patch_current_version(monkeypatch, "0.3.0")
     _patch_latest(monkeypatch, "0.3.0")
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     rc = update_cmd.main([])
     out = capsys.readouterr().out
@@ -220,9 +211,7 @@ def test_install_records_prior_version(monkeypatch, tmp_path: Path):
     _patch_current_version(monkeypatch, "0.2.0")
     _patch_latest(monkeypatch, "0.3.0")
     _patch_changelog(monkeypatch)
-    _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip", version_installed="0.3.0")
-    )
+    _patch_install(monkeypatch, ApplyResult(status="done", method="pip", version_installed="0.3.0"))
 
     update_cmd.main(["--yes"])
 
@@ -251,9 +240,7 @@ def test_install_pinned_skips_latest_lookup(monkeypatch, tmp_path: Path):
 
     import athena.update.check  # noqa: F401
 
-    monkeypatch.setattr(
-        sys.modules["athena.update.check"], "latest_for", _spy_latest
-    )
+    monkeypatch.setattr(sys.modules["athena.update.check"], "latest_for", _spy_latest)
 
     install_calls = _patch_install(
         monkeypatch, ApplyResult(status="done", method="pip", version_installed="0.4.2")
@@ -269,9 +256,7 @@ def test_editable_refused(monkeypatch, tmp_path: Path, capsys):
     _patch_cfg(monkeypatch, _cfg(tmp_path))
     _patch_detect(monkeypatch, InstallMethod.EDITABLE)
     _patch_current_version(monkeypatch, "0.2.0")
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     rc = update_cmd.main(["--yes"])
     out = capsys.readouterr().out
@@ -285,9 +270,7 @@ def test_unknown_refused(monkeypatch, tmp_path: Path):
     _patch_cfg(monkeypatch, _cfg(tmp_path))
     _patch_detect(monkeypatch, InstallMethod.UNKNOWN)
     _patch_current_version(monkeypatch, "0.2.0")
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     rc = update_cmd.main([])
     assert rc == 1
@@ -328,9 +311,7 @@ def test_rollback_installs_prior_version(monkeypatch, tmp_path: Path):
             message="rolled back to 0.1.5",
         )
 
-    monkeypatch.setattr(
-        sys.modules["athena.update.apply"], "rollback", _stub_rollback
-    )
+    monkeypatch.setattr(sys.modules["athena.update.apply"], "rollback", _stub_rollback)
 
     rc = update_cmd.main(["--rollback", "--yes"])
     assert rc == 0
@@ -402,9 +383,7 @@ def test_auto_check_prints_notice_when_newer(monkeypatch, tmp_path: Path, capsys
         lambda channel="stable", timeout=3.0: "0.3.0",
     )
 
-    install_calls = _patch_install(
-        monkeypatch, ApplyResult(status="done", method="pip")
-    )
+    install_calls = _patch_install(monkeypatch, ApplyResult(status="done", method="pip"))
 
     cfg = _cfg(tmp_path, update_auto_check=True)
     update_cmd.startup_notice(cfg)

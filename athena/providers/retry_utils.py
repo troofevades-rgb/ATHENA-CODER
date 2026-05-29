@@ -108,10 +108,7 @@ def with_retry(
             # rotate callback gets a chance to swap creds.
             if classification.error_class is ErrorClass.RATE_LIMIT:
                 consecutive_429s += 1
-                if (
-                    consecutive_429s >= _ROTATE_AFTER_N_429s
-                    and on_rotate_credential is not None
-                ):
+                if consecutive_429s >= _ROTATE_AFTER_N_429s and on_rotate_credential is not None:
                     classification = Classification(
                         action=ErrorAction.ROTATE_CREDENTIAL,
                         error_class=classification.error_class,

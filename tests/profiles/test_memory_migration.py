@@ -73,9 +73,7 @@ def _seed_legacy(home: Path, slug: str, files: dict[str, str]) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def test_migrate_copies_all_files(
-    fake_home: Path, short_slug: str, tmp_path: Path
-) -> None:
+def test_migrate_copies_all_files(fake_home: Path, short_slug: str, tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     src = _seed_legacy(
@@ -125,7 +123,11 @@ def test_migrate_skips_when_target_already_exists(
     opportunistic call from ``Agent.__init__`` stays cheap."""
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    _seed_legacy(fake_home, short_slug, {"alpha.md": "---\nname: alpha\ndescription: x\ntype: user\n---\n\nb\n"})
+    _seed_legacy(
+        fake_home,
+        short_slug,
+        {"alpha.md": "---\nname: alpha\ndescription: x\ntype: user\n---\n\nb\n"},
+    )
 
     # First run migrates.
     first = migration.migrate_workspace_memory(
@@ -177,20 +179,20 @@ def test_migrate_only_touches_requested_workspace(
     def _slug(ws: Path) -> str:
         return f"slug-{ws.name}"
 
-    monkeypatch.setattr(
-        BuiltinFileProvider, "workspace_slug", staticmethod(_slug)
-    )
+    monkeypatch.setattr(BuiltinFileProvider, "workspace_slug", staticmethod(_slug))
 
     ws_a = tmp_path / "ws-a"
     ws_a.mkdir()
     ws_b = tmp_path / "ws-b"
     ws_b.mkdir()
-    _seed_legacy(fake_home, _slug(ws_a), {"a.md": "---\nname: a\ndescription: x\ntype: user\n---\n\nA\n"})
-    _seed_legacy(fake_home, _slug(ws_b), {"b.md": "---\nname: b\ndescription: x\ntype: user\n---\n\nB\n"})
-
-    migration.migrate_workspace_memory(
-        profile="default", workspace=ws_a, home=fake_home
+    _seed_legacy(
+        fake_home, _slug(ws_a), {"a.md": "---\nname: a\ndescription: x\ntype: user\n---\n\nA\n"}
     )
+    _seed_legacy(
+        fake_home, _slug(ws_b), {"b.md": "---\nname: b\ndescription: x\ntype: user\n---\n\nB\n"}
+    )
+
+    migration.migrate_workspace_memory(profile="default", workspace=ws_a, home=fake_home)
 
     target_a = fake_home / "profiles" / "default" / "memory" / "legacy" / _slug(ws_a)
     target_b = fake_home / "profiles" / "default" / "memory" / "legacy" / _slug(ws_b)
@@ -203,15 +205,17 @@ def test_migrate_only_touches_requested_workspace(
 # ---------------------------------------------------------------------------
 
 
-def test_maybe_migrate_off_by_default(
-    fake_home: Path, short_slug: str, tmp_path: Path
-) -> None:
+def test_maybe_migrate_off_by_default(fake_home: Path, short_slug: str, tmp_path: Path) -> None:
     """Without ``cfg.migrate_legacy_memory = True`` the wrapper must
     be a no-op -- session starts during the dogfood window stay
     free of disk side-effects."""
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    _seed_legacy(fake_home, short_slug, {"alpha.md": "---\nname: alpha\ndescription: x\ntype: user\n---\n\nb\n"})
+    _seed_legacy(
+        fake_home,
+        short_slug,
+        {"alpha.md": "---\nname: alpha\ndescription: x\ntype: user\n---\n\nb\n"},
+    )
 
     cfg = SimpleNamespace(profile="default", migrate_legacy_memory=False)
     result = migration.maybe_migrate_workspace_memory(cfg, workspace)
@@ -230,7 +234,11 @@ def test_maybe_migrate_runs_when_flag_set(
     (profile, workspace)."""
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    _seed_legacy(fake_home, short_slug, {"alpha.md": "---\nname: alpha\ndescription: x\ntype: user\n---\n\nb\n"})
+    _seed_legacy(
+        fake_home,
+        short_slug,
+        {"alpha.md": "---\nname: alpha\ndescription: x\ntype: user\n---\n\nb\n"},
+    )
 
     monkeypatch.setattr(migration, "CONFIG_DIR", fake_home)
 

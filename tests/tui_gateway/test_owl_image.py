@@ -20,7 +20,6 @@ import pytest
 
 from athena.tui_gateway.owl_image import render_owl_pixels
 
-
 _HEX = re.compile(r"^#[0-9a-f]{6}$")
 
 
@@ -82,13 +81,13 @@ def test_top_left_pixel_is_dark(monkeypatch):
     matrix = render_owl_pixels(20, 10)
     assert matrix is not None
     _glyph, fg, bg = matrix["cells"][0][0]
+
     # Hex → int sum of RGB channels. Dark = low sum.
     def luminance(h: str) -> int:
         return int(h[1:3], 16) + int(h[3:5], 16) + int(h[5:7], 16)
 
     assert luminance(fg) < 200, (
-        f"top-left cell unexpectedly bright: fg={fg} "
-        "(loaded the wrong image?)"
+        f"top-left cell unexpectedly bright: fg={fg} (loaded the wrong image?)"
     )
     assert luminance(bg) < 200
 

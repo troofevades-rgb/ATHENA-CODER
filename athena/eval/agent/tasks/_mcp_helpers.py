@@ -28,7 +28,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 _CALL_LOG_FILE = "mcp_call_log.jsonl"
 
 

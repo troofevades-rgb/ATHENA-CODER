@@ -205,7 +205,10 @@ class ShellHookPlugin(Plugin):
         return False if not allow else None
 
     def post_tool_call(
-        self, tool_name: str, tool_args: dict[str, Any], result: str,
+        self,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        result: str,
     ) -> None:
         _run_shell_hooks(
             self._hooks,

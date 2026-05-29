@@ -62,7 +62,8 @@ def test_video_generate_refuses_when_disabled(monkeypatch, tmp_path: Path):
     """cfg.video_generation_enabled=False → not_enabled payload,
     NO backend resolution attempted."""
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, video_generation_enabled=False),
     )
 
@@ -80,14 +81,13 @@ def test_video_generate_refuses_when_disabled(monkeypatch, tmp_path: Path):
 
 def test_animate_image_refuses_when_disabled(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, video_generation_enabled=False),
     )
     img = tmp_path / "src.png"
     img.write_bytes(b"img")
-    out = json.loads(
-        tools_mod.animate_image(image_path=str(img), motion_prompt="zoom")
-    )
+    out = json.loads(tools_mod.animate_image(image_path=str(img), motion_prompt="zoom"))
     assert out["status"] == "not_enabled"
 
 
@@ -113,18 +113,14 @@ def test_animate_image_requires_source(monkeypatch, tmp_path: Path):
     assert "image_path" in out1["reason"]
 
     out2 = json.loads(
-        tools_mod.animate_image(
-            image_path=str(tmp_path / "missing.png"), motion_prompt="x"
-        )
+        tools_mod.animate_image(image_path=str(tmp_path / "missing.png"), motion_prompt="x")
     )
     assert out2["status"] == "rejected"
     assert "does not exist" in out2["reason"]
 
     img = tmp_path / "src.png"
     img.write_bytes(b"img")
-    out3 = json.loads(
-        tools_mod.animate_image(image_path=str(img), motion_prompt="")
-    )
+    out3 = json.loads(tools_mod.animate_image(image_path=str(img), motion_prompt=""))
     assert out3["status"] == "rejected"
     assert "motion_prompt" in out3["reason"]
 
@@ -152,11 +148,7 @@ def test_video_generate_writes_output(monkeypatch, tmp_path: Path):
     succeeds → file written + sha + audit."""
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
 
-    out = json.loads(
-        tools_mod.video_generate(
-            prompt="a paper boat", duration_s=3.0
-        )
-    )
+    out = json.loads(tools_mod.video_generate(prompt="a paper boat", duration_s=3.0))
     assert out["status"] == "done"
     assert out["backend"] == "stub_video_local"
     assert "path" in out
@@ -195,12 +187,11 @@ def test_video_generate_long_job_declined_by_default(monkeypatch, tmp_path: Path
     no confirm UI plumbed → default_deny kicks in →
     status=declined, no file produced."""
     monkeypatch.setattr(
-        tools_mod, "_load_cfg",
+        tools_mod,
+        "_load_cfg",
         lambda: _cfg(tmp_path, video_confirm_over_seconds=10.0),
     )
-    out = json.loads(
-        tools_mod.video_generate(prompt="long clip", duration_s=120.0)
-    )
+    out = json.loads(tools_mod.video_generate(prompt="long clip", duration_s=120.0))
     assert out["status"] == "declined"
     assert out["estimate"]["seconds_est"] == 120.0
     # And no media file was written for the declined job.

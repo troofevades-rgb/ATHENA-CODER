@@ -200,6 +200,7 @@ class ObservabilityPlugin(Plugin):
             )
         else:
             from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
             reader = InMemoryMetricReader()
         provider = MeterProvider(metric_readers=[reader])
         _otel_metrics.set_meter_provider(provider)

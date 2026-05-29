@@ -85,8 +85,8 @@ class ApplyResult:
 
     status: str  # done | skipped | error | refused
     method: str
-    version_installed: Optional[str] = None
-    prior_version: Optional[str] = None
+    version_installed: str | None = None
+    prior_version: str | None = None
     stdout: str = ""
     stderr: str = ""
     message: str = ""
@@ -141,7 +141,7 @@ def record_prior(version: str, *, cfg: Any = None) -> bool:
     return True
 
 
-def read_prior(*, cfg: Any = None) -> Optional[str]:
+def read_prior(*, cfg: Any = None) -> str | None:
     """Return the recorded prior version, or None when no
     upgrade has been recorded yet / the file is unreadable."""
     p = state_path(cfg=cfg)
@@ -183,14 +183,18 @@ def _run(
     except FileNotFoundError as e:
         return 127, "", f"executable not found: {e}"
     except subprocess.TimeoutExpired as e:
-        return 124, (e.stdout or "" if isinstance(e.stdout, str) else ""), (
-            (e.stderr or "" if isinstance(e.stderr, str) else "")
-            + f"\n[update] command timed out after {timeout:.0f}s"
+        return (
+            124,
+            (e.stdout or "" if isinstance(e.stdout, str) else ""),
+            (
+                (e.stderr or "" if isinstance(e.stderr, str) else "")
+                + f"\n[update] command timed out after {timeout:.0f}s"
+            ),
         )
     return proc.returncode, proc.stdout or "", proc.stderr or ""
 
 
-def _pip_argv(version: Optional[str], *, pkg: str = PACKAGE_NAME) -> list[str]:
+def _pip_argv(version: str | None, *, pkg: str = PACKAGE_NAME) -> list[str]:
     """Build the pip argv. Uses ``sys.executable -m pip`` so we
     target the running interpreter's pip — important when the
     user has multiple Python installations."""
@@ -198,9 +202,7 @@ def _pip_argv(version: Optional[str], *, pkg: str = PACKAGE_NAME) -> list[str]:
     return [sys.executable, "-m", "pip", "install", "--upgrade", spec]
 
 
-def _pipx_argv(
-    version: Optional[str], *, pkg: str = PACKAGE_NAME
-) -> list[str]:
+def _pipx_argv(version: str | None, *, pkg: str = PACKAGE_NAME) -> list[str]:
     """For a plain upgrade pipx supports ``pipx upgrade``;
     for a pinned version we use ``pipx install ... --force``
     which replaces the venv."""
@@ -217,8 +219,8 @@ def _pipx_argv(
 def install(
     method: InstallMethod,
     *,
-    version: Optional[str] = None,
-    repo_root: Optional[str] = None,
+    version: str | None = None,
+    repo_root: str | None = None,
     pkg: str = PACKAGE_NAME,
     cfg: Any = None,
 ) -> ApplyResult:
@@ -304,11 +306,13 @@ def rollback(*, cfg: Any = None, pkg: str = PACKAGE_NAME) -> ApplyResult:
 
 def _install_via_pip_or_pipx(
     method: InstallMethod,
-    version: Optional[str],
+    version: str | None,
     *,
     pkg: str,
 ) -> ApplyResult:
-    argv = _pip_argv(version, pkg=pkg) if method == InstallMethod.PIP else _pipx_argv(version, pkg=pkg)
+    argv = (
+        _pip_argv(version, pkg=pkg) if method == InstallMethod.PIP else _pipx_argv(version, pkg=pkg)
+    )
     # Belt-and-braces: if pipx isn't on PATH we don't have a
     # path forward (the install would have been pip), so error
     # early with a clear message instead of FileNotFoundError.
@@ -334,8 +338,7 @@ def _install_via_pip_or_pipx(
         stdout=out,
         stderr=err,
         message=(
-            f"installed {pkg} {version or '(latest)'} via {method.value} — "
-            "restart athena to use it"
+            f"installed {pkg} {version or '(latest)'} via {method.value} — restart athena to use it"
         ),
     )
 
@@ -346,9 +349,9 @@ def _install_via_pip_or_pipx(
 
 
 def _install_via_git(
-    version: Optional[str],
+    version: str | None,
     *,
-    repo_root: Optional[str],
+    repo_root: str | None,
     pkg: str,
 ) -> ApplyResult:
     """Three steps: fetch, checkout, reinstall.
@@ -384,9 +387,7 @@ def _install_via_git(
     if version:
         # Try v-prefix tag, fall back to bare version.
         for ref in (f"v{version}", version):
-            code, out, err = _run(
-                ["git", "-C", repo_root or ".", "checkout", ref]
-            )
+            code, out, err = _run(["git", "-C", repo_root or ".", "checkout", ref])
             if code == 0:
                 break
         else:
@@ -399,9 +400,7 @@ def _install_via_git(
             )
     else:
         # Default branch HEAD.
-        code, out, err = _run(
-            ["git", "-C", repo_root or ".", "merge", "--ff-only", "@{u}"]
-        )
+        code, out, err = _run(["git", "-C", repo_root or ".", "merge", "--ff-only", "@{u}"])
         if code != 0:
             return ApplyResult(
                 status="error",
@@ -430,7 +429,6 @@ def _install_via_git(
         stdout=out,
         stderr=err,
         message=(
-            f"installed {pkg} from git ({version or 'origin/HEAD'}) — "
-            "restart athena to use it"
+            f"installed {pkg} from git ({version or 'origin/HEAD'}) — restart athena to use it"
         ),
     )

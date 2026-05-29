@@ -22,7 +22,6 @@ from athena.audio.job import (
     TranscribeResult,
 )
 
-
 # ---------------------------------------------------------------
 # Capability declaration
 # ---------------------------------------------------------------
@@ -30,6 +29,7 @@ from athena.audio.job import (
 
 def test_capabilities_has_audio_transcription_field():
     from athena.providers.base import Capabilities
+
     c = Capabilities()
     assert hasattr(c, "audio_transcription")
     assert c.audio_transcription is False  # safe default
@@ -38,6 +38,7 @@ def test_capabilities_has_audio_transcription_field():
 def test_capabilities_supports_audio_transcription_lookup():
     """The supports() helper accepts the new field by name."""
     from athena.providers.base import Capabilities
+
     c = Capabilities(audio_transcription=True)
     assert c.supports("audio_transcription") is True
     assert c.supports("nonsense") is False
@@ -51,6 +52,7 @@ def test_faster_whisper_backend_declares_capability():
     from athena.audio.backends.faster_whisper_local import (
         FasterWhisperLocalBackend,
     )
+
     caps = FasterWhisperLocalBackend.static_capabilities()
     assert caps.audio_transcription is True
     assert caps.is_local is True
@@ -167,6 +169,7 @@ def test_faster_whisper_is_available_when_lib_importable():
     from athena.audio.backends.faster_whisper_local import (
         FasterWhisperLocalBackend,
     )
+
     b = FasterWhisperLocalBackend()
     # We don't strictly require faster-whisper to be installed
     # at test time — but if it isn't, the backend is simply
@@ -181,6 +184,7 @@ def test_faster_whisper_chat_methods_raise():
     from athena.audio.backends.faster_whisper_local import (
         FasterWhisperLocalBackend,
     )
+
     b = FasterWhisperLocalBackend()
     with pytest.raises(NotImplementedError):
         b.stream_chat(model="x", messages=[])

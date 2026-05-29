@@ -51,9 +51,7 @@ _PYPI_URL_TEMPLATE = "https://pypi.org/pypi/{pkg}/json"
 # release-candidate / dev tag. PEP 440 covers more shapes but
 # this matches the practical set without dragging in the
 # `packaging` library at import time.
-_PRERELEASE_RX = re.compile(
-    r"(?i)(?:[._-]?(?:a|alpha|b|beta|rc|c|dev|pre)\d*)\b"
-)
+_PRERELEASE_RX = re.compile(r"(?i)(?:[._-]?(?:a|alpha|b|beta|rc|c|dev|pre)\d*)\b")
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +85,7 @@ def _parse(version: str) -> Any:
     return tuple(parts)
 
 
-def is_newer(current: str, latest: Optional[str]) -> bool:
+def is_newer(current: str, latest: str | None) -> bool:
     """``True`` iff ``latest`` is strictly newer than
     ``current``. ``latest=None`` (offline / lookup failed) →
     False so the command never advertises an update it
@@ -106,7 +104,7 @@ def _is_prerelease(version: str) -> bool:
     return bool(_PRERELEASE_RX.search(version))
 
 
-def _max_version(versions: list[str]) -> Optional[str]:
+def _max_version(versions: list[str]) -> str | None:
     """Return the highest version string, or None when the
     input is empty."""
     if not versions:
@@ -127,7 +125,7 @@ def latest_pypi_version(
     *,
     channel: str = "stable",
     timeout: float = _PYPI_TIMEOUT,
-) -> Optional[str]:
+) -> str | None:
     """Query PyPI's JSON API for the highest release in the
     requested channel.
 
@@ -147,10 +145,7 @@ def latest_pypi_version(
     releases = data.get("releases") if isinstance(data, dict) else None
     if not isinstance(releases, dict):
         return None
-    versions = [
-        v for v in releases.keys()
-        if channel == "pre" or not _is_prerelease(v)
-    ]
+    versions = [v for v in releases.keys() if channel == "pre" or not _is_prerelease(v)]
     return _max_version(versions)
 
 
@@ -161,9 +156,9 @@ def latest_pypi_version(
 
 def latest_git_tag(
     *,
-    repo_root: Optional[str] = None,
+    repo_root: str | None = None,
     timeout: float = 10.0,
-) -> Optional[str]:
+) -> str | None:
     """Run ``git ls-remote --tags origin`` to find the latest
     version tag in the upstream. Best-effort: any subprocess
     failure (git missing, no remote, network unreachable)
@@ -215,7 +210,7 @@ def latest_for(
     *,
     cfg: Any | None = None,
     pkg: str = PACKAGE_NAME,
-) -> Optional[str]:
+) -> str | None:
     """Pick the right "latest" lookup per install method.
 
     PIP / PIPX → PyPI JSON.
@@ -225,9 +220,7 @@ def latest_for(
     speculate on what the user's editing toward).
     UNKNOWN → None.
     """
-    channel = (
-        getattr(cfg, "update_channel", "stable") if cfg is not None else "stable"
-    )
+    channel = getattr(cfg, "update_channel", "stable") if cfg is not None else "stable"
     if method in (InstallMethod.PIP, InstallMethod.PIPX):
         return latest_pypi_version(pkg, channel=channel)
     if method == InstallMethod.GIT:
@@ -245,8 +238,8 @@ def changelog_between(
     latest: str,
     *,
     method: InstallMethod | None = None,
-    changelog_path: Optional[str] = None,
-    repo_root: Optional[str] = None,
+    changelog_path: str | None = None,
+    repo_root: str | None = None,
 ) -> str:
     """Return a human-readable preview of what changed between
     ``current`` and ``latest``.
@@ -274,7 +267,7 @@ def _changelog_via_file(
     current: str,
     latest: str,
     *,
-    changelog_path: Optional[str],
+    changelog_path: str | None,
 ) -> str:
     """Read the on-disk CHANGELOG and slice between the two
     version sections. Uses the standard ``## [<version>]``
@@ -308,7 +301,7 @@ def _changelog_via_git(
     current: str,
     latest: str,
     *,
-    repo_root: Optional[str],
+    repo_root: str | None,
 ) -> str:
     """`git log v<current>..v<latest> --oneline`. Tries with
     and without the v-prefix; the first one that returns
@@ -340,7 +333,7 @@ def _pointer_fallback() -> str:
     )
 
 
-def _resolve_changelog_path(explicit: Optional[str]):
+def _resolve_changelog_path(explicit: str | None):
     from pathlib import Path
 
     if explicit:

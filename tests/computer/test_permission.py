@@ -40,7 +40,6 @@ from athena.safety.approval_guard import (
     current_grants,
 )
 
-
 # ---------------------------------------------------------------------------
 # Cfg + callback helpers
 # ---------------------------------------------------------------------------
@@ -151,15 +150,10 @@ def test_observe_passes_even_with_no_allowlist():
 
 
 def test_denylist_wins_no_prompt():
-    gate = PermissionGate(
-        cfg=cfg(mode="per_session", allowlist=["bank"], denylist=["bank"])
-    )
+    gate = PermissionGate(cfg=cfg(mode="per_session", allowlist=["bank"], denylist=["bank"]))
     token, asks = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="bank.app"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="bank.app")) is False
         assert asks == []
     finally:
         reset_approval_callback(token)
@@ -180,7 +174,8 @@ def test_denylist_wins_over_destructive_confirm_path():
         assert (
             gate.check(
                 Action(
-                    type="click", target_desc="Delete account",
+                    type="click",
+                    target_desc="Delete account",
                     app="password-manager",
                 )
             )
@@ -201,10 +196,7 @@ def test_denylist_partial_match_blocks():
     )
     token, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="1Password 7"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="1Password 7")) is False
     finally:
         reset_approval_callback(token)
 
@@ -218,10 +210,7 @@ def test_not_in_allowlist_blocked():
     gate = PermissionGate(cfg=cfg(mode="per_action", allowlist=["editor"]))
     token, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="Slack"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="Slack")) is False
     finally:
         reset_approval_callback(token)
 
@@ -230,10 +219,7 @@ def test_empty_allowlist_blocks_all_input():
     gate = PermissionGate(cfg=cfg(mode="per_action", allowlist=[]))
     token, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="editor")) is False
     finally:
         reset_approval_callback(token)
 
@@ -244,10 +230,7 @@ def test_no_app_name_blocked_under_allowlist():
     gate = PermissionGate(cfg=cfg(mode="per_action", allowlist=["editor"]))
     token, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app=None))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app=None)) is False
     finally:
         reset_approval_callback(token)
 
@@ -258,26 +241,17 @@ def test_allowlist_substring_match():
     t1, _ = _bind(lambda a, t: True)
     try:
         # "editor" is not a substring of "VS Code" — refuse.
-        assert (
-            gate.check(Action(type="click", target_desc="Tab 2", app="VS Code"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="Tab 2", app="VS Code")) is False
     finally:
         reset_approval_callback(t1)
     t2, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate2.check(Action(type="click", target_desc="Tab 2", app="VS Code"))
-            is True
-        )
+        assert gate2.check(Action(type="click", target_desc="Tab 2", app="VS Code")) is True
     finally:
         reset_approval_callback(t2)
     t3, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="Tab 2", app="TextEdit"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="Tab 2", app="TextEdit")) is False
     finally:
         reset_approval_callback(t3)
 
@@ -294,15 +268,10 @@ def test_observe_only_blocks_all_input():
     token, asks = _bind(lambda a, t: True)
     try:
         assert (
-            gate.check(
-                Action(type="type", text="hi", target_desc="text field", app="editor")
-            )
+            gate.check(Action(type="type", text="hi", target_desc="text field", app="editor"))
             is False
         )
-        assert (
-            gate.check(Action(type="click", target_desc="Tab 2", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="Tab 2", app="editor")) is False
         # No prompts burned — observe_only short-circuits.
         assert asks == []
     finally:
@@ -360,10 +329,7 @@ def test_destructive_in_observe_only_refuses_no_prompt():
     )
     token, asks = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="Delete", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="Delete", app="editor")) is False
         assert asks == []
     finally:
         reset_approval_callback(token)
@@ -414,15 +380,9 @@ def test_input_denial_persists_across_calls():
     gate = PermissionGate(cfg=cfg(mode="per_session", allowlist=["editor"]))
     token, asks = _bind(lambda a, t: False)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="editor")) is False
         asks.clear()
-        assert (
-            gate.check(Action(type="click", target_desc="Tab 2", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="Tab 2", app="editor")) is False
         assert asks == []
     finally:
         reset_approval_callback(token)
@@ -455,10 +415,7 @@ def test_unknown_mode_refuses():
     gate = PermissionGate(cfg=cfg(mode="zarquon", allowlist=["editor"]))
     token, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="editor")) is False
     finally:
         reset_approval_callback(token)
 
@@ -473,10 +430,7 @@ def test_confirm_callback_raises_treated_as_denial():
 
     token = set_approval_callback(_explodes)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="OK", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="OK", app="editor")) is False
     finally:
         reset_approval_callback(token)
 
@@ -485,10 +439,7 @@ def test_destructive_denial_blocks():
     gate = PermissionGate(cfg=cfg(mode="per_action", allowlist=["editor"]))
     token, _ = _bind(lambda a, t: False)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="Delete", app="editor"))
-            is False
-        )
+        assert gate.check(Action(type="click", target_desc="Delete", app="editor")) is False
     finally:
         reset_approval_callback(token)
 
@@ -497,9 +448,6 @@ def test_destructive_approval_allows():
     gate = PermissionGate(cfg=cfg(mode="per_action", allowlist=["editor"]))
     token, _ = _bind(lambda a, t: True)
     try:
-        assert (
-            gate.check(Action(type="click", target_desc="Delete", app="editor"))
-            is True
-        )
+        assert gate.check(Action(type="click", target_desc="Delete", app="editor")) is True
     finally:
         reset_approval_callback(token)

@@ -27,21 +27,13 @@ def _swatch(color: str) -> str:
 
 def _show(agent) -> None:
     active = ui.theme()
-    ui.console.print(
-        f"[bold]active theme:[/] {active.name} — [dim]{active.description}[/]"
-    )
+    ui.console.print(f"[bold]active theme:[/] {active.name} — [dim]{active.description}[/]")
     ui.console.print("[bold]available themes:[/]")
     for t in ui.list_themes():
         marker = " *" if t.name == active.name else "  "
         # Inline preview: primary / accent / dim swatches.
-        swatches = (
-            _swatch(t.primary)
-            + _swatch(t.accent)
-            + _swatch(t.primary_dim)
-        )
-        ui.console.print(
-            f"{marker} [bold]{t.name:10}[/] {swatches}  [dim]{t.description}[/]"
-        )
+        swatches = _swatch(t.primary) + _swatch(t.accent) + _swatch(t.primary_dim)
+        ui.console.print(f"{marker} [bold]{t.name:10}[/] {swatches}  [dim]{t.description}[/]")
 
 
 def _list(agent) -> None:
@@ -71,10 +63,7 @@ def _set(agent, name: str) -> None:
     # instead of waiting for the next session. Headless / Rich
     # mode has no gateway; the call is a no-op there.
     _refresh_tui_banner(agent)
-    ui.info(
-        f"theme → {new.name} ({new.description}). "
-        "session-scoped; use /theme save to persist."
-    )
+    ui.info(f"theme → {new.name} ({new.description}). session-scoped; use /theme save to persist.")
 
 
 def _refresh_tui_banner(agent) -> None:
@@ -118,7 +107,8 @@ def _save(agent) -> None:
         # Create with a minimal header line.
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(
-            f'theme = "{active.name}"\n', encoding="utf-8",
+            f'theme = "{active.name}"\n',
+            encoding="utf-8",
         )
         ui.info(f"wrote new config at {cfg_path} with theme = {active.name!r}")
         return

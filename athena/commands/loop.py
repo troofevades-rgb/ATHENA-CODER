@@ -94,6 +94,7 @@ def cmd_loop(agent, arg: str = "") -> str:
     # critically, a gateway-installed approval router on the
     # foreground would not be visible inside the loop's tool calls.
     import contextvars as _ctx
+
     _foreground_ctx = _ctx.copy_context()
 
     def _entry() -> None:

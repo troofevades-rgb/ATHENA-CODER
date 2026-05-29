@@ -122,14 +122,14 @@ class AgentRuntime:
             # reused across run_turn calls in the same session.
             from ..recall import (
                 build_vector_store as _build_vs,
+            )
+            from ..recall import (
                 set_active_vector_store,
             )
 
             if not hasattr(self, "_vector_store"):
                 try:
-                    self._vector_store = _build_vs(
-                        cfg=self.cfg, profile_dir=self._profile_dir()
-                    )
+                    self._vector_store = _build_vs(cfg=self.cfg, profile_dir=self._profile_dir())
                 except Exception:  # noqa: BLE001
                     self._vector_store = None
             set_active_vector_store(self._vector_store)
@@ -138,9 +138,7 @@ class AgentRuntime:
             progress_stop = self._start_progress_ticker()
             try:
                 current_input = user_input
-                tokens_at_loop_start = (
-                    self.stats.prompt_tokens + self.stats.eval_tokens
-                )
+                tokens_at_loop_start = self.stats.prompt_tokens + self.stats.eval_tokens
                 while True:
                     self._run_turn_inner(current_input)
                     next_input = self._consult_goal_continuation(
@@ -310,6 +308,7 @@ class AgentRuntime:
         if t is None or not t.is_alive():
             return
         import time as _time
+
         t0 = _time.monotonic()
         t.join(timeout=timeout)
         elapsed = _time.monotonic() - t0
@@ -373,10 +372,7 @@ class AgentRuntime:
             while not stop.wait(timeout=30.0):
                 elapsed = int(time.monotonic() - start_at)
                 tools_this_turn = self.stats.tool_calls - tools_at_start
-                msg = (
-                    f"still working — {tools_this_turn} tool call(s), "
-                    f"{elapsed}s elapsed"
-                )
+                msg = f"still working — {tools_this_turn} tool call(s), {elapsed}s elapsed"
                 try:
                     ui._emit_flash("info", msg)
                 except Exception:  # noqa: BLE001
@@ -384,7 +380,9 @@ class AgentRuntime:
                     pass
 
         threading.Thread(
-            target=_tick, name="athena-progress-ticker", daemon=True,
+            target=_tick,
+            name="athena-progress-ticker",
+            daemon=True,
         ).start()
         return stop
 
@@ -764,9 +762,7 @@ class AgentRuntime:
         except Exception:  # noqa: BLE001
             import logging as _logging
 
-            _logging.getLogger(__name__).debug(
-                "record_turn failed", exc_info=True
-            )
+            _logging.getLogger(__name__).debug("record_turn failed", exc_info=True)
 
     def _maybe_compress_context(self) -> None:
         """T2-04: compress ``self.messages`` if total tokens exceed

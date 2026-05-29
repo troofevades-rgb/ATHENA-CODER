@@ -146,9 +146,7 @@ def _resolve_social_provider() -> tuple[str | None, Any]:
     try:
         instance = cls()
     except Exception as e:  # noqa: BLE001
-        logger.warning(
-            "search_x: could not instantiate social provider %r: %s", name, e
-        )
+        logger.warning("search_x: could not instantiate social provider %r: %s", name, e)
         return name, None
 
     is_available_fn = getattr(instance, "is_available", None)

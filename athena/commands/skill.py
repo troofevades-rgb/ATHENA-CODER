@@ -35,11 +35,7 @@ def _is_archive(path: Path) -> bool:
 def cmd_skill(agent, arg: str = "") -> str:
     parts = (arg or "").strip().split(maxsplit=1)
     if not parts:
-        ui.error(
-            "usage: /skill import <path> | "
-            "/skill import-workspace <path> | "
-            "/skill reload"
-        )
+        ui.error("usage: /skill import <path> | /skill import-workspace <path> | /skill reload")
         return ""
     verb = parts[0].lower()
     rest = parts[1] if len(parts) > 1 else ""

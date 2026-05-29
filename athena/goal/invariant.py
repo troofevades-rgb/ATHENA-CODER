@@ -13,6 +13,10 @@ decisions.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from .state import GoalState
 
 GOAL_FILENAME = "goal.txt"
 GOAL_HEADER = "## Current goal (invariant — keep in mind during every action)"
@@ -57,7 +61,7 @@ def clear_goal(profile_dir: Path) -> bool:
 def format_for_system_prompt(
     goal: str,
     *,
-    state: "GoalState | None" = None,
+    state: GoalState | None = None,
 ) -> str:
     """Return the block to append at the end of the system prompt.
 

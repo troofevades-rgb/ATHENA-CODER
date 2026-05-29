@@ -205,10 +205,7 @@ def _extract_text_tool_calls(text: str) -> tuple[str, list[dict]]:
 # Sections live in athena/prompts/system.py.
 
 
-
-
 class Agent(AgentLifecycle, AgentRuntime, AgentGoalIntegration):
-
     # _cancel_in_flight, _build_plugin_hooks, _run_session_start_hooks,
     # _init_cross_session_cache, _build_system, _profile_dir, _load_goal,
     # _load_goal_state, _configure_shell_hook_plugin, reload_skills,
@@ -216,16 +213,9 @@ class Agent(AgentLifecycle, AgentRuntime, AgentGoalIntegration):
     # AgentLifecycle (R1 stage 2). All still on the Agent surface via
     # the mixin in the class declaration above.
 
-
-
     # _consult_goal_continuation and _persist_goal_state moved to
     # athena/agent/goal_integration.py:AgentGoalIntegration (R1 stage 1).
     # Both methods are still on the Agent surface via the mixin.
-
-
-
-
-
 
     def write_status_snapshot(self) -> None:
         """Atomically write ``<profile_dir>/.status.json`` with the
@@ -262,16 +252,6 @@ class Agent(AgentLifecycle, AgentRuntime, AgentGoalIntegration):
             os.replace(tmp, target)
         except OSError:
             pass
-
-
-
-
-
-
-
-
-
-
 
     # -- introspection helpers used by Agent.fork() ---------------------
 
@@ -332,8 +312,6 @@ class Agent(AgentLifecycle, AgentRuntime, AgentGoalIntegration):
             if m.get("role") == "assistant":
                 out.extend(m.get("tool_calls") or [])
         return out
-
-
 
 
 # Bind fork() as an Agent method. Done at module load so `Agent(...).fork(...)`

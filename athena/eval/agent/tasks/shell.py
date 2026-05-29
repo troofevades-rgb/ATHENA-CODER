@@ -235,11 +235,7 @@ _copy_file = EvalTask(
 def _verify_package_skeleton(ctx: VerifyContext) -> bool:
     ws = ctx.workspace
     pkg = ws / "mypkg"
-    return (
-        pkg.is_dir()
-        and (pkg / "__init__.py").exists()
-        and (pkg / "core.py").exists()
-    )
+    return pkg.is_dir() and (pkg / "__init__.py").exists() and (pkg / "core.py").exists()
 
 
 _python_package = EvalTask(
@@ -298,11 +294,7 @@ _concat_logs_in_order = EvalTask(
 
 def _setup_for_grep(ws: Path) -> None:
     (ws / "log.txt").write_text(
-        "INFO: starting up\n"
-        "ERROR: bad input\n"
-        "INFO: ready\n"
-        "ERROR: timeout\n"
-        "INFO: shutdown\n",
+        "INFO: starting up\nERROR: bad input\nINFO: ready\nERROR: timeout\nINFO: shutdown\n",
         encoding="utf-8",
     )
 

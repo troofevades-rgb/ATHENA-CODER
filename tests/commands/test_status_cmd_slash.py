@@ -22,8 +22,7 @@ def _capture():
     patches = [
         patch(
             "athena.commands.status.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         ),
     ]
     return lines, patches
@@ -100,10 +99,15 @@ def test_passes_default_profile_when_cfg_profile_none() -> None:
     # passed by instrumenting the stats fake.
     received_kwargs: dict = {}
     agent.stats = SimpleNamespace(
-        to_snapshot=lambda **k: (received_kwargs.update(k), {
-            "profile": k["profile"], "model": "qwen",
-            "provider": "ollama", "session_id": "s-1",
-        })[1],
+        to_snapshot=lambda **k: (
+            received_kwargs.update(k),
+            {
+                "profile": k["profile"],
+                "model": "qwen",
+                "provider": "ollama",
+                "session_id": "s-1",
+            },
+        )[1],
     )
     with patch(
         "athena.cli.status.render_status",

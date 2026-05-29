@@ -13,7 +13,6 @@ import dataclasses
 import json
 from typing import Any
 
-
 # Excerpt limits keep the summary file manageable for human
 # inspection; full text lives in the per-case score row +
 # per-run envelope on disk.
@@ -53,15 +52,20 @@ class EvalCase:
     extras: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "EvalCase":
+    def from_dict(cls, d: dict[str, Any]) -> EvalCase:
         task = d.get("task")
         if not task or not str(task).strip():
             raise ValueError("EvalCase requires non-empty 'task'")
         if "expected" not in d:
             raise ValueError("EvalCase requires 'expected' field")
         known = {
-            "task", "expected", "case_id", "scorer", "cwd",
-            "timeout_s", "model",
+            "task",
+            "expected",
+            "case_id",
+            "scorer",
+            "cwd",
+            "timeout_s",
+            "model",
         }
         extras = {k: v for k, v in d.items() if k not in known}
         return cls(
@@ -70,9 +74,7 @@ class EvalCase:
             case_id=str(d["case_id"]) if d.get("case_id") else None,
             scorer=str(d["scorer"]) if d.get("scorer") else None,
             cwd=str(d["cwd"]) if d.get("cwd") else None,
-            timeout_s=(
-                float(d["timeout_s"]) if d.get("timeout_s") is not None else None
-            ),
+            timeout_s=(float(d["timeout_s"]) if d.get("timeout_s") is not None else None),
             model=str(d["model"]) if d.get("model") else None,
             extras=extras,
         )
@@ -81,6 +83,7 @@ class EvalCase:
 def mint_case_id() -> str:
     """``e-<uuid12>`` — same family as the other ID shapes."""
     import uuid
+
     return f"e-{uuid.uuid4().hex[:12]}"
 
 
@@ -91,18 +94,18 @@ class EvalScore:
 
     case_id: str
     run_id: str
-    task_excerpt: str       # short version of the prompt
-    actual_excerpt: str     # short version of the model's answer
+    task_excerpt: str  # short version of the prompt
+    actual_excerpt: str  # short version of the model's answer
     passed: bool
     score: float
-    scorer: str             # name of the scorer that ran
-    details: str            # human-readable explanation
+    scorer: str  # name of the scorer that ran
+    details: str  # human-readable explanation
     # Status of the underlying RunResult — eval scoring is
     # only meaningful when the run completed; runs that
     # errored / timed out / were interrupted appear in the
     # summary as their own categories.
     run_status: str
-    envelope_path: str      # per-run JSON envelope path
+    envelope_path: str  # per-run JSON envelope path
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -123,22 +126,22 @@ class EvalScore:
 class EvalSummary:
     """Aggregated outcome of one eval invocation."""
 
-    eval_id: str            # ``v-<uuid12>``; "v" for "verified"
-    batch_id: str           # the underlying batch's ID
+    eval_id: str  # ``v-<uuid12>``; "v" for "verified"
+    batch_id: str  # the underlying batch's ID
     started_at: str
     finished_at: str
     duration_s: float
     output_dir: str
-    total: int              # cases in the input
-    passed: int             # scorer returned passed=True
-    failed: int             # scorer returned passed=False (run completed)
-    errored: int            # the underlying run didn't complete (error / timeout / etc.)
-    pass_rate: float        # passed / total, 0.0 when total == 0
-    avg_score: float        # mean(score) over completed scoring; 0.0 on empty
+    total: int  # cases in the input
+    passed: int  # scorer returned passed=True
+    failed: int  # scorer returned passed=False (run completed)
+    errored: int  # the underlying run didn't complete (error / timeout / etc.)
+    pass_rate: float  # passed / total, 0.0 when total == 0
+    avg_score: float  # mean(score) over completed scoring; 0.0 on empty
     by_scorer: dict[str, dict[str, int]] = dataclasses.field(default_factory=dict)
     # Populated only when --baseline DIR is supplied:
     baseline_id: str | None = None
-    regressions: list[str] = dataclasses.field(default_factory=list)   # case_ids
+    regressions: list[str] = dataclasses.field(default_factory=list)  # case_ids
     improvements: list[str] = dataclasses.field(default_factory=list)  # case_ids
     cases: list[EvalScore] = dataclasses.field(default_factory=list)
 
@@ -177,6 +180,7 @@ def mint_eval_id() -> str:
     "evaluation" — distinct from ``b-`` batch IDs and ``r-``
     run IDs so an operator can tell IDs apart at a glance."""
     import uuid
+
     return f"v-{uuid.uuid4().hex[:12]}"
 
 

@@ -121,7 +121,7 @@ def _rejected(reason: str) -> str:
         "``error``). When the user asks for a video, CALL THIS TOOL — "
         "don't pre-judge whether config is right. The tool returns a "
         "structured response and you react to that. Refusing to call "
-        "on the basis of \"video gen might be disabled\" wastes a turn "
+        'on the basis of "video gen might be disabled" wastes a turn '
         "and misinforms the operator."
     ),
     parameters={

@@ -31,7 +31,8 @@ def _wait_for(predicate, timeout: float = 3.0, interval: float = 0.05) -> bool:
 
 
 def test_watcher_fires_on_added_skill(
-    isolated_home: Path, tmp_path: Path,
+    isolated_home: Path,
+    tmp_path: Path,
 ) -> None:
     """Adding a new SKILL.md after the watcher starts must fire the
     on_change callback in less than poll_interval * 3 seconds."""
@@ -54,7 +55,8 @@ def test_watcher_fires_on_added_skill(
 
 
 def test_watcher_fires_on_modified_skill(
-    isolated_home: Path, tmp_path: Path,
+    isolated_home: Path,
+    tmp_path: Path,
 ) -> None:
     """Editing an existing SKILL.md must also fire the callback. Mtime
     is bumped explicitly so we don't depend on filesystem
@@ -75,6 +77,7 @@ def test_watcher_fires_on_modified_skill(
         # using ``os.utime`` rather than just rewriting (some filesystems
         # batch sub-second mtimes).
         import os as _os
+
         skill_md = skill_dir / "SKILL.md"
         future = time.time() + 5
         _os.utime(skill_md, (future, future))

@@ -38,7 +38,8 @@ def _write_settings(dir_path: Path, hooks_block: dict) -> Path:
 
 @pytest.fixture
 def isolated_settings(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> Path:
     """Redirect ``_user_settings()`` at ~/.athena/settings.json so a
     test's writes can't touch the developer's real home."""
@@ -76,7 +77,8 @@ def test_user_settings_hooks_loaded(isolated_settings: Path) -> None:
 
 
 def test_workspace_settings_are_added_on_configure(
-    isolated_settings: Path, tmp_path: Path,
+    isolated_settings: Path,
+    tmp_path: Path,
 ) -> None:
     """The plugin re-reads its hook list when configure_workspace is
     called; workspace-local hooks merge with user-global ones."""
@@ -101,7 +103,8 @@ def test_workspace_settings_are_added_on_configure(
 
 
 def test_malformed_settings_skipped(
-    isolated_settings: Path, caplog,
+    isolated_settings: Path,
+    caplog,
 ) -> None:
     """A broken settings.json must not stop the session -- log a warning
     and move on."""
@@ -185,7 +188,8 @@ def test_check_user_message_blocks_on_exit_one(isolated_settings: Path) -> None:
 
 
 def test_post_tool_call_runs_but_does_not_block(
-    isolated_settings: Path, tmp_path: Path,
+    isolated_settings: Path,
+    tmp_path: Path,
 ) -> None:
     """PostToolUse fires (touch the marker file) and its return value
     is ignored. We use a marker file rather than env-var expansion to
@@ -194,10 +198,14 @@ def test_post_tool_call_runs_but_does_not_block(
     marker = tmp_path / "postlog"
     _write_settings(
         isolated_settings,
-        {"PostToolUse": [{
-            "matcher": "",
-            "command": f"echo touched > {marker}",
-        }]},
+        {
+            "PostToolUse": [
+                {
+                    "matcher": "",
+                    "command": f"echo touched > {marker}",
+                }
+            ]
+        },
     )
     plugin = ShellHookPlugin()
     plugin.on_session_start("s", "default")
@@ -207,7 +215,8 @@ def test_post_tool_call_runs_but_does_not_block(
 
 
 def test_on_turn_end_runs_stop_hook(
-    isolated_settings: Path, tmp_path: Path,
+    isolated_settings: Path,
+    tmp_path: Path,
 ) -> None:
     marker = tmp_path / "stoplog"
     _write_settings(

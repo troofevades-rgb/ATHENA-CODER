@@ -40,6 +40,7 @@ def run_agent_job_by_id(job_id: str, *, jobs_db_path: Path | None = None) -> Non
     """
     if jobs_db_path is None:
         from ..cli.cron import _profile_cron_paths
+
         _, jobs_db_path = _profile_cron_paths()
     store = JobStore(Path(jobs_db_path))
     job = store.get(job_id)
