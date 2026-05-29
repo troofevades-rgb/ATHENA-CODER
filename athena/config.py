@@ -69,6 +69,38 @@ class SkillsConfig:
 
 
 @dataclass
+class SafetyConfig:
+    """Snapshot + audit retention policy + mutation-snapshot behaviour.
+
+    Phase 18.1 R4 stage 2: replaces the ``cfg.safety: dict[str, Any]``
+    blob whose keys were advertised in code but never actually consulted
+    (verified by grep: zero readers). This commit also threads the
+    dataclass through to :class:`~athena.safety.snapshots.SnapshotStore`
+    so the user's ``[safety]`` TOML table finally takes effect.
+
+    Defaults match the prior dict exactly (no behaviour change for
+    users on factory settings).
+    """
+
+    # When True, also snapshot mutations made under
+    # write_origin="foreground" -- not just background_review / curator /
+    # migration. False by default because foreground writes are
+    # user-driven and undo is already a user-driven question; the
+    # snapshot/audit chain mainly exists for autonomous mutations.
+    snapshot_foreground: bool = False
+    # Retention policy. The store's prune() pass deletes snapshots older
+    # than retention_days, beyond retention_count, or in excess of
+    # retention_bytes total on disk -- whichever fires first. Pinned
+    # snapshots bypass every rule.
+    retention_days: int = 90
+    retention_count: int = 5_000
+    retention_bytes: int = 5 * 1024**3
+    # Note: bash denylist patterns live in BashConfig.extra_denylist.
+    # The legacy cfg.safety["extra_denylist"] key was a duplicate that
+    # nobody read; dropped here to avoid the parallel-keys footgun.
+
+
+@dataclass
 class BashConfig:
     """Bash gate config -- allowlist + extra denylist patterns.
 
@@ -222,18 +254,13 @@ class Config:
     # names ``skills_autoload`` / ``skills_autoload_interval`` still
     # resolve via ``Config.__getattr__`` with a deprecation warning.
     skills: SkillsConfig = field(default_factory=SkillsConfig)
-    # Phase 17 [safety] settings. Keys preserved in a sub-dict so
-    # athena.safety modules can read them without growing the top-
-    # level Config surface for every new option.
-    safety: dict[str, Any] = field(
-        default_factory=lambda: {
-            "snapshot_foreground": False,
-            "retention_days": 90,
-            "retention_count": 5_000,
-            "retention_bytes": 5 * 1024**3,
-            "extra_denylist": [],
-        }
-    )
+    # [safety] subsystem config. Promoted from dict[str, Any] to a
+    # real dataclass in Phase 18.1 R4 stage 2. Until that promotion
+    # this dict's keys were advertised in code but never consulted
+    # (the SnapshotStore used its own hardcoded defaults); the
+    # dataclass is now actually wired through to SnapshotStore in
+    # agent/core.py + cli/snapshot.py.
+    safety: SafetyConfig = field(default_factory=SafetyConfig)
     # Hard cap on tool-call rounds per user turn. Stops runaway loops.
     max_turn_steps: int = 25
     # Plugin configuration. ``plugins["enabled"]`` is a {plugin_name: bool}

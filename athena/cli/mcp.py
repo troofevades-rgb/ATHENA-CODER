@@ -176,7 +176,14 @@ def cmd_serve(args: argparse.Namespace) -> int:
     audit_dir = Path(args.audit_dir or (CONFIG_DIR / "audit")).expanduser()
     profile = args.profile or cfg.profile
 
-    snapshot_store = SnapshotStore()
+    # Honor cfg.safety retention policy here too (R4 stage 2). The
+    # MCP server's mutation-snapshot store shares the same retention
+    # rules as the agent's foreground store.
+    snapshot_store = SnapshotStore(
+        retention_days=cfg.safety.retention_days,
+        retention_count=cfg.safety.retention_count,
+        retention_bytes=cfg.safety.retention_bytes,
+    )
     tools = AthenaMCPTools(
         workspace=workspace,
         memory_profile=profile,

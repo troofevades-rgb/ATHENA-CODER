@@ -243,6 +243,77 @@ def test_new_table_wins_over_legacy_flat_for_same_field(
 
 
 # ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 2 -- SafetyConfig promotion
+# ---------------------------------------------------------------------------
+
+
+def test_safety_defaults_match_legacy_dict(isolated: Path) -> None:
+    """No [safety] table -> dataclass defaults match the dict the
+    promotion replaced. Users on factory settings see no behaviour
+    change."""
+    cfg = cfg_mod.load_config()
+    assert cfg.safety.snapshot_foreground is False
+    assert cfg.safety.retention_days == 90
+    assert cfg.safety.retention_count == 5_000
+    assert cfg.safety.retention_bytes == 5 * 1024**3
+
+
+def test_safety_table_overrides_defaults(isolated: Path) -> None:
+    """The [safety] TOML table maps onto SafetyConfig field-by-field
+    through the existing _assign_field dataclass-merge logic."""
+    _write_toml(isolated, """
+        [safety]
+        snapshot_foreground = true
+        retention_days = 30
+        retention_count = 100
+        retention_bytes = 1073741824
+    """)
+    cfg = cfg_mod.load_config()
+    assert cfg.safety.snapshot_foreground is True
+    assert cfg.safety.retention_days == 30
+    assert cfg.safety.retention_count == 100
+    assert cfg.safety.retention_bytes == 1024**3
+
+
+def test_safety_partial_override_keeps_other_defaults(isolated: Path) -> None:
+    """Setting only retention_days must leave the other fields at their
+    defaults (the merge logic at _assign_field doesn't overwrite the
+    whole dataclass with a sparse TOML table)."""
+    _write_toml(isolated, """
+        [safety]
+        retention_days = 7
+    """)
+    cfg = cfg_mod.load_config()
+    assert cfg.safety.retention_days == 7
+    assert cfg.safety.retention_count == 5_000  # default preserved
+    assert cfg.safety.snapshot_foreground is False  # default preserved
+
+
+def test_snapshot_store_singleton_picks_up_safety_retention(
+    isolated: Path, tmp_path: Path,
+) -> None:
+    """The Phase 18.1 R4 stage 2 wiring change: get_snapshot_store()
+    now reads cfg.safety so the user's [safety] table actually takes
+    effect on retention. Before this commit the singleton ignored cfg
+    entirely and used SnapshotStore's hardcoded defaults -- the
+    [safety] dict was advertised but dead."""
+    from athena.safety import context as ctx_mod
+
+    _write_toml(isolated, """
+        [safety]
+        retention_days = 14
+        retention_count = 50
+    """)
+    ctx_mod.reset_for_tests()
+    try:
+        store = ctx_mod.get_snapshot_store(profile_dir=tmp_path)
+        assert store.retention_days == 14
+        assert store.retention_count == 50
+    finally:
+        ctx_mod.reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
 # Theme application
 # ---------------------------------------------------------------------------
 
