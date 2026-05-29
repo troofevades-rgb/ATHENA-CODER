@@ -32,16 +32,31 @@ _NEED_FFMPEG = pytest.mark.skipif(
 
 
 def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
-    base = dict(
+    # Phase 18.1 R4 stage 5 promoted the ``video_*`` flat fields into
+    # VideoAnalysisConfig. Translate legacy override kwargs into the
+    # nested shape so the post-R4 production code (``cfg.video_analysis.*``)
+    # sees them.
+    legacy_to_nested = {
+        "video_enabled": "enabled",
+        "video_ffmpeg_path": "ffmpeg_path",
+        "video_ffprobe_path": "ffprobe_path",
+        "video_frames_dir": "frames_dir",
+        "video_max_frames": "max_frames",
+        "video_default_extract": "default_extract",
+        "video_sampled_interval_s": "sampled_interval_s",
+    }
+    video_analysis_defaults = dict(
+        enabled=True,
+        ffmpeg_path="ffmpeg",
+        ffprobe_path="ffprobe",
+        frames_dir=str(tmp_path / "frames"),
+        max_frames=200,
+        default_extract="keyframes",
+        sampled_interval_s=5.0,
+    )
+    top_defaults: dict = dict(
         profile="default",
-        video_enabled=True,
         vision_enabled=True,
-        video_ffmpeg_path="ffmpeg",
-        video_ffprobe_path="ffprobe",
-        video_frames_dir=str(tmp_path / "frames"),
-        video_max_frames=200,
-        video_default_extract="keyframes",
-        video_sampled_interval_s=5.0,
         # Audio side — values mostly irrelevant since we inject
         # _audio_fn directly, but resolve_paths/load_config
         # might reach for them in error paths.
@@ -53,8 +68,17 @@ def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
         provider="ollama",
         model="stub",
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            video_analysis_defaults[legacy_to_nested[k]] = v
+        elif k in video_analysis_defaults:
+            video_analysis_defaults[k] = v
+        else:
+            top_defaults[k] = v
+    return SimpleNamespace(
+        video_analysis=SimpleNamespace(**video_analysis_defaults),
+        **top_defaults,
+    )
 
 
 @pytest.fixture(autouse=True)

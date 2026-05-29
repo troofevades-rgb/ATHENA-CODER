@@ -78,10 +78,11 @@ shim preserves backward compat for one release.
 
 ## Refactor 4 — Decompose `Config` into nested per-subsystem classes
 
-**Status: Stage 1 LANDED** (commit on PR #12). SkillsConfig + BashConfig
-pilot promoted; `__getattr__` shim + TOML loader handle both shapes; agent,
-shell tool, and sandbox runner read through the nested dataclasses
-directly. Stages 2-5 below remain to do.
+**Status: COMPLETE.** All six stages landed on PR #12. Every former
+``dict[str, Any]`` Config slot is now a typed nested dataclass with a
+matching ``_LEGACY_FIELD_MAP`` entry; the ``__getattr__`` / ``__setattr__``
+shims absorb legacy access for one release. Future work: drop the shim
+and the legacy TOML-key warnings in the next minor release.
 
 **Problem:** `athena/config.py:Config` is a 40+ flat-field dataclass that's
 already half-decomposed (it has `review: ReviewConfig`, `curator: CuratorConfig`,
@@ -162,9 +163,25 @@ them would mean another nested dataclass and the current style is inconsistent.
       _LEGACY_FIELD_MAP routes each legacy ``video_*`` name to the
       correct subsystem so reads/writes stay coherent. 19 new
       _LEGACY_FIELD_MAP entries (5 OCR + 7 generation + 7 analysis).
-   6. ProvidersConfig (touches routing + credential pool -- leave for
-      last because the routing dict has more user-visible shape than
-      the other dicts).
+   6. **LANDED** -- ProvidersConfig promotion (closes R4).
+      ``cfg.providers: dict[str, Any]`` -> ProvidersConfig with
+      ``routing`` (the model_name -> provider_name override map)
+      split from ``per_provider`` (per-provider host / fallback /
+      base_url slices). The dataclass implements ``__getitem__`` /
+      ``get`` / ``__contains__`` / ``__bool__`` shims so the existing
+      ``(cfg.providers or {}).get("routing")`` / ``.get(name, {})``
+      readers in ``athena.providers.runtime_resolver`` and
+      ``athena.cli.providers`` keep working unchanged. A new
+      ``Config.__post_init__`` coerces dict inputs (the legacy
+      ``Config(providers={...})`` shape used by 20+ test sites) into
+      the dataclass via ``ProvidersConfig.from_dict`` so the field
+      type stays accurate. TOML translation mirrors the PluginsConfig
+      pattern: explicit handling of ``[providers.routing]`` plus
+      arbitrary ``[providers.<name>]`` sub-tables before the generic
+      ``_assign_field`` loop. Companion test fixture fix:
+      ``tests/audio/test_video_integration.py``'s ``_cfg`` builder
+      rewritten with the same ``legacy_to_nested`` translation table
+      pattern used elsewhere (R4 stage 5 had left it on flat names).
 
 **Files touched:**
 - `athena/config.py` (904 lines) → `athena/config/` package
