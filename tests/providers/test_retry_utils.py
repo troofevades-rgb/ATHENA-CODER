@@ -247,9 +247,7 @@ def test_rotate_callback_success_continues_retrying() -> None:
         max_retries=5,
     )
     assert result == "ok after rotation"
-    assert len(rotated) == 1, (
-        f"expected exactly one rotation; got {len(rotated)}"
-    )
+    assert len(rotated) == 1, f"expected exactly one rotation; got {len(rotated)}"
 
 
 def test_compress_context_callback_invoked() -> None:

@@ -31,15 +31,19 @@ def main(argv: list[str]) -> int:
         ),
     )
     ap.add_argument(
-        "path", nargs="?", default=None,
+        "path",
+        nargs="?",
+        default=None,
         help="Image path to render (default: athena/_wordmark.png)",
     )
     ap.add_argument(
-        "--diag", action="store_true",
+        "--diag",
+        action="store_true",
         help="Print capability report only; don't emit any image data.",
     )
     ap.add_argument(
-        "--force", choices=("kitty", "iterm2", "sixel"),
+        "--force",
+        choices=("kitty", "iterm2", "sixel"),
         help="Override capability detection and force a specific protocol.",
     )
     args = ap.parse_args(argv)
@@ -82,9 +86,7 @@ def main(argv: list[str]) -> int:
         ]
         img_path = next((p for p in candidates if p.exists()), None)  # type: ignore[assignment]
         if img_path is None:
-            sys.stderr.write(
-                "could not find athena/_wordmark.png; pass a path explicitly\n"
-            )
+            sys.stderr.write("could not find athena/_wordmark.png; pass a path explicitly\n")
             return 2
 
     if not img_path.exists():
@@ -94,9 +96,7 @@ def main(argv: list[str]) -> int:
     try:
         from PIL import Image
     except ImportError:
-        sys.stderr.write(
-            "Pillow is required: pip install pillow\n"
-        )
+        sys.stderr.write("Pillow is required: pip install pillow\n")
         return 3
 
     try:

@@ -27,7 +27,6 @@ from typing import Any
 from .. import ui
 from .registry import tool
 
-
 # Per-request reply inbox keyed by request_id. The gateway's
 # _dispatch_ask_question_reply pushes into this; the agent thread that
 # called AskUserQuestion blocks on .get() for the matching id.
@@ -35,7 +34,9 @@ _pending_questions: dict[str, _queue.Queue[tuple[list[dict[str, str]], bool]]] =
 
 
 def _deliver_question_reply(
-    request_id: str, answers: list[dict[str, str]], cancelled: bool,
+    request_id: str,
+    answers: list[dict[str, str]],
+    cancelled: bool,
 ) -> None:
     """Called by the gateway when an AskQuestionReplyCommand arrives.
     Hands the answers to the waiting tool call via its per-request
@@ -51,7 +52,10 @@ def _deliver_question_reply(
 
 
 def _ask_via_gateway(
-    gw: Any, questions: list[dict[str, Any]], *, timeout_s: float = 600.0,
+    gw: Any,
+    questions: list[dict[str, Any]],
+    *,
+    timeout_s: float = 600.0,
 ) -> str:
     """Ship an AskQuestionRequest to the TUI, wait up to ``timeout_s``
     for a matching reply, and format the answers for the model.
@@ -65,9 +69,7 @@ def _ask_via_gateway(
     inbox: _queue.Queue[tuple[list[dict[str, str]], bool]] = _queue.Queue(maxsize=1)
     _pending_questions[request_id] = inbox
     try:
-        gw.send_event(
-            AskQuestionRequestEvent(request_id=request_id, questions=questions)
-        )
+        gw.send_event(AskQuestionRequestEvent(request_id=request_id, questions=questions))
     except Exception:  # noqa: BLE001 — gateway momentarily unavailable
         _pending_questions.pop(request_id, None)
         return _format_no_answer(questions, reason="(could not deliver to TUI)")
@@ -87,7 +89,8 @@ def _ask_via_gateway(
 
 
 def _format_answers(
-    questions: list[dict[str, Any]], answers: list[dict[str, str]],
+    questions: list[dict[str, Any]],
+    answers: list[dict[str, str]],
 ) -> str:
     """Render the reply as the Q/A block the model expects."""
     # Pair questions with answers by index; missing answers (TUI
@@ -104,9 +107,7 @@ def _format_answers(
 
 
 def _format_no_answer(questions: list[dict[str, Any]], *, reason: str) -> str:
-    return "\n".join(
-        f"Q: {q.get('question', '')}\nA: {reason}" for q in questions
-    )
+    return "\n".join(f"Q: {q.get('question', '')}\nA: {reason}" for q in questions)
 
 
 def _ask_one_stdin(q: dict[str, Any]) -> dict[str, str]:

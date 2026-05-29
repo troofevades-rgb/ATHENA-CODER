@@ -18,7 +18,6 @@ from ..ui import console
 from . import file_ops  # for workspace
 from .registry import tool
 
-
 # Windows drive-letter paths with backslash separators get mangled by
 # Bash (Git Bash / MSYS) which treats backslash as an escape character.
 # ``python C:\Users\foo\bar.py`` becomes ``python C:Usersfoobar.py``
@@ -49,16 +48,28 @@ def _normalize_windows_paths(command: str) -> str:
 
 
 def _policy_for_config() -> ShellPolicy:
-    """Build the always-on denylist policy from current config.
+    """Build the always-on denylist policy from the live agent cfg.
 
-    Imported lazily so the config singleton is read fresh on each
-    call — useful in tests that rebuild Config between cases.
+    Reads through ``_active_cfg.active_cfg()`` so a session-scoped
+    ``/allowlist add`` is immediately effective. The prior
+    implementation called ``load_config()`` directly, so mid-session
+    allowlist tweaks were invisible to the bash gate until the user
+    restarted athena.
     """
-    from ..config import load_config
+    from ._active_cfg import active_cfg
 
-    cfg = load_config()
-    deny = tuple(DEFAULT_DENYLIST) + tuple(getattr(cfg, "bash_extra_denylist", ()))
-    return ShellPolicy(allowlist=cfg.bash_allowlist, denylist=deny)
+    cfg = active_cfg()
+    bash_cfg = getattr(cfg, "bash", None)
+    if bash_cfg is not None:
+        deny = tuple(DEFAULT_DENYLIST) + tuple(bash_cfg.extra_denylist or ())
+        return ShellPolicy(allowlist=bash_cfg.allowlist, denylist=deny)
+    # Defensive fallback for stub cfg objects in tests that don't carry
+    # the nested BashConfig instance (SimpleNamespace fixtures).
+    deny = tuple(DEFAULT_DENYLIST) + tuple(getattr(cfg, "bash_extra_denylist", ()) or ())
+    return ShellPolicy(
+        allowlist=getattr(cfg, "bash_allowlist", []) or [],
+        denylist=deny,
+    )
 
 
 _IS_WINDOWS = sys.platform == "win32"
@@ -276,10 +287,10 @@ def _maybe_sandbox(command: str, exec_path: str | None) -> list[str] | None:
     """
     import logging
 
-    from ..config import load_config
+    from ._active_cfg import active_cfg
 
     log = logging.getLogger(__name__)
-    cfg = load_config()
+    cfg = active_cfg()
     if not getattr(cfg, "sandbox_enabled", False):
         return None
 

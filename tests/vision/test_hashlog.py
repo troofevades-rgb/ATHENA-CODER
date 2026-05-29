@@ -99,8 +99,10 @@ def test_hashlog_multiple_rows_ordered(tmp_path: Path):
     log = HashLogger(audit_path(tmp_path))
     for i in range(5):
         log.log(
-            mode="describe", path=f"/tmp/f{i}.png",
-            sha256=str(i) * 64, size_bytes=100 + i,
+            mode="describe",
+            path=f"/tmp/f{i}.png",
+            sha256=str(i) * 64,
+            size_bytes=100 + i,
         )
     tailed = log.tail()
     assert [e.path for e in tailed] == [f"/tmp/f{i}.png" for i in range(5)]

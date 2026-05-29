@@ -30,8 +30,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..config import load_config, profile_dir
 from ..tools.registry import tool
@@ -128,7 +129,8 @@ def _default_vision_fn(cfg: Any) -> VisionFn | None:
         # enough for vision_analyze to process; we clean up
         # on exit.
         with tempfile.NamedTemporaryFile(
-            suffix=".png", delete=False,
+            suffix=".png",
+            delete=False,
         ) as tmp:
             tmp.write(image_bytes)
             tmp_path = tmp.name
@@ -193,13 +195,17 @@ def _ocr_scanned_pages(
             png_bytes = rasterize(path, page_no, dpi=dpi)
         except Exception as e:  # noqa: BLE001
             logger.warning(
-                "document: rasterize page %d failed: %s", page_no, e,
+                "document: rasterize page %d failed: %s",
+                page_no,
+                e,
             )
             continue
         # Write to a temp file — ocr_recognize takes paths.
         import tempfile
+
         with tempfile.NamedTemporaryFile(
-            suffix=".png", delete=False,
+            suffix=".png",
+            delete=False,
         ) as tmp:
             tmp.write(png_bytes)
             tmp_path = Path(tmp.name)
@@ -207,7 +213,9 @@ def _ocr_scanned_pages(
             ocr_result = ocr_fn(tmp_path)
         except Exception as e:  # noqa: BLE001
             logger.warning(
-                "document: OCR on page %d failed: %s", page_no, e,
+                "document: OCR on page %d failed: %s",
+                page_no,
+                e,
             )
             ocr_result = {"text": ""}
         finally:
@@ -223,9 +231,7 @@ def _ocr_scanned_pages(
 
     # Rebuild full text from per-page slices in page order.
     # PyMuPDF original used \f between pages; keep that.
-    rebuilt = "\f".join(
-        new_page_texts.get(i, "") for i in range(1, result.pages + 1)
-    )
+    rebuilt = "\f".join(new_page_texts.get(i, "") for i in range(1, result.pages + 1))
     return DocumentResult(
         text=rebuilt,
         pages=result.pages,
@@ -278,7 +284,8 @@ def _describe_figures(
             except Exception as e:  # noqa: BLE001
                 logger.warning(
                     "document: rasterize for figure on page %d failed: %s",
-                    fig.page, e,
+                    fig.page,
+                    e,
                 )
                 described.append(fig)
                 continue
@@ -286,13 +293,19 @@ def _describe_figures(
             desc = vision_fn(cache_by_page[fig.page])
         except Exception as e:  # noqa: BLE001
             logger.warning(
-                "document: figure describe failed on page %d: %s", fig.page, e,
+                "document: figure describe failed on page %d: %s",
+                fig.page,
+                e,
             )
             desc = None
         if desc:
-            described.append(FigureRef(
-                page=fig.page, bbox=fig.bbox, description=desc,
-            ))
+            described.append(
+                FigureRef(
+                    page=fig.page,
+                    bbox=fig.bbox,
+                    description=desc,
+                )
+            )
         else:
             described.append(fig)
 
@@ -386,36 +399,42 @@ def _run(
 ) -> str:
     cfg = _cfg if _cfg is not None else load_config()
     if not getattr(cfg, "document_analyze_enabled", True):
-        return json.dumps({
-            "available": False,
-            "error": "document_analyze_enabled=False; operator disabled document_analyze",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "document_analyze_enabled=False; operator disabled document_analyze",
+            }
+        )
 
     mode = extract or getattr(cfg, "document_default_extract", "structure")
     if mode not in VALID_MODES:
-        return json.dumps({
-            "available": False,
-            "error": f"unknown extract mode {mode!r}; choose from {list(VALID_MODES)}",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": f"unknown extract mode {mode!r}; choose from {list(VALID_MODES)}",
+            }
+        )
 
     if not path:
         return json.dumps({"available": False, "error": "path is required"})
     p = Path(path)
     if not p.exists():
-        return json.dumps({
-            "available": False, "error": f"file not found: {path}",
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": f"file not found: {path}",
+            }
+        )
 
     ext = p.suffix.lower().lstrip(".")
     extractor = for_extension(ext)
     if extractor is None:
-        return json.dumps({
-            "available": False,
-            "reason": (
-                f"unsupported document type: {ext!r}; "
-                f"supported formats: pdf, docx"
-            ),
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "reason": (f"unsupported document type: {ext!r}; supported formats: pdf, docx"),
+            }
+        )
 
     paths = _resolve_paths(cfg)
     audit = HashLogger(paths["audit"])
@@ -425,18 +444,24 @@ def _run(
         result = extractor(p)
     except Exception as e:  # noqa: BLE001
         logger.exception("document_analyze: extractor failed")
-        return json.dumps({
-            "available": True,
-            "error": f"extract failed: {type(e).__name__}: {e}",
-            "path": str(p), "sha256": sha,
-        })
+        return json.dumps(
+            {
+                "available": True,
+                "error": f"extract failed: {type(e).__name__}: {e}",
+                "path": str(p),
+                "sha256": sha,
+            }
+        )
 
     # OCR fallback for scanned pages.
     if result.scanned_pages:
         ocr_fn = _ocr_fn if _ocr_fn is not None else _default_ocr_fn(cfg)
         if ocr_fn is not None:
             result = _ocr_scanned_pages(
-                result, path=p, cfg=cfg, ocr_fn=ocr_fn,
+                result,
+                path=p,
+                cfg=cfg,
+                ocr_fn=ocr_fn,
                 progress=_progress,
             )
 
@@ -445,16 +470,23 @@ def _run(
         vision_fn = _vision_fn if _vision_fn is not None else _default_vision_fn(cfg)
         if vision_fn is not None and result.figures:
             result = _describe_figures(
-                result, path=p, cfg=cfg, vision_fn=vision_fn,
+                result,
+                path=p,
+                cfg=cfg,
+                vision_fn=vision_fn,
             )
 
     artifact_path = _write_artifact(
-        result, out_dir=paths["out_dir"],
-        source_sha=sha, source_path=p,
+        result,
+        out_dir=paths["out_dir"],
+        source_sha=sha,
+        source_path=p,
     )
 
     audit.log(
-        mode=mode, path=p, sha256=sha,
+        mode=mode,
+        path=p,
+        sha256=sha,
         size_bytes=p.stat().st_size,
         extra={
             "format": result.metadata.get("format"),
@@ -503,10 +535,7 @@ def _run(
             "extract": {
                 "type": "string",
                 "enum": list(VALID_MODES),
-                "description": (
-                    "What to extract. Default 'structure' (text + "
-                    "outline)."
-                ),
+                "description": ("What to extract. Default 'structure' (text + outline)."),
             },
         },
         "required": ["path"],

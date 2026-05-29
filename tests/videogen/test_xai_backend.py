@@ -54,7 +54,6 @@ def no_api_key(monkeypatch, tmp_path):
 
 def test_backend_registered_under_xai_video():
     import athena.providers  # noqa: F401 — populates registry
-
     from athena.providers import get_provider_class
 
     cls = get_provider_class("xai_video")
@@ -162,10 +161,13 @@ def _fake_urlopen_response(payload: dict, status: int = 200):
     class _Resp:
         def __enter__(self):
             return self
+
         def __exit__(self, *a):
             return False
+
         def read(self):
             return body
+
         def getcode(self):
             return status
 
@@ -184,7 +186,9 @@ def test_submit_rejects_image_to_video(with_api_key):
     needs to error clearly, not silently send the wrong shape."""
     backend = XAIVideoBackend()
     req = job_mod.GenerationRequest(
-        mode="image_to_video", prompt="x", image_path=Path("/tmp/x.png"),
+        mode="image_to_video",
+        prompt="x",
+        image_path=Path("/tmp/x.png"),
     )
     with pytest.raises(XAIAPIError, match="text_to_video"):
         backend.submit(req)
@@ -199,16 +203,18 @@ def test_submit_posts_expected_body(monkeypatch, with_api_key):
         captured["method"] = req.get_method()
         captured["headers"] = dict(req.header_items())
         captured["body"] = json.loads(req.data.decode("utf-8")) if req.data else None
-        return _fake_urlopen_response(
-            {"request_id": "req-abc123", "status": "pending"}
-        )
+        return _fake_urlopen_response({"request_id": "req-abc123", "status": "pending"})
 
     monkeypatch.setattr(
-        "athena.videogen.backends.xai.urllib.request.urlopen", _fake_urlopen,
+        "athena.videogen.backends.xai.urllib.request.urlopen",
+        _fake_urlopen,
     )
 
     req = job_mod.GenerationRequest(
-        mode="text_to_video", prompt="a sunrise", duration_s=5.0, aspect="16:9",
+        mode="text_to_video",
+        prompt="a sunrise",
+        duration_s=5.0,
+        aspect="16:9",
     )
     handle = XAIVideoBackend().submit(req)
 
@@ -241,15 +247,18 @@ def test_submit_posts_expected_body(monkeypatch, with_api_key):
     [
         (5.0, 5),
         (5, 5),
-        (5.5, 6),       # round up
-        (5.4, 5),       # round down
-        (0.3, 1),       # min-1 floor
-        (0, 1),         # min-1 floor
-        (-2.0, 1),      # negative clamped to 1
+        (5.5, 6),  # round up
+        (5.4, 5),  # round down
+        (0.3, 1),  # min-1 floor
+        (0, 1),  # min-1 floor
+        (-2.0, 1),  # negative clamped to 1
     ],
 )
 def test_submit_duration_serializes_as_int(
-    monkeypatch, with_api_key, duration_s, expected,
+    monkeypatch,
+    with_api_key,
+    duration_s,
+    expected,
 ):
     """xAI rejects floats for the ``duration`` field with HTTP 422.
     The adapter rounds half-up to int and floors at 1."""
@@ -260,11 +269,14 @@ def test_submit_duration_serializes_as_int(
         return _fake_urlopen_response({"request_id": "req-x"})
 
     monkeypatch.setattr(
-        "athena.videogen.backends.xai.urllib.request.urlopen", _fake_urlopen,
+        "athena.videogen.backends.xai.urllib.request.urlopen",
+        _fake_urlopen,
     )
 
     req = job_mod.GenerationRequest(
-        mode="text_to_video", prompt="x", duration_s=duration_s,
+        mode="text_to_video",
+        prompt="x",
+        duration_s=duration_s,
     )
     XAIVideoBackend().submit(req)
     assert captured["body"]["duration"] == expected
@@ -276,7 +288,8 @@ def test_submit_no_request_id_raises(monkeypatch, with_api_key):
         return _fake_urlopen_response({"status": "pending"})  # missing request_id
 
     monkeypatch.setattr(
-        "athena.videogen.backends.xai.urllib.request.urlopen", _fake_urlopen,
+        "athena.videogen.backends.xai.urllib.request.urlopen",
+        _fake_urlopen,
     )
     backend = XAIVideoBackend()
     req = job_mod.GenerationRequest(mode="text_to_video", prompt="x")
@@ -292,16 +305,21 @@ def test_submit_no_request_id_raises(monkeypatch, with_api_key):
 def _stub_poll_response(monkeypatch, payload):
     def _fake_urlopen(req, timeout=None):
         return _fake_urlopen_response(payload)
+
     monkeypatch.setattr(
-        "athena.videogen.backends.xai.urllib.request.urlopen", _fake_urlopen,
+        "athena.videogen.backends.xai.urllib.request.urlopen",
+        _fake_urlopen,
     )
 
 
 def test_poll_done_flips_status_and_stashes_response(monkeypatch, with_api_key):
-    _stub_poll_response(monkeypatch, {
-        "status": "done",
-        "video": {"url": "https://example.com/video.mp4"},
-    })
+    _stub_poll_response(
+        monkeypatch,
+        {
+            "status": "done",
+            "video": {"url": "https://example.com/video.mp4"},
+        },
+    )
     handle = job_mod.JobHandle(backend="xai_video", job_id="req-1", status="pending")
     out = XAIVideoBackend().poll(handle)
     assert out.status == "done"
@@ -328,7 +346,10 @@ def test_poll_processing_marks_running(monkeypatch, with_api_key):
 def test_poll_unknown_status_keeps_current(monkeypatch, with_api_key):
     _stub_poll_response(monkeypatch, {"status": "queued_v2"})  # unrecognised
     handle = job_mod.JobHandle(
-        backend="xai_video", job_id="req-1", status="pending", progress=0.0,
+        backend="xai_video",
+        job_id="req-1",
+        status="pending",
+        progress=0.0,
     )
     out = XAIVideoBackend().poll(handle)
     assert out.status == "pending"
@@ -338,10 +359,13 @@ def test_poll_network_failure_is_not_terminal(monkeypatch, with_api_key):
     """Transient HTTP failures should leave the handle in its current
     state with the error in `extra` — the orchestrator decides whether
     to keep polling. Marking 'failed' on every blip would tank long jobs."""
+
     def _raise(req, timeout=None):
         raise urllib_error_for_test()
+
     monkeypatch.setattr(
-        "athena.videogen.backends.xai.urllib.request.urlopen", _raise,
+        "athena.videogen.backends.xai.urllib.request.urlopen",
+        _raise,
     )
     handle = job_mod.JobHandle(backend="xai_video", job_id="req-1", status="running")
     out = XAIVideoBackend().poll(handle)
@@ -351,6 +375,7 @@ def test_poll_network_failure_is_not_terminal(monkeypatch, with_api_key):
 
 def urllib_error_for_test():
     import urllib.error
+
     return urllib.error.URLError("simulated transient")
 
 
@@ -367,7 +392,9 @@ def test_fetch_requires_done_status(tmp_path):
 
 def test_fetch_no_url_raises(tmp_path):
     handle = job_mod.JobHandle(
-        backend="xai_video", job_id="req-1", status="done",
+        backend="xai_video",
+        job_id="req-1",
+        status="done",
         extra={"poll_response": {"status": "done", "video": {}}},
     )
     with pytest.raises(XAIAPIError, match="no video.url"):
@@ -383,11 +410,14 @@ def test_fetch_downloads_to_target(monkeypatch, tmp_path):
         return _fake_urlopen_response_raw(fake_bytes)
 
     monkeypatch.setattr(
-        "athena.videogen.backends.xai.urllib.request.urlopen", _fake_urlopen,
+        "athena.videogen.backends.xai.urllib.request.urlopen",
+        _fake_urlopen,
     )
 
     handle = job_mod.JobHandle(
-        backend="xai_video", job_id="req-abc", status="done",
+        backend="xai_video",
+        job_id="req-abc",
+        status="done",
         extra={
             "poll_response": {
                 "status": "done",
@@ -404,10 +434,14 @@ def _fake_urlopen_response_raw(body: bytes):
     class _Resp:
         def __enter__(self):
             return self
+
         def __exit__(self, *a):
             return False
+
         def read(self):
             return body
+
         def getcode(self):
             return 200
+
     return _Resp()

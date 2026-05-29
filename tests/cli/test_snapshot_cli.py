@@ -56,7 +56,8 @@ def _make_skill(workspace: Path, name: str, body: str = "v1") -> Path:
     skill = workspace / "skills" / name
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text(
-        f"---\nname: {name}\n---\n\n{body}\n", encoding="utf-8",
+        f"---\nname: {name}\n---\n\n{body}\n",
+        encoding="utf-8",
     )
     return skill
 
@@ -84,7 +85,8 @@ def _run(argv, capsys) -> tuple[int, str, str]:
 
 
 def test_list_empty_store_prints_friendly_message(
-    isolated_store, capsys,
+    isolated_store,
+    capsys,
 ) -> None:
     code, out, err = _run(["list"], capsys)
     assert code == 0
@@ -93,9 +95,12 @@ def test_list_empty_store_prints_friendly_message(
 
 
 def test_list_shows_all_snapshots_newest_first(
-    isolated_store, workspace, capsys,
+    isolated_store,
+    workspace,
+    capsys,
 ) -> None:
     import time
+
     skill = _make_skill(workspace, "alpha")
     older = _snap(isolated_store, [skill])
     time.sleep(1.05)  # different second so created_at differs
@@ -112,7 +117,9 @@ def test_list_shows_all_snapshots_newest_first(
 
 
 def test_list_json_format_is_parseable(
-    isolated_store, workspace, capsys,
+    isolated_store,
+    workspace,
+    capsys,
 ) -> None:
     """--json must emit a valid JSON array that downstream scripts
     can parse. Required for ops automation."""
@@ -145,6 +152,7 @@ def test_list_write_origin_filter(isolated_store, workspace, capsys) -> None:
 
 def test_list_limit_caps_rows(isolated_store, workspace, capsys) -> None:
     import time
+
     skill = _make_skill(workspace, "alpha")
     snaps = []
     for i in range(4):
@@ -167,7 +175,9 @@ def test_list_limit_caps_rows(isolated_store, workspace, capsys) -> None:
 
 
 def test_show_dumps_sidecar_and_tar_listing(
-    isolated_store, workspace, capsys,
+    isolated_store,
+    workspace,
+    capsys,
 ) -> None:
     skill = _make_skill(workspace, "alpha", "content")
     snap = _snap(isolated_store, [skill])
@@ -182,7 +192,8 @@ def test_show_dumps_sidecar_and_tar_listing(
 
 
 def test_show_unknown_id_exits_nonzero(
-    isolated_store, capsys,
+    isolated_store,
+    capsys,
 ) -> None:
     code, out, err = _run(["show", "no-such-snapshot"], capsys)
     assert code == 1
@@ -195,7 +206,9 @@ def test_show_unknown_id_exits_nonzero(
 
 
 def test_pin_then_unpin_round_trip(
-    isolated_store, workspace, capsys,
+    isolated_store,
+    workspace,
+    capsys,
 ) -> None:
     skill = _make_skill(workspace, "alpha")
     snap = _snap(isolated_store, [skill])
@@ -230,12 +243,15 @@ def test_pin_unknown_id_exits_nonzero(isolated_store, capsys) -> None:
 
 
 def test_prune_dry_run_does_not_remove(
-    isolated_store, workspace, capsys,
+    isolated_store,
+    workspace,
+    capsys,
 ) -> None:
     """``--dry-run`` must print the plan without touching the
     filesystem. If this regresses to actually deleting, an
     operator's investigatory prune-list becomes a real prune."""
     import datetime as dt
+
     skill = _make_skill(workspace, "alpha")
     snap = _snap(isolated_store, [skill])
 
@@ -245,7 +261,8 @@ def test_prune_dry_run_does_not_remove(
         dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=180)
     ).isoformat()
     snap.sidecar_path.write_text(
-        json.dumps(sidecar_payload, default=str), encoding="utf-8",
+        json.dumps(sidecar_payload, default=str),
+        encoding="utf-8",
     )
 
     before_tar_exists = snap.tarball_path.exists()
@@ -256,33 +273,30 @@ def test_prune_dry_run_does_not_remove(
     assert "dry-run" in out.lower()
 
     # Tarball still on disk — dry-run is non-destructive
-    assert snap.tarball_path.exists(), (
-        "--dry-run removed a snapshot — must be read-only"
-    )
+    assert snap.tarball_path.exists(), "--dry-run removed a snapshot — must be read-only"
 
 
 def test_prune_actually_removes_eligible_snapshots(
-    isolated_store, workspace, capsys,
+    isolated_store,
+    workspace,
+    capsys,
 ) -> None:
     """The destructive path: stale snapshots beyond retention_days
     get evicted on a real prune."""
     import datetime as dt
+
     skill = _make_skill(workspace, "alpha")
     snap = _snap(isolated_store, [skill])
 
     # Force it to be far past the retention horizon
     payload = json.loads(snap.sidecar_path.read_text(encoding="utf-8"))
-    payload["created_at"] = (
-        dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=180)
-    ).isoformat()
+    payload["created_at"] = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=180)).isoformat()
     snap.sidecar_path.write_text(json.dumps(payload, default=str), encoding="utf-8")
 
     code, out, _ = _run(["prune"], capsys)
     assert code == 0
     m = re.search(r"removed=(\d+)", out)
     assert m, f"prune output missing removed= counter: {out!r}"
-    assert int(m.group(1)) >= 1, (
-        f"expected to evict the stale snapshot; output={out!r}"
-    )
+    assert int(m.group(1)) >= 1, f"expected to evict the stale snapshot; output={out!r}"
     assert not snap.tarball_path.exists()
     assert not snap.sidecar_path.exists()

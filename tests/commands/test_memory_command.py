@@ -1,9 +1,9 @@
 """Tests for ``/memory`` — list / show / delete / dir.
 
-The command thinly wraps ``athena.memory``: we mock each of the
-memory module's exports and verify the command's routing logic
-(arg parsing, error messages, calls into memory with the right
-workspace).
+R2 stage 3: the command now wraps ``athena.memory.store`` (the
+profile-keyed provider façade). We mock each of the store's exports
+and verify the command's routing logic (arg parsing, error messages,
+calls into the provider with profile + workspace).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from athena.commands.memory_command import cmd_memory
+from athena.commands.memory import cmd_memory
 
 
 def _capture():
@@ -23,16 +23,14 @@ def _capture():
     for fn in ("info", "warn", "error"):
         patches.append(
             patch(
-                f"athena.commands.memory_command.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                f"athena.commands.memory.ui.{fn}",
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
-            "athena.commands.memory_command.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            "athena.commands.memory.ui.console.print",
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -50,12 +48,18 @@ def _run(agent, arg: str) -> str:
     return "\n".join(lines)
 
 
-def _agent(workspace: Path) -> SimpleNamespace:
-    return SimpleNamespace(workspace=workspace)
+def _agent(workspace: Path, profile: str = "default") -> SimpleNamespace:
+    return SimpleNamespace(
+        workspace=workspace,
+        cfg=SimpleNamespace(profile=profile),
+    )
 
 
-def _mem(name: str, *, type: str = "fact", description: str = "", path: Path = None) -> SimpleNamespace:
-    """Build a fake memory-file record matching what list_memories returns."""
+def _mem(
+    name: str, *, type: str = "fact", description: str = "", path: Path = None
+) -> SimpleNamespace:
+    """Build a fake MemoryEntry record (R2 stage 3: provider returns
+    these; previously SimpleNamespace stood in for MemoryFile)."""
     return SimpleNamespace(
         name=name,
         type=type,
@@ -73,11 +77,15 @@ def test_no_arg_lists_memories(tmp_path: Path) -> None:
         _mem("api-keys", description="API tokens"),
         _mem("conventions", type="preference", description="Code style"),
     ]
-    with patch(
-        "athena.commands.memory_command.list_memories", return_value=mems,
-    ), patch(
-        "athena.commands.memory_command.memory_dir",
-        return_value=tmp_path / "memory",
+    with (
+        patch(
+            "athena.commands.memory.list_entries",
+            return_value=mems,
+        ),
+        patch(
+            "athena.commands.memory.memory_dir",
+            return_value=tmp_path / "memory",
+        ),
     ):
         out = _run(_agent(tmp_path), "")
     assert "api-keys" in out
@@ -93,10 +101,15 @@ def test_no_arg_with_no_memories_shows_dir() -> None:
     """When the workspace has no memories, surface the dir path
     so the user knows where to drop one."""
     fake_dir = Path("/fake/memdir")
-    with patch(
-        "athena.commands.memory_command.list_memories", return_value=[],
-    ), patch(
-        "athena.commands.memory_command.memory_dir", return_value=fake_dir,
+    with (
+        patch(
+            "athena.commands.memory.list_entries",
+            return_value=[],
+        ),
+        patch(
+            "athena.commands.memory.memory_dir",
+            return_value=fake_dir,
+        ),
     ):
         out = _run(_agent(Path("/ws")), "")
     assert "no memories" in out.lower()
@@ -105,11 +118,15 @@ def test_no_arg_with_no_memories_shows_dir() -> None:
 
 def test_explicit_list_subcommand_works() -> None:
     """``/memory list`` should behave identically to bare ``/memory``."""
-    with patch(
-        "athena.commands.memory_command.list_memories",
-        return_value=[_mem("only-one")],
-    ), patch(
-        "athena.commands.memory_command.memory_dir", return_value=Path("/m"),
+    with (
+        patch(
+            "athena.commands.memory.list_entries",
+            return_value=[_mem("only-one")],
+        ),
+        patch(
+            "athena.commands.memory.memory_dir",
+            return_value=Path("/m"),
+        ),
     ):
         out = _run(_agent(Path("/ws")), "list")
     assert "only-one" in out
@@ -119,9 +136,7 @@ def test_explicit_list_subcommand_works() -> None:
 
 
 def test_show_without_filename_errors() -> None:
-    with patch(
-        "athena.commands.memory_command.parse_memory_file"
-    ) as parse:
+    with patch("athena.commands.memory.read_entry") as parse:
         out = _run(_agent(Path("/ws")), "show")
     parse.assert_not_called()
     assert "usage" in out.lower()
@@ -136,12 +151,15 @@ def test_show_renders_memory_body() -> None:
         description="API tokens we care about",
         body="API_KEY=xxx\nOTHER=yyy",
     )
-    with patch(
-        "athena.commands.memory_command.memory_dir",
-        return_value=Path("/m"),
-    ), patch(
-        "athena.commands.memory_command.parse_memory_file",
-        return_value=fake,
+    with (
+        patch(
+            "athena.commands.memory.memory_dir",
+            return_value=Path("/m"),
+        ),
+        patch(
+            "athena.commands.memory.read_entry",
+            return_value=fake,
+        ),
     ):
         out = _run(_agent(Path("/ws")), "show api.md")
     assert "api-keys" in out
@@ -151,27 +169,31 @@ def test_show_renders_memory_body() -> None:
     assert "OTHER=yyy" in out
 
 
-def test_show_unparseable_errors() -> None:
-    """parse_memory_file returning None means the file doesn't exist
-    or has bad frontmatter — surface a friendly error, not a crash."""
-    with patch(
-        "athena.commands.memory_command.memory_dir",
-        return_value=Path("/m"),
-    ), patch(
-        "athena.commands.memory_command.parse_memory_file",
-        return_value=None,
+def test_show_missing_entry_errors() -> None:
+    """read_entry returning None means the entry doesn't exist under
+    this (profile, workspace) -- surface a friendly error, not a
+    crash. R2 stage 3 dropped the legacy ``parse_memory_file`` path
+    (which conflated missing-file and bad-frontmatter cases); the
+    provider's read_entry returns None only for missing entries."""
+    with (
+        patch(
+            "athena.commands.memory.memory_dir",
+            return_value=Path("/m"),
+        ),
+        patch(
+            "athena.commands.memory.read_entry",
+            return_value=None,
+        ),
     ):
         out = _run(_agent(Path("/ws")), "show bogus.md")
-    assert "not found or unparseable" in out.lower()
+    assert "not found" in out.lower()
 
 
 # ---- /memory delete <file> -----------------------------------------
 
 
 def test_delete_without_filename_errors() -> None:
-    with patch(
-        "athena.commands.memory_command.delete_memory"
-    ) as del_mock:
+    with patch("athena.commands.memory.delete_entry") as del_mock:
         out = _run(_agent(Path("/ws")), "delete")
     del_mock.assert_not_called()
     assert "usage" in out.lower()
@@ -181,7 +203,8 @@ def test_delete_without_filename_errors() -> None:
 def test_delete_success_path() -> None:
     """delete_memory returning True means deletion succeeded."""
     with patch(
-        "athena.commands.memory_command.delete_memory", return_value=True,
+        "athena.commands.memory.delete_entry",
+        return_value=True,
     ):
         out = _run(_agent(Path("/ws")), "delete obsolete.md")
     # No error message
@@ -193,7 +216,8 @@ def test_delete_missing_file_errors() -> None:
     """delete_memory returning False means it wasn't there — error
     surface should match."""
     with patch(
-        "athena.commands.memory_command.delete_memory", return_value=False,
+        "athena.commands.memory.delete_entry",
+        return_value=False,
     ):
         out = _run(_agent(Path("/ws")), "delete missing.md")
     assert "not found" in out.lower()
@@ -205,7 +229,8 @@ def test_delete_missing_file_errors() -> None:
 def test_dir_prints_memory_directory_path() -> None:
     target = Path("/some/profile/memory")
     with patch(
-        "athena.commands.memory_command.memory_dir", return_value=target,
+        "athena.commands.memory.memory_dir",
+        return_value=target,
     ):
         out = _run(_agent(Path("/ws")), "dir")
     assert str(target) in out

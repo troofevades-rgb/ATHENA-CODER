@@ -68,7 +68,8 @@ def test_loop_drives_multiple_turns_then_terminates_on_achieved(
 
     # Turn 1: model is working
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Started analyzing the test.",
         cfg=cfg,
     )
@@ -78,7 +79,8 @@ def test_loop_drives_multiple_turns_then_terminates_on_achieved(
 
     # Turn 2: still working
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Fixed one assertion.",
         cfg=cfg,
     )
@@ -87,7 +89,8 @@ def test_loop_drives_multiple_turns_then_terminates_on_achieved(
 
     # Turn 3: still working
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Refactored the helper.",
         cfg=cfg,
     )
@@ -96,7 +99,8 @@ def test_loop_drives_multiple_turns_then_terminates_on_achieved(
 
     # Turn 4: GOAL ACHIEVED — loop must terminate
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="All tests pass.\nGOAL ACHIEVED",
         cfg=cfg,
     )
@@ -111,10 +115,10 @@ def test_loop_terminates_on_goal_blocked_sentinel(tmp_path: Path) -> None:
     state = _state()
 
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text=(
-            "I need the API token to continue.\n"
-            "GOAL BLOCKED: missing ATHENA_X_BEARER_TOKEN"
+            "I need the API token to continue.\nGOAL BLOCKED: missing ATHENA_X_BEARER_TOKEN"
         ),
         cfg=_cfg(),
     )
@@ -135,8 +139,9 @@ def test_loop_terminates_on_max_turns_reached(tmp_path: Path) -> None:
     # Walk to the cap
     for i in range(3):
         d = maybe_continue_goal_after_turn(
-            profile_dir=tmp_path, state=state,
-            last_assistant_text=f"Working step {i+1}.",
+            profile_dir=tmp_path,
+            state=state,
+            last_assistant_text=f"Working step {i + 1}.",
             cfg=cfg,
         )
         # Each turn before the cap should continue
@@ -147,7 +152,8 @@ def test_loop_terminates_on_max_turns_reached(tmp_path: Path) -> None:
     # 'exhausted' OR the next call returns exhausted.
     if state.status != "exhausted":
         d = maybe_continue_goal_after_turn(
-            profile_dir=tmp_path, state=state,
+            profile_dir=tmp_path,
+            state=state,
             last_assistant_text="Still working.",
             cfg=cfg,
         )
@@ -160,7 +166,8 @@ def test_loop_returns_disabled_when_cfg_says_so(tmp_path: Path) -> None:
     circuit the entire driver regardless of state."""
     state = _state()
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Working on it.",
         cfg=_cfg(goal_loop_enabled=False),
     )
@@ -174,7 +181,8 @@ def test_loop_returns_disabled_when_cfg_says_so(tmp_path: Path) -> None:
 def test_no_state_means_no_continuation(tmp_path: Path) -> None:
     """When no goal is set, the driver must be a strict no-op."""
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=None,
+        profile_dir=tmp_path,
+        state=None,
         last_assistant_text="Anything goes here.",
         cfg=_cfg(),
     )
@@ -195,13 +203,15 @@ def test_state_persists_between_turns(tmp_path: Path) -> None:
 
     for i in range(3):
         maybe_continue_goal_after_turn(
-            profile_dir=tmp_path, state=state,
+            profile_dir=tmp_path,
+            state=state,
             last_assistant_text=f"Step {i}",
             cfg=cfg,
         )
 
     # Reload from disk and verify
     from athena.goal.state import load_state
+
     loaded = load_state(tmp_path)
     assert loaded is not None
     assert loaded.turns_taken == 3
@@ -215,7 +225,8 @@ def test_paused_state_returns_paused_without_advancing(tmp_path: Path) -> None:
     state = _state(status="paused", turns_taken=2)
 
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Working away.",
         cfg=_cfg(),
     )
@@ -231,7 +242,8 @@ def test_paused_state_returns_paused_without_advancing(tmp_path: Path) -> None:
 
 
 def test_verifier_rejection_keeps_loop_alive_and_bumps_turns(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When the model emits GOAL ACHIEVED but the verifier command
     exits non-zero, the loop must:
@@ -243,8 +255,10 @@ def test_verifier_rejection_keeps_loop_alive_and_bumps_turns(
 
     # Stub run_goal_verifier to simulate a failing test run
     from athena.goal.loop import VerifierResult
+
     monkeypatch.setattr(
-        loop_mod, "run_goal_verifier",
+        loop_mod,
+        "run_goal_verifier",
         lambda cfg: VerifierResult(
             passed=False,
             output="FAIL: tests/test_widget.py::test_color  expected red got green",
@@ -255,14 +269,15 @@ def test_verifier_rejection_keeps_loop_alive_and_bumps_turns(
     cfg = _cfg(goal_verifier_command="pytest tests/test_widget.py")
 
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Done.\nGOAL ACHIEVED",
         cfg=cfg,
     )
     # Rejected — must continue with feedback
     assert d.should_continue is True
     assert state.status == "active"  # NOT achieved
-    assert state.turns_taken == 3    # bumped (failed claim costs a turn)
+    assert state.turns_taken == 3  # bumped (failed claim costs a turn)
     # Synthetic prompt must surface the rejection + verifier output
     assert d.synthetic_prompt is not None
     assert "rejected" in d.synthetic_prompt.lower()
@@ -270,7 +285,8 @@ def test_verifier_rejection_keeps_loop_alive_and_bumps_turns(
 
 
 def test_verifier_rejection_at_max_turns_marks_exhausted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """If the verifier rejects on the LAST allowed turn, the loop
     must mark ``exhausted`` rather than letting the model loop
@@ -279,7 +295,8 @@ def test_verifier_rejection_at_max_turns_marks_exhausted(
     from athena.goal.loop import VerifierResult
 
     monkeypatch.setattr(
-        loop_mod, "run_goal_verifier",
+        loop_mod,
+        "run_goal_verifier",
         lambda cfg: VerifierResult(passed=False, output="STILL FAILING"),
     )
 
@@ -288,7 +305,8 @@ def test_verifier_rejection_at_max_turns_marks_exhausted(
     cfg = _cfg(goal_verifier_command="false")
 
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Tried.\nGOAL ACHIEVED",
         cfg=cfg,
     )
@@ -298,14 +316,16 @@ def test_verifier_rejection_at_max_turns_marks_exhausted(
 
 
 def test_verifier_pass_accepts_achievement(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When the verifier passes, achievement stands."""
     from athena.goal import loop as loop_mod
     from athena.goal.loop import VerifierResult
 
     monkeypatch.setattr(
-        loop_mod, "run_goal_verifier",
+        loop_mod,
+        "run_goal_verifier",
         lambda cfg: VerifierResult(passed=True, output="ok"),
     )
 
@@ -313,7 +333,8 @@ def test_verifier_pass_accepts_achievement(
     cfg = _cfg(goal_verifier_command="true")
 
     d = maybe_continue_goal_after_turn(
-        profile_dir=tmp_path, state=state,
+        profile_dir=tmp_path,
+        state=state,
         last_assistant_text="Done.\nGOAL ACHIEVED",
         cfg=cfg,
     )

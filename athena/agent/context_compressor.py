@@ -376,7 +376,10 @@ def compress(
         logger.info(
             "Compressor: tail budget clamped from %d to %d tokens "
             "(head=%d, summary=%d, window=%d) to fit window",
-            static_tail, tail_budget, head_tokens, summary_budget,
+            static_tail,
+            tail_budget,
+            head_tokens,
+            summary_budget,
             cfg.model_context_window,
         )
 

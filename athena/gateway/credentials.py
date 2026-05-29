@@ -86,22 +86,28 @@ def resolve_credential(
             raw = p.read_text(encoding="utf-8")
         except OSError as e:
             logger.warning(
-                "gateway %s.%s_path %s unreadable: %s — "
-                "falling back to cleartext if present",
-                platform, key, p, e,
+                "gateway %s.%s_path %s unreadable: %s — falling back to cleartext if present",
+                platform,
+                key,
+                p,
+                e,
             )
         else:
             tok = raw.strip()
             if tok:
                 logger.debug(
                     "gateway %s.%s loaded from %s (len=%d)",
-                    platform, key, p, len(tok),
+                    platform,
+                    key,
+                    p,
+                    len(tok),
                 )
                 return tok
             logger.warning(
-                "gateway %s.%s_path %s is empty — "
-                "falling back to cleartext if present",
-                platform, key, p,
+                "gateway %s.%s_path %s is empty — falling back to cleartext if present",
+                platform,
+                key,
+                p,
             )
 
     cleartext = settings.get(key)
@@ -135,7 +141,9 @@ def _warn_once(platform: str, key: str) -> None:
         "for safety move it to %s_path pointing at a 0o600 file "
         "(see docs/reference/gateway-credentials.md for the "
         "migration recipe)",
-        platform, key, key,
+        platform,
+        key,
+        key,
     )
 
 

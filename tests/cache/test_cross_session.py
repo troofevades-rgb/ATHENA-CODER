@@ -21,7 +21,6 @@ from athena.cache.cross_session import (
 )
 from athena.providers.base import Capabilities, Provider
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

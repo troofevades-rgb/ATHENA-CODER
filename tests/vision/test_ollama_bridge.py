@@ -18,20 +18,30 @@ def test_text_only_message_passes_through_untouched():
 
 
 def test_text_only_list_content_collapses_to_string():
-    msgs = [{"role": "user", "content": [
-        {"type": "text", "text": "first line"},
-        {"type": "text", "text": "second line"},
-    ]}]
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "first line"},
+                {"type": "text", "text": "second line"},
+            ],
+        }
+    ]
     out = _normalize_vision_messages(msgs)
     assert out[0]["content"] == "first line\nsecond line"
     assert "images" not in out[0]
 
 
 def test_single_image_block_moves_to_images_list():
-    msgs = [{"role": "user", "content": [
-        {"type": "text", "text": "what's in this?"},
-        {"type": "image", "media_type": "image/png", "data": "AAAA", "label": "image"},
-    ]}]
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "what's in this?"},
+                {"type": "image", "media_type": "image/png", "data": "AAAA", "label": "image"},
+            ],
+        }
+    ]
     out = _normalize_vision_messages(msgs)
     m = out[0]
     assert m["role"] == "user"
@@ -43,13 +53,18 @@ def test_single_image_block_moves_to_images_list():
 
 
 def test_multiple_tiles_carry_distinct_labels_inline():
-    msgs = [{"role": "user", "content": [
-        {"type": "text", "text": "describe the whole scene"},
-        {"type": "image", "data": "T1", "label": "tile_0_0"},
-        {"type": "image", "data": "T2", "label": "tile_0_1"},
-        {"type": "image", "data": "T3", "label": "tile_1_0"},
-        {"type": "image", "data": "T4", "label": "tile_1_1"},
-    ]}]
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "describe the whole scene"},
+                {"type": "image", "data": "T1", "label": "tile_0_0"},
+                {"type": "image", "data": "T2", "label": "tile_0_1"},
+                {"type": "image", "data": "T3", "label": "tile_1_0"},
+                {"type": "image", "data": "T4", "label": "tile_1_1"},
+            ],
+        }
+    ]
     out = _normalize_vision_messages(msgs)
     m = out[0]
     assert m["images"] == ["T1", "T2", "T3", "T4"]
@@ -59,10 +74,15 @@ def test_multiple_tiles_carry_distinct_labels_inline():
 
 def test_input_is_not_mutated():
     """Caller's message list must survive the call unchanged."""
-    msgs = [{"role": "user", "content": [
-        {"type": "text", "text": "hi"},
-        {"type": "image", "data": "Z", "label": "image"},
-    ]}]
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "hi"},
+                {"type": "image", "data": "Z", "label": "image"},
+            ],
+        }
+    ]
     original_content = msgs[0]["content"]
     _ = _normalize_vision_messages(msgs)
     assert msgs[0]["content"] is original_content  # same list, untouched
@@ -71,10 +91,15 @@ def test_input_is_not_mutated():
 def test_image_block_without_data_dropped():
     """Defensive: a malformed image block with no data shouldn't
     crash; it just doesn't contribute to images=."""
-    msgs = [{"role": "user", "content": [
-        {"type": "text", "text": "ok"},
-        {"type": "image", "media_type": "image/png"},  # no data
-    ]}]
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "ok"},
+                {"type": "image", "media_type": "image/png"},  # no data
+            ],
+        }
+    ]
     out = _normalize_vision_messages(msgs)
     assert out[0].get("images") in (None,)  # absent or empty
     assert out[0]["content"] == "ok"
@@ -84,10 +109,15 @@ def test_other_provider_block_shape_ignored():
     """An OpenAI image_url block accidentally fed to Ollama is
     ignored rather than crashing the call. vision_analyze's
     provider-shape picker should prevent this in practice."""
-    msgs = [{"role": "user", "content": [
-        {"type": "text", "text": "describe"},
-        {"type": "image_url", "image_url": {"url": "data:image/png;base64,XX"}},
-    ]}]
+    msgs = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "describe"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,XX"}},
+            ],
+        }
+    ]
     out = _normalize_vision_messages(msgs)
     # text survives; the image_url block is dropped.
     assert out[0]["content"] == "describe"
@@ -108,6 +138,7 @@ def test_end_to_end_vision_passthrough_to_ollama_shape(tmp_path):
     a user message → _normalize → assert Ollama shape."""
     from athena.vision.passthrough import passthrough_blocks
     from tests.vision.fixtures import FIXTURES_DIR, ensure_fixtures
+
     ensure_fixtures()
 
     blocks = passthrough_blocks(FIXTURES_DIR / "small.png", provider="ollama")
@@ -124,6 +155,8 @@ def test_end_to_end_vision_passthrough_to_ollama_shape(tmp_path):
     # The base64 payload round-trips through Pillow → real image.
     import base64
     import io
+
     from PIL import Image
+
     img = Image.open(io.BytesIO(base64.b64decode(out[0]["images"][0])))
     img.verify()

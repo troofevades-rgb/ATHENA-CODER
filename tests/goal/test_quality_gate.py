@@ -88,15 +88,11 @@ def test_validate_make_perfect_rejected():
 
 def test_validate_concrete_deliverable_accepted():
     """The error message's own example must pass its own check."""
-    assert _validate_goal_text(
-        "Ship the migration verify command with passing tests"
-    ) is None
+    assert _validate_goal_text("Ship the migration verify command with passing tests") is None
 
 
 def test_validate_specific_port_task_accepted():
-    assert _validate_goal_text(
-        "Port hermes website_policy as athena/browser/policy.py"
-    ) is None
+    assert _validate_goal_text("Port hermes website_policy as athena/browser/policy.py") is None
 
 
 def test_validate_case_insensitive():

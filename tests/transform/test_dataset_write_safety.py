@@ -63,8 +63,7 @@ def test_newlines_in_content_are_escaped_not_inlined(tmp_path: Path) -> None:
     with open(path, encoding="utf-8") as f:
         lines = f.readlines()
     assert len(lines) == 2, (
-        f"expected 2 jsonl lines, got {len(lines)} — "
-        f"newlines in content corrupted the file"
+        f"expected 2 jsonl lines, got {len(lines)} — newlines in content corrupted the file"
     )
     # Round-trip preserves the newlines
     loaded = _read_jsonl(path)
@@ -113,7 +112,8 @@ def test_large_example_does_not_truncate_or_split(tmp_path: Path) -> None:
 
 
 def test_disk_full_during_write_leaves_target_atomic(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Atomic-rename contract: when write_jsonl fails mid-write, the
     TARGET path is unchanged (still has the prior content, or absent
@@ -168,6 +168,7 @@ def test_disk_full_during_write_leaves_target_atomic(
         return f
 
     import builtins as _bi
+
     monkeypatch.setattr(_bi, "open", _wrapped)
 
     with pytest.raises(OSError):
@@ -184,8 +185,7 @@ def test_disk_full_during_write_leaves_target_atomic(
     # 2. No leftover .tmp turd
     tmp_path_str = path.with_name(path.name + ".tmp")
     assert not tmp_path_str.exists(), (
-        f"leftover {tmp_path_str.name} after failed write — "
-        f"tmp cleanup didn't run"
+        f"leftover {tmp_path_str.name} after failed write — tmp cleanup didn't run"
     )
 
 

@@ -43,6 +43,7 @@ def _notify(state: bool) -> None:
             # break plan-mode transitions. Surfaced via the standard
             # logging path.
             import logging
+
             logging.getLogger(__name__).exception(
                 "plan-mode listener raised; continuing",
             )

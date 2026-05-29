@@ -226,6 +226,7 @@ def test_persistence_failure_does_not_block_decision(tmp_path: Path, monkeypatch
     """A disk error during save_state doesn't change the
     in-memory decision — the loop still tells the caller to
     continue (or stop), the persistence is best-effort."""
+
     def _boom(*a, **kw):
         raise OSError("disk full (synthetic)")
 

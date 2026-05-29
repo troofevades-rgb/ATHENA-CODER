@@ -87,9 +87,7 @@ def resolve_embedder(*, cfg: Any) -> Embedder | None:
     registry = MediaRegistry(cfg=cfg)
     backend_cls = registry.backend_for("embeddings")
     if backend_cls is None:
-        logger.info(
-            "recall: no embeddings backend registered; falling back to keyword-only"
-        )
+        logger.info("recall: no embeddings backend registered; falling back to keyword-only")
         return None
     model_id = _resolve_model_id(backend_cls, cfg)
     # Instantiate with kwargs the provider's __init__ expects.

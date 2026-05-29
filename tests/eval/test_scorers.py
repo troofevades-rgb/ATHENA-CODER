@@ -21,7 +21,6 @@ from athena.eval.summary import (
     mint_eval_id,
 )
 
-
 # ---------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------
@@ -50,6 +49,7 @@ def test_register_then_get_round_trip():
     finally:
         # Clean up so other tests don't see it.
         from athena.eval.scorers import _REGISTRY
+
         _REGISTRY.pop("test_custom", None)
 
 
@@ -212,10 +212,14 @@ def test_json_path_value_can_be_complex():
     objects work too."""
     fn = get_scorer("json_path")
     actual = '{"data": {"nested": {"key": "value"}}}'
-    s = fn(actual, {
-        "path": "data.nested",
-        "value": {"key": "value"},
-    }, context={})
+    s = fn(
+        actual,
+        {
+            "path": "data.nested",
+            "value": {"key": "value"},
+        },
+        context={},
+    )
     assert s.passed is True
 
 
@@ -241,10 +245,12 @@ def test_score_rounds_to_4_decimals():
 
 
 def test_evalcase_from_dict_required_fields():
-    c = EvalCase.from_dict({
-        "task": "what is 2+2?",
-        "expected": "4",
-    })
+    c = EvalCase.from_dict(
+        {
+            "task": "what is 2+2?",
+            "expected": "4",
+        }
+    )
     assert c.task == "what is 2+2?"
     assert c.expected == "4"
     assert c.case_id is None
@@ -252,15 +258,17 @@ def test_evalcase_from_dict_required_fields():
 
 
 def test_evalcase_from_dict_all_fields():
-    c = EvalCase.from_dict({
-        "task": "T",
-        "expected": "E",
-        "case_id": "e-explicit",
-        "scorer": "regex",
-        "cwd": "/tmp",
-        "timeout_s": 30.5,
-        "model": "m",
-    })
+    c = EvalCase.from_dict(
+        {
+            "task": "T",
+            "expected": "E",
+            "case_id": "e-explicit",
+            "scorer": "regex",
+            "cwd": "/tmp",
+            "timeout_s": 30.5,
+            "model": "m",
+        }
+    )
     assert c.case_id == "e-explicit"
     assert c.scorer == "regex"
     assert c.timeout_s == 30.5
@@ -269,10 +277,14 @@ def test_evalcase_from_dict_all_fields():
 def test_evalcase_preserves_extras():
     """Unknown keys → c.extras so custom scorers can read them
     off the case context."""
-    c = EvalCase.from_dict({
-        "task": "T", "expected": "E",
-        "category": "math", "difficulty": "hard",
-    })
+    c = EvalCase.from_dict(
+        {
+            "task": "T",
+            "expected": "E",
+            "category": "math",
+            "difficulty": "hard",
+        }
+    )
     assert c.extras == {"category": "math", "difficulty": "hard"}
 
 
@@ -320,18 +332,29 @@ def test_minted_ids_unique():
 
 def test_evalscore_to_dict_shape():
     s = EvalScore(
-        case_id="e-1", run_id="r-1",
-        task_excerpt="t", actual_excerpt="a",
-        passed=True, score=1.0, scorer="exact",
+        case_id="e-1",
+        run_id="r-1",
+        task_excerpt="t",
+        actual_excerpt="a",
+        passed=True,
+        score=1.0,
+        scorer="exact",
         details="match",
         run_status="ok",
         envelope_path="/tmp/r-1.json",
     )
     d = s.to_dict()
     assert set(d.keys()) >= {
-        "case_id", "run_id", "task_excerpt", "actual_excerpt",
-        "passed", "score", "scorer", "details",
-        "run_status", "envelope_path",
+        "case_id",
+        "run_id",
+        "task_excerpt",
+        "actual_excerpt",
+        "passed",
+        "score",
+        "scorer",
+        "details",
+        "run_status",
+        "envelope_path",
     }
 
 
@@ -340,13 +363,18 @@ def test_evalsummary_to_dict_baseline_fields_only_when_set():
     the dict when baseline_id is set — keeps the summary clean
     when no baseline was passed."""
     s = EvalSummary(
-        eval_id="v-1", batch_id="b-1",
+        eval_id="v-1",
+        batch_id="b-1",
         started_at="2026-05-21T00:00:00.000000Z",
         finished_at="2026-05-21T00:00:00.000000Z",
         duration_s=1.0,
         output_dir="/tmp/out",
-        total=0, passed=0, failed=0, errored=0,
-        pass_rate=0.0, avg_score=0.0,
+        total=0,
+        passed=0,
+        failed=0,
+        errored=0,
+        pass_rate=0.0,
+        avg_score=0.0,
     )
     d = s.to_dict()
     assert "baseline_id" not in d
@@ -356,13 +384,18 @@ def test_evalsummary_to_dict_baseline_fields_only_when_set():
 
 def test_evalsummary_to_dict_with_baseline():
     s = EvalSummary(
-        eval_id="v-1", batch_id="b-1",
+        eval_id="v-1",
+        batch_id="b-1",
         started_at="2026-05-21T00:00:00.000000Z",
         finished_at="2026-05-21T00:00:00.000000Z",
         duration_s=1.0,
         output_dir="/tmp/out",
-        total=2, passed=1, failed=1, errored=0,
-        pass_rate=0.5, avg_score=0.5,
+        total=2,
+        passed=1,
+        failed=1,
+        errored=0,
+        pass_rate=0.5,
+        avg_score=0.5,
         baseline_id="v-baseline",
         regressions=["e-1"],
         improvements=["e-3"],
@@ -375,12 +408,18 @@ def test_evalsummary_to_dict_with_baseline():
 
 def test_evalsummary_to_json_round_trip():
     s = EvalSummary(
-        eval_id="v-x", batch_id="b-x",
+        eval_id="v-x",
+        batch_id="b-x",
         started_at="2026-05-21T00:00:00.000000Z",
         finished_at="2026-05-21T00:00:00.000000Z",
-        duration_s=0.0, output_dir="/o",
-        total=0, passed=0, failed=0, errored=0,
-        pass_rate=0.0, avg_score=0.0,
+        duration_s=0.0,
+        output_dir="/o",
+        total=0,
+        passed=0,
+        failed=0,
+        errored=0,
+        pass_rate=0.0,
+        avg_score=0.0,
     )
     parsed = json.loads(s.to_json())
     assert parsed["eval_id"] == "v-x"

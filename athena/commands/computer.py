@@ -12,36 +12,34 @@ adjust the underlying knobs.
 from __future__ import annotations
 
 from .. import ui
+from ..computer.audit import ActionAuditLog, default_audit_path
 from ..computer.detect import available_backends, select_backend
-from ..computer.audit import default_audit_path, ActionAuditLog
 from ..config import load_config, profile_dir
 from . import command
 
 
 def _print_status(*, tail_n: int = 5) -> None:
     cfg = load_config()
-    enabled = bool(getattr(cfg, "computer_use_enabled", False))
+    cu = cfg.computer
+    enabled = bool(cu.use_enabled)
     ui.console.print(
         f"[bold]computer use:[/] "
         f"{'[green]enabled[/]' if enabled else '[red]disabled[/]'} "
-        f"(computer_use_enabled={enabled})"
+        f"(use_enabled={enabled})"
     )
 
-    mode = getattr(cfg, "computer_permission_mode", "observe_only")
-    ui.console.print(f"  mode: [bold]{mode}[/]")
+    ui.console.print(f"  mode: [bold]{cu.permission_mode}[/]")
 
-    allow = list(getattr(cfg, "computer_app_allowlist", []) or [])
-    deny = list(getattr(cfg, "computer_app_denylist", []) or [])
+    allow = list(cu.app_allowlist or [])
+    deny = list(cu.app_denylist or [])
     ui.console.print(
         f"  allowlist: {allow if allow else '[dim](empty — no app may be controlled)[/]'}"
     )
     ui.console.print(f"  denylist:  {deny}")
+    ui.console.print(f"  kill hotkey: {cu.kill_hotkey} (Ctrl+C always active)")
     ui.console.print(
-        f"  kill hotkey: {getattr(cfg, 'computer_kill_hotkey', 'ctrl+alt+k')} (Ctrl+C always active)"
-    )
-    ui.console.print(
-        f"  caps: max_actions/task={getattr(cfg, 'computer_max_actions_per_task', 40)}, "
-        f"max_actions/sec={getattr(cfg, 'computer_max_actions_per_sec', 2.0)}"
+        f"  caps: max_actions/task={cu.max_actions_per_task}, "
+        f"max_actions/sec={cu.max_actions_per_sec}"
     )
 
     backend = select_backend(cfg)
@@ -55,9 +53,7 @@ def _print_status(*, tail_n: int = 5) -> None:
     ui.console.print("  known backends:")
     for row in available_backends():
         marker = "✓" if row["available"] else "✗"
-        ui.console.print(
-            f"    {marker} {row['name']}: supports={row['supports']}"
-        )
+        ui.console.print(f"    {marker} {row['name']}: supports={row['supports']}")
 
     # Audit log tail.
     prof = getattr(cfg, "profile", None) or "default"
@@ -71,13 +67,10 @@ def _print_status(*, tail_n: int = 5) -> None:
     ui.console.print(f"  recent actions (last {len(entries)}):")
     for e in entries:
         result_color = (
-            "green" if e.executed and e.result == "ok"
-            else "yellow" if not e.executed
-            else "red"
+            "green" if e.executed and e.result == "ok" else "yellow" if not e.executed else "red"
         )
         ui.console.print(
-            f"    [{e.ts}] {e.type} tier={e.tier} "
-            f"app={e.app!r} → [{result_color}]{e.result}[/]"
+            f"    [{e.ts}] {e.type} tier={e.tier} app={e.app!r} → [{result_color}]{e.result}[/]"
         )
 
 

@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from athena import ui
-from athena.commands.theme_cmd import cmd_theme
+from athena.commands.theme import cmd_theme
 
 
 @pytest.fixture(autouse=True)
@@ -30,16 +30,14 @@ def _capture_ui():
     for fn_name in ("info", "warn", "error"):
         patches.append(
             patch(
-                f"athena.commands.theme_cmd.ui.{fn_name}",
-                side_effect=lambda msg, *a, _n=fn_name, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                f"athena.commands.theme.ui.{fn_name}",
+                side_effect=lambda msg, *a, _n=fn_name, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
-            "athena.commands.theme_cmd.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            "athena.commands.theme.ui.console.print",
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -66,9 +64,7 @@ def test_status_shows_both_themes():
 def test_status_marks_active_with_asterisk():
     ui.set_theme("noctua")
     _, out = _run("")
-    list_lines = [
-        l for l in out.splitlines() if "active theme" not in l.lower()
-    ]
+    list_lines = [l for l in out.splitlines() if "active theme" not in l.lower()]
     noctua_line = next(l for l in list_lines if "noctua" in l)
     phos_line = next(l for l in list_lines if "phosphor" in l)
     assert "*" in noctua_line
@@ -146,7 +142,8 @@ def test_save_replaces_existing_theme_line(tmp_path, monkeypatch):
     cfg_path = fake_home / ".athena" / "config.toml"
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
     cfg_path.write_text(
-        'theme = "phosphor"\nmodel = "x"\n', encoding="utf-8",
+        'theme = "phosphor"\nmodel = "x"\n',
+        encoding="utf-8",
     )
 
     ui.set_theme("noctua")

@@ -127,9 +127,7 @@ def _image_block(
     prefer_original_format: bool = False,
 ) -> dict[str, Any]:
     """Produce one provider-shaped content block for an in-memory image."""
-    data, mime = _bytes_for_provider(
-        img, prefer_original_format=prefer_original_format
-    )
+    data, mime = _bytes_for_provider(img, prefer_original_format=prefer_original_format)
     b64 = base64.b64encode(data).decode("ascii")
     if provider == "anthropic":
         block: dict[str, Any] = {
@@ -227,10 +225,7 @@ def passthrough_blocks(
     a crop's original-format identity is meaningless.
     """
     if provider not in LONG_EDGE_CAP:
-        raise ValueError(
-            f"unknown provider {provider!r}; "
-            f"choose from {sorted(LONG_EDGE_CAP)}"
-        )
+        raise ValueError(f"unknown provider {provider!r}; choose from {sorted(LONG_EDGE_CAP)}")
     cap = long_edge_cap or LONG_EDGE_CAP[provider]
 
     img = Image.open(Path(path))
@@ -239,7 +234,9 @@ def passthrough_blocks(
 
     if max(w, h) <= cap:
         block = _image_block(
-            img, provider=provider, prefer_original_format=True,
+            img,
+            provider=provider,
+            prefer_original_format=True,
         )
         return {"provider": provider, "tiled": False, "blocks": [block]}
 

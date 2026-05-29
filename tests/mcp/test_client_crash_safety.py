@@ -66,7 +66,9 @@ def test_server_exits_before_response_wakes_pending_request(
     """
     script = _server_script(tmp_path, body)
     client = MCPStdioClient(
-        name="crasher", command=sys.executable, args=[str(script)],
+        name="crasher",
+        command=sys.executable,
+        args=[str(script)],
         request_timeout=5.0,
     )
     try:
@@ -102,7 +104,9 @@ def test_server_crashes_with_nonzero_exit_still_wakes_pending(
     """
     script = _server_script(tmp_path, body)
     client = MCPStdioClient(
-        name="panicker", command=sys.executable, args=[str(script)],
+        name="panicker",
+        command=sys.executable,
+        args=[str(script)],
         request_timeout=5.0,
     )
     try:
@@ -136,7 +140,9 @@ def test_unresponsive_server_request_respects_timeout(
     """
     script = _server_script(tmp_path, body)
     client = MCPStdioClient(
-        name="silent", command=sys.executable, args=[str(script)],
+        name="silent",
+        command=sys.executable,
+        args=[str(script)],
         request_timeout=1.0,
     )
     try:
@@ -145,14 +151,11 @@ def test_unresponsive_server_request_respects_timeout(
             client.request("ping", timeout=1.0)
         elapsed = time.perf_counter() - t0
         # Must respect the 1s timeout
-        assert 0.9 < elapsed < 2.5, (
-            f"request did not respect 1s timeout; took {elapsed:.2f}s"
-        )
+        assert 0.9 < elapsed < 2.5, f"request did not respect 1s timeout; took {elapsed:.2f}s"
         assert "timeout" in str(ei.value).lower()
         # Slot must be freed — pending dict empty
         assert len(client._pending) == 0, (
-            "timed-out request left orphan entry in _pending; "
-            "long-running session would leak slots"
+            "timed-out request left orphan entry in _pending; long-running session would leak slots"
         )
     finally:
         client.close()
@@ -185,7 +188,9 @@ def test_malformed_server_output_does_not_kill_client(
     """
     script = _server_script(tmp_path, body)
     client = MCPStdioClient(
-        name="junker", command=sys.executable, args=[str(script)],
+        name="junker",
+        command=sys.executable,
+        args=[str(script)],
         request_timeout=3.0,
     )
     try:
@@ -216,15 +221,15 @@ def test_close_is_idempotent_and_does_not_hang(tmp_path: Path) -> None:
     """
     script = _server_script(tmp_path, body)
     client = MCPStdioClient(
-        name="sleeper", command=sys.executable, args=[str(script)],
+        name="sleeper",
+        command=sys.executable,
+        args=[str(script)],
     )
     t0 = time.perf_counter()
     client.close()
     client.close()  # second call must be a no-op
     elapsed = time.perf_counter() - t0
-    assert elapsed < 5.0, (
-        f"double-close took {elapsed:.2f}s; close() is not bounded"
-    )
+    assert elapsed < 5.0, f"double-close took {elapsed:.2f}s; close() is not bounded"
     # Process is reaped
     assert not client.is_alive()
 
@@ -238,7 +243,9 @@ def test_request_after_close_raises_not_hangs(tmp_path: Path) -> None:
     """
     script = _server_script(tmp_path, body)
     client = MCPStdioClient(
-        name="closed", command=sys.executable, args=[str(script)],
+        name="closed",
+        command=sys.executable,
+        args=[str(script)],
         request_timeout=3.0,
     )
     client.close()
@@ -246,9 +253,7 @@ def test_request_after_close_raises_not_hangs(tmp_path: Path) -> None:
     with pytest.raises(MCPError):
         client.request("anything", timeout=2.0)
     elapsed = time.perf_counter() - t0
-    assert elapsed < 2.5, (
-        f"post-close request hung {elapsed:.2f}s instead of failing fast"
-    )
+    assert elapsed < 2.5, f"post-close request hung {elapsed:.2f}s instead of failing fast"
 
 
 # ---------------------------------------------------------------------------

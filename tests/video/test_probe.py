@@ -22,7 +22,6 @@ from athena.video.probe import (
 )
 from tests.video.fixtures import FIXTURES_DIR, have_ffmpeg, have_ffprobe
 
-
 _NEED_FFPROBE = pytest.mark.skipif(
     not have_ffprobe() or not have_ffmpeg(),
     reason="ffprobe / ffmpeg not on PATH",
@@ -103,10 +102,12 @@ def test_encoder_fingerprint_flags_x265():
 def test_encoder_fingerprint_finds_stream_level_tag():
     probe = {
         "format": {"tags": {}},
-        "streams": [{
-            "codec_type": "video",
-            "tags": {"encoder": "x264 - core"},
-        }],
+        "streams": [
+            {
+                "codec_type": "video",
+                "tags": {"encoder": "x264 - core"},
+            }
+        ],
     }
     fp = encoder_fingerprint(probe)
     assert fp["software_encoder_likely"] is True
@@ -124,10 +125,12 @@ def test_encoder_fingerprint_hedges_on_absence():
 def test_encoder_fingerprint_collects_handler_names():
     probe = {
         "format": {"tags": {}},
-        "streams": [{
-            "codec_type": "video",
-            "tags": {"handler_name": "Mainconcept Video Media Handler"},
-        }],
+        "streams": [
+            {
+                "codec_type": "video",
+                "tags": {"handler_name": "Mainconcept Video Media Handler"},
+            }
+        ],
     }
     fp = encoder_fingerprint(probe)
     assert "Mainconcept Video Media Handler" in fp["handler_names"]

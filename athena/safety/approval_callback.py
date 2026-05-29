@@ -24,10 +24,17 @@ def _interactive_approval(tool_name: str, args: dict) -> str:
     from .. import ui  # local import — avoids circular at module load
 
     preview, kind = _build_preview(tool_name, args)
-    return "allow" if ui.confirm(
-        f"Run {tool_name}?", default=False,
-        tool_name=tool_name, preview=preview, preview_kind=kind,
-    ) else "deny"
+    return (
+        "allow"
+        if ui.confirm(
+            f"Run {tool_name}?",
+            default=False,
+            tool_name=tool_name,
+            preview=preview,
+            preview_kind=kind,
+        )
+        else "deny"
+    )
 
 
 def _build_preview(tool_name: str, args: dict) -> tuple[str | None, str | None]:
@@ -54,12 +61,12 @@ def _build_preview(tool_name: str, args: dict) -> tuple[str | None, str | None]:
             old = args.get("old_string") or ""
             new = args.get("new_string") or ""
             return (
-                f"--- a/{path}\n+++ b/{path}\n"
-                + _format_replace_as_diff(old, new),
+                f"--- a/{path}\n+++ b/{path}\n" + _format_replace_as_diff(old, new),
                 "diff",
             )
         # Fallback: short pretty JSON of args
         import json
+
         try:
             body = json.dumps(args, indent=2, default=str)[:1000]
         except (TypeError, ValueError):

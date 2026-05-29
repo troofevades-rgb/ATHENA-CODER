@@ -116,9 +116,7 @@ def _safe_call(fn, *args, **kw):
 
 
 def _now_iso() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y%m%d_%H%M%S_%f"
-    )
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
 
 
 # ---------------------------------------------------------------
@@ -239,6 +237,7 @@ def browser_screenshot(**kw: Any) -> str:
     if analyze_prompt:
         try:
             from ..vision.analyze import _run as vision_run
+
             ans_json = vision_run(
                 mode="describe",
                 path=str(out_path),

@@ -31,7 +31,8 @@ def _stub_agent(verifier_command):
     agent._last_turn_interrupted = False
     agent._goal_loop_tokens_used = 0
     agent.stats = SimpleNamespace(
-        prompt_tokens=0, eval_tokens=0,
+        prompt_tokens=0,
+        eval_tokens=0,
     )
     return agent
 
@@ -48,7 +49,8 @@ def _achievement_branch_output(verifier_command):
     from athena.goal.loop import ContinuationDecision
 
     decision = ContinuationDecision(
-        should_continue=False, stop_reason="achieved",
+        should_continue=False,
+        stop_reason="achieved",
     )
     agent = _stub_agent(verifier_command)
 
@@ -57,10 +59,13 @@ def _achievement_branch_output(verifier_command):
     def _capture(*args, **kwargs):
         captured_lines.append(" ".join(str(a) for a in args))
 
-    with patch(
-        "athena.goal.loop.maybe_continue_goal_after_turn",
-        return_value=decision,
-    ), patch("athena.ui.console.print", side_effect=_capture):
+    with (
+        patch(
+            "athena.goal.loop.maybe_continue_goal_after_turn",
+            return_value=decision,
+        ),
+        patch("athena.ui.console.print", side_effect=_capture),
+    ):
         Agent._consult_goal_continuation(agent, tokens_at_loop_start=0)
     return "\n".join(captured_lines)
 

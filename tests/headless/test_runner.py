@@ -16,15 +16,13 @@ import pytest
 
 from athena.headless.runner import run_headless
 
-
 # ---------------------------------------------------------------
 # Stub agent — minimal surface for run_headless to read.
 # ---------------------------------------------------------------
 
 
 class _Stats:
-    def __init__(self, *, prompt=0, eval_=0, cache_read=0, cache_creation=0,
-                 tool_call_counts=None):
+    def __init__(self, *, prompt=0, eval_=0, cache_read=0, cache_creation=0, tool_call_counts=None):
         self.prompt_tokens = prompt
         self.eval_tokens = eval_
         self.cache_read_tokens = cache_read
@@ -53,7 +51,8 @@ class _StubAgent:
         self.session_id = "s-stub-1"
         self._last_assistant_text = assistant_text
         self.stats = stats or _Stats(
-            prompt=42, eval_=21,
+            prompt=42,
+            eval_=21,
             tool_call_counts={"Bash": 2, "Read": 5},
         )
         self._raise = raise_on_run_turn
@@ -108,8 +107,10 @@ def test_success_returns_ok(tmp_path: Path):
     assert result.session_id == "s-stub-1"
     assert result.assistant_text == "synthetic answer"
     assert result.tokens == {
-        "prompt": 42, "completion": 21,
-        "cache_read": 0, "cache_creation": 0,
+        "prompt": 42,
+        "completion": 21,
+        "cache_read": 0,
+        "cache_creation": 0,
     }
     # Tool calls listed in desc-count order.
     assert result.tool_calls == [
@@ -123,7 +124,9 @@ def test_success_returns_ok(tmp_path: Path):
 
 def test_run_id_minted_when_absent(tmp_path: Path):
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
     assert result.run_id.startswith("r-")
@@ -132,7 +135,9 @@ def test_run_id_minted_when_absent(tmp_path: Path):
 
 def test_run_id_passed_through(tmp_path: Path):
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         run_id="r-batch-001",
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
@@ -141,7 +146,9 @@ def test_run_id_passed_through(tmp_path: Path):
 
 def test_timestamps_and_duration_present(tmp_path: Path):
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
     assert result.started_at.endswith("Z")
@@ -156,7 +163,9 @@ def test_timestamps_and_duration_present(tmp_path: Path):
 
 def test_empty_task_invalid(tmp_path: Path):
     result = run_headless(
-        "", cfg=_cfg(), workspace=tmp_path,
+        "",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
     assert result.status == "invalid"
@@ -166,7 +175,9 @@ def test_empty_task_invalid(tmp_path: Path):
 
 def test_whitespace_only_task_invalid(tmp_path: Path):
     result = run_headless(
-        "   \n  ", cfg=_cfg(), workspace=tmp_path,
+        "   \n  ",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
     assert result.status == "invalid"
@@ -175,7 +186,9 @@ def test_whitespace_only_task_invalid(tmp_path: Path):
 
 def test_nonexistent_workspace_invalid(tmp_path: Path):
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path / "nope",
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path / "nope",
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
     assert result.status == "invalid"
@@ -186,7 +199,9 @@ def test_non_directory_workspace_invalid(tmp_path: Path):
     bogus = tmp_path / "a.txt"
     bogus.write_text("file, not a directory", encoding="utf-8")
     result = run_headless(
-        "x", cfg=_cfg(), workspace=bogus,
+        "x",
+        cfg=_cfg(),
+        workspace=bogus,
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
     assert result.status == "invalid"
@@ -200,9 +215,12 @@ def test_non_directory_workspace_invalid(tmp_path: Path):
 
 def test_agent_exception_returns_error(tmp_path: Path):
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=lambda **kw: _StubAgent(
-            raise_on_run_turn=RuntimeError("model unreachable"), **kw,
+            raise_on_run_turn=RuntimeError("model unreachable"),
+            **kw,
         ),
     )
     assert result.status == "error"
@@ -218,9 +236,12 @@ def test_agent_exception_returns_error(tmp_path: Path):
 
 def test_keyboard_interrupt_returns_interrupted(tmp_path: Path):
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=lambda **kw: _StubAgent(
-            raise_on_run_turn=KeyboardInterrupt(), **kw,
+            raise_on_run_turn=KeyboardInterrupt(),
+            **kw,
         ),
     )
     assert result.status == "interrupted"
@@ -236,7 +257,9 @@ def test_keyboard_interrupt_returns_interrupted(tmp_path: Path):
 def test_on_info_callback_fires(tmp_path: Path):
     msgs: list[str] = []
     run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         on_info=msgs.append,
         _agent_factory=lambda **kw: _StubAgent(**kw),
     )
@@ -260,7 +283,9 @@ def test_agent_close_always_called_on_success(tmp_path: Path):
         return a
 
     run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=_factory,
     )
     assert holder[0].closed is True
@@ -275,7 +300,9 @@ def test_agent_close_called_on_error(tmp_path: Path):
         return a
 
     run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=_factory,
     )
     assert holder[0].closed is True
@@ -289,15 +316,23 @@ def test_agent_close_called_on_error(tmp_path: Path):
 def test_empty_stats_produces_zero_tokens(tmp_path: Path):
     """Agent with empty Stats → tokens dict has zeros, not
     missing keys (the envelope shape is stable)."""
-    factory = lambda **kw: _StubAgent(
-        stats=_Stats(), **kw,
-    )
+
+    def factory(**kw):
+        return _StubAgent(
+            stats=_Stats(),
+            **kw,
+        )
+
     result = run_headless(
-        "x", cfg=_cfg(), workspace=tmp_path,
+        "x",
+        cfg=_cfg(),
+        workspace=tmp_path,
         _agent_factory=factory,
     )
     assert result.tokens == {
-        "prompt": 0, "completion": 0,
-        "cache_read": 0, "cache_creation": 0,
+        "prompt": 0,
+        "completion": 0,
+        "cache_read": 0,
+        "cache_creation": 0,
     }
     assert result.tool_calls == []

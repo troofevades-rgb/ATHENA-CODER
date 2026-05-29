@@ -28,9 +28,8 @@ import time
 
 import pytest
 
-from athena.tui_gateway.events import MessageAppendEvent
 from athena.tui_gateway import server as srv
-
+from athena.tui_gateway.events import MessageAppendEvent
 
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
@@ -68,11 +67,22 @@ def _build_stub_gateway(transport):
     gw._heartbeat_stop = threading.Event()
     gw._last_pong_at = 0.0
     gw._handshake_done = False
+    # Step 4b outbound writer machinery -- send_event reaches into all
+    # of these. test_outbound_queue's stub already wires them up; this
+    # stub originally predated the writer-thread split and worked on
+    # Windows-host CI because send_event was never exercised by the
+    # tests in this file, but ``test_heartbeat_and_seq_monotonic``
+    # calls ``send_event`` directly. Linux CI surfaces the missing
+    # attributes.
+    gw._outbound = srv._OutboundQueue()
+    gw._writer_thread = None
+    gw._writer_stop = threading.Event()
+    gw._conn_ready = threading.Event()
+    gw._ring = srv._EventRing()
     return gw
 
 
-def _spawn_client(sock_path, *, send_pong=True, pongs_target=3,
-                  protocol_version=2):
+def _spawn_client(sock_path, *, send_pong=True, pongs_target=3, protocol_version=2):
     """Background thread that simulates the Ink client. Returns
     a dict you can read after thread.join() with what it saw."""
     state = {"events": [], "pongs": 0, "seqs": [], "err": None}
@@ -85,16 +95,23 @@ def _spawn_client(sock_path, *, send_pong=True, pongs_target=3,
             line = f.readline().decode("utf-8")
             server_hello = json.loads(line)
             state["events"].append(server_hello)
-            f.write((json.dumps({
-                "jsonrpc": "2.0",
-                "method": "hello",
-                "params": {
-                    "protocol_version": protocol_version,
-                    "client_version": "fake-ink-test",
-                    "capabilities": ["heartbeats", "seq"],
-                    "last_seq": 0,
-                },
-            }) + chr(10)).encode("utf-8"))
+            f.write(
+                (
+                    json.dumps(
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "hello",
+                            "params": {
+                                "protocol_version": protocol_version,
+                                "client_version": "fake-ink-test",
+                                "capabilities": ["heartbeats", "seq"],
+                                "last_seq": 0,
+                            },
+                        }
+                    )
+                    + chr(10)
+                ).encode("utf-8")
+            )
             f.flush()
             while state["pongs"] < pongs_target:
                 line = f.readline()
@@ -105,11 +122,18 @@ def _spawn_client(sock_path, *, send_pong=True, pongs_target=3,
                 if "seq" in msg:
                     state["seqs"].append(msg["seq"])
                 if msg.get("method") == "ping" and send_pong:
-                    f.write((json.dumps({
-                        "jsonrpc": "2.0",
-                        "method": "pong",
-                        "params": {},
-                    }) + chr(10)).encode("utf-8"))
+                    f.write(
+                        (
+                            json.dumps(
+                                {
+                                    "jsonrpc": "2.0",
+                                    "method": "pong",
+                                    "params": {},
+                                }
+                            )
+                            + chr(10)
+                        ).encode("utf-8")
+                    )
                     f.flush()
                     state["pongs"] += 1
             c.close()
@@ -147,7 +171,14 @@ def test_hello_handshake_with_matching_version(fast_heartbeats):
         # The client saw the server's hello with our protocol_version.
         assert state["events"][0]["method"] == "hello"
         assert state["events"][0]["params"]["protocol_version"] == 2
-        assert state["events"][0]["params"]["capabilities"] == ["heartbeats", "seq"]
+        # _GATEWAY_CAPABILITIES in athena/tui_gateway/server.py grew
+        # ``coalesce`` when outbound batching shipped; the test wasn't
+        # updated then.
+        assert state["events"][0]["params"]["capabilities"] == [
+            "heartbeats",
+            "seq",
+            "coalesce",
+        ]
     finally:
         transport.close()
 
@@ -160,7 +191,9 @@ def test_mismatched_protocol_version_raises(fast_heartbeats):
         _, env_value = transport.env_var()
         # Client claims protocol v999, server rejects.
         client_t, state = _spawn_client(
-            env_value, pongs_target=0, protocol_version=999,
+            env_value,
+            pongs_target=0,
+            protocol_version=999,
         )
         try:
             with pytest.raises(srv._HandshakeError, match="version mismatch"):
@@ -169,10 +202,7 @@ def test_mismatched_protocol_version_raises(fast_heartbeats):
             client_t.join(timeout=2.0)
         # The client should have received a protocol.error before
         # the server closed.
-        err_events = [
-            e for e in state["events"]
-            if e.get("method") == "protocol.error"
-        ]
+        err_events = [e for e in state["events"] if e.get("method") == "protocol.error"]
         assert err_events, (
             f"client did not receive protocol.error event; "
             f"saw {[e.get('method') for e in state['events']]}"
@@ -193,11 +223,13 @@ def test_heartbeat_and_seq_monotonic(fast_heartbeats):
             _drive_gateway_through_handshake(gw, transport)
             # Spawn heartbeat + reader threads.
             gw._heartbeat_thread = threading.Thread(
-                target=gw._heartbeat_loop, daemon=True,
+                target=gw._heartbeat_loop,
+                daemon=True,
             )
             gw._heartbeat_thread.start()
             gw._reader_thread = threading.Thread(
-                target=gw._read_loop, daemon=True,
+                target=gw._read_loop,
+                daemon=True,
             )
             gw._reader_thread.start()
             # Send a real event so seq=1 is exercised.

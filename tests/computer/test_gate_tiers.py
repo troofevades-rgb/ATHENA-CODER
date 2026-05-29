@@ -45,16 +45,45 @@ from athena.safety.approval_guard import (
 
 
 def _cfg(**overrides: Any) -> SimpleNamespace:
-    base = dict(
-        computer_use_enabled=True,
-        computer_permission_mode="per_action",
-        computer_app_allowlist=["TestApp"],
-        computer_app_denylist=[],
-        computer_deny_during_goal_loop=True,
-        profile="default",
+    """Post-R4 nested cfg stub; legacy ``computer_X`` flat overrides
+    translate to nested for back-compat with existing test cases."""
+    legacy_to_nested = {
+        "computer_use_enabled": "use_enabled",
+        "computer_permission_mode": "permission_mode",
+        "computer_app_allowlist": "app_allowlist",
+        "computer_app_denylist": "app_denylist",
+        "computer_deny_during_goal_loop": "deny_during_goal_loop",
+        "computer_kill_hotkey": "kill_hotkey",
+        "computer_max_actions_per_task": "max_actions_per_task",
+        "computer_max_actions_per_sec": "max_actions_per_sec",
+        "computer_backend": "backend",
+        "computer_dry_run": "dry_run",
+        "computer_audit_path": "audit_path",
+        "computer_screenshots_dir": "screenshots_dir",
+    }
+    cu = dict(
+        use_enabled=True,
+        permission_mode="per_action",
+        app_allowlist=["TestApp"],
+        app_denylist=[],
+        kill_hotkey="ctrl+alt+k",
+        max_actions_per_task=40,
+        max_actions_per_sec=2.0,
+        backend="auto",
+        dry_run=False,
+        audit_path=None,
+        screenshots_dir=None,
+        deny_during_goal_loop=True,
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    top: dict = {"profile": "default"}
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            cu[legacy_to_nested[k]] = v
+        elif k in cu:
+            cu[k] = v
+        else:
+            top[k] = v
+    return SimpleNamespace(computer=SimpleNamespace(**cu), **top)
 
 
 @pytest.fixture(autouse=True)
@@ -95,8 +124,12 @@ def test_observe_no_approval():
     token = set_approval_callback(cb)
     try:
         action = Action(
-            type="screenshot", target_desc="active window",
-            coords=None, text=None, key=None, app="TestApp",
+            type="screenshot",
+            target_desc="active window",
+            coords=None,
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert classify(action) == "observe"
         assert gate.check(action) is True
@@ -119,13 +152,19 @@ def test_input_requests_approval_then_caches():
     token = set_approval_callback(cb)
     try:
         a1 = Action(
-            type="click", target_desc="Save button",
-            coords=(100, 100), text=None, key=None,
+            type="click",
+            target_desc="Save button",
+            coords=(100, 100),
+            text=None,
+            key=None,
             app="TestApp",
         )
         a2 = Action(
-            type="type", target_desc="search box",
-            coords=None, text="hello", key=None,
+            type="type",
+            target_desc="search box",
+            coords=None,
+            text="hello",
+            key=None,
             app="TestApp",
         )
         # Both classify as input (no destructive verbs).
@@ -152,8 +191,12 @@ def test_input_denial_also_caches():
     token = set_approval_callback(cb)
     try:
         a1 = Action(
-            type="click", target_desc="Save", coords=(0, 0),
-            text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a1) is False
         assert gate.check(a1) is False
@@ -175,16 +218,28 @@ def test_destructive_never_cached():
     token = set_approval_callback(cb)
     try:
         a1 = Action(
-            type="click", target_desc="Delete file",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Delete file",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         a2 = Action(
-            type="click", target_desc="Submit form",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Submit form",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         a3 = Action(
-            type="click", target_desc="Delete file",  # same as a1
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Delete file",  # same as a1
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert classify(a1) == "destructive"
         assert classify(a2) == "destructive"
@@ -216,8 +271,12 @@ def test_destructive_actions_get_distinct_resource_ids():
     token1 = set_approval_callback(cb_allow)
     try:
         a_delete = Action(
-            type="click", target_desc="Delete file",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Delete file",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a_delete) is True
     finally:
@@ -229,8 +288,12 @@ def test_destructive_actions_get_distinct_resource_ids():
     token2 = set_approval_callback(cb_deny)
     try:
         a_submit = Action(
-            type="click", target_desc="Submit form",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Submit form",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a_submit) is False
         assert len(calls_deny) == 1
@@ -248,8 +311,12 @@ def test_click_without_target_is_destructive():
     destructive (the conservative default — assume the worst
     because we don't know what the click does)."""
     a = Action(
-        type="click", target_desc=None, coords=(10, 10),
-        text=None, key=None, app="TestApp",
+        type="click",
+        target_desc=None,
+        coords=(10, 10),
+        text=None,
+        key=None,
+        app="TestApp",
     )
     assert classify(a) == "destructive"
 
@@ -260,8 +327,12 @@ def test_destructive_verb_in_target_classified_destructive():
     submit / pay buttons."""
     for verb in ("Delete", "Submit", "Pay now", "Sign out", "Erase all"):
         a = Action(
-            type="click", target_desc=verb,
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc=verb,
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert classify(a) == "destructive", f"missed verb: {verb}"
 
@@ -282,8 +353,12 @@ def test_background_denies_input():
     cb_token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is False
         # The callback was NOT invoked — approval_guard raised
@@ -301,8 +376,12 @@ def test_background_denies_destructive_too():
     cb_token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Delete account",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Delete account",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is False
         assert calls == []
@@ -318,9 +397,9 @@ def test_background_denies_destructive_too():
 
 def test_panic_drops_grants_and_disables():
     """computer_use_panic() must:
-      (a) drop every cached grant
-      (b) flip the gate's panic flag so further input/
-          destructive checks refuse WITHOUT prompting
+    (a) drop every cached grant
+    (b) flip the gate's panic flag so further input/
+        destructive checks refuse WITHOUT prompting
     """
     gate = PermissionGate(cfg=_cfg())
     cb, calls = _approval("allow")
@@ -328,8 +407,12 @@ def test_panic_drops_grants_and_disables():
     try:
         # Prime a cached input grant.
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is True
         assert "computer_input" in current_grants()
@@ -349,8 +432,12 @@ def test_panic_drops_grants_and_disables():
         # Even a destructive that would normally prompt is now
         # silently refused.
         a_destructive = Action(
-            type="click", target_desc="Delete",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Delete",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a_destructive) is False
         assert len(calls) == 1
@@ -384,8 +471,12 @@ def test_goal_loop_active_denies_input(monkeypatch):
     token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is False
         assert calls == []
@@ -406,8 +497,12 @@ def test_goal_loop_check_opt_out(monkeypatch):
     token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is True
         assert len(calls) == 1
@@ -421,16 +516,22 @@ def test_goal_loop_check_opt_out(monkeypatch):
 
 
 def test_denylist_refuses_without_prompting():
-    gate = PermissionGate(cfg=_cfg(
-        computer_app_allowlist=["TestApp", "Banking"],
-        computer_app_denylist=["banking"],
-    ))
+    gate = PermissionGate(
+        cfg=_cfg(
+            computer_app_allowlist=["TestApp", "Banking"],
+            computer_app_denylist=["banking"],
+        )
+    )
     cb, calls = _approval("allow")
     token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Pay $1000",
-            coords=(0, 0), text=None, key=None, app="Banking",
+            type="click",
+            target_desc="Pay $1000",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="Banking",
         )
         assert gate.check(a) is False
         assert calls == []  # denylist wins, no prompt
@@ -444,8 +545,12 @@ def test_observe_only_mode_refuses_without_prompting():
     token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is False
         assert calls == []
@@ -454,15 +559,21 @@ def test_observe_only_mode_refuses_without_prompting():
 
 
 def test_app_not_in_allowlist_refuses_without_prompting():
-    gate = PermissionGate(cfg=_cfg(
-        computer_app_allowlist=["OnlyThisOne"],
-    ))
+    gate = PermissionGate(
+        cfg=_cfg(
+            computer_app_allowlist=["OnlyThisOne"],
+        )
+    )
     cb, calls = _approval("allow")
     token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="SomethingElse",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="SomethingElse",
         )
         assert gate.check(a) is False
         assert calls == []
@@ -484,8 +595,12 @@ def test_callback_exception_treated_as_denial():
     token = set_approval_callback(_raise)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         assert gate.check(a) is False
     finally:
@@ -503,8 +618,12 @@ def test_reset_session_drops_input_grant():
     token = set_approval_callback(cb)
     try:
         a = Action(
-            type="click", target_desc="Save",
-            coords=(0, 0), text=None, key=None, app="TestApp",
+            type="click",
+            target_desc="Save",
+            coords=(0, 0),
+            text=None,
+            key=None,
+            app="TestApp",
         )
         gate.check(a)
         assert "computer_input" in current_grants()

@@ -34,7 +34,10 @@ def test_register_is_idempotent_same_callable() -> None:
     """A double-register doesn't double-fire. Each registered
     callable is treated as a single hook."""
     fired: list[int] = []
-    fn = lambda: fired.append(1)
+
+    def fn():
+        return fired.append(1)
+
     interrupt_hooks.register_cancel_hook(fn)
     interrupt_hooks.register_cancel_hook(fn)
     interrupt_hooks.fire_cancel_hooks()
@@ -74,7 +77,10 @@ def test_buggy_hook_does_not_block_others() -> None:
 
 def test_unregister_removes_hook() -> None:
     fired: list[int] = []
-    fn = lambda: fired.append(1)
+
+    def fn():
+        return fired.append(1)
+
     interrupt_hooks.register_cancel_hook(fn)
     interrupt_hooks.unregister_cancel_hook(fn)
     interrupt_hooks.fire_cancel_hooks()
@@ -91,10 +97,28 @@ def test_no_hooks_fire_is_clean_noop() -> None:
     interrupt_hooks.fire_cancel_hooks()  # no exception
 
 
+def test_register_then_unregister_leaves_empty_list() -> None:
+    """The hook list must not retain stale references after
+    unregister -- daemon-mode AgentPool rotates through hundreds of
+    Agent instances; each one previously left its bound method
+    pinned in ``_hooks`` forever, leaking the entire Agent (provider,
+    SessionStore, messages) through the bound-method reference."""
+    fns = [lambda: None for _ in range(50)]
+    for fn in fns:
+        interrupt_hooks.register_cancel_hook(fn)
+    for fn in fns:
+        interrupt_hooks.unregister_cancel_hook(fn)
+    # Inspect the module-private list directly: the contract we're
+    # asserting is "nothing pinned after balanced register/unregister",
+    # which only the internal state can demonstrate.
+    assert interrupt_hooks._hooks == []
+
+
 def test_thread_safe_concurrent_registration() -> None:
     """Many threads registering simultaneously must not corrupt
     the hook list."""
     import threading
+
     barrier = threading.Barrier(8)
 
     def _worker(i: int) -> None:

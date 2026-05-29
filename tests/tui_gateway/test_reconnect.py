@@ -4,7 +4,8 @@ Two scenarios via fake-Python clients (no Node bundle needed):
   - queue-during-disconnect: events sent while no client is connected
     accumulate in the outbound queue and ship to the next client
   - ring-replay: client reconnects with last_seq < server's last
-    shipped seq; ring buffer replays missed events before live ones
+    shipped seq
+    ring buffer replays missed events before live ones
     resume
 
 Both verify monotonic seq, zero duplicates, in-order delivery.
@@ -22,9 +23,8 @@ import time
 
 import pytest
 
-from athena.tui_gateway.events import MessageAppendEvent
 from athena.tui_gateway import server as srv
-
+from athena.tui_gateway.events import MessageAppendEvent
 
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
@@ -81,20 +81,29 @@ def _start_threads(gw):
     gw._reader_thread.start()
 
 
-def _client_hello_and_drain(sock_path, *, last_seq, n_to_recv=None,
-                            timeout=1.5):
+def _client_hello_and_drain(sock_path, *, last_seq, n_to_recv=None, timeout=1.5):
     received = []
     c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     c.connect(sock_path)
     f = c.makefile("rwb", buffering=0)
     f.readline()
-    f.write((json.dumps({
-        "jsonrpc": "2.0", "method": "hello",
-        "params": {
-            "protocol_version": 2, "client_version": "test",
-            "capabilities": [], "last_seq": last_seq,
-        },
-    }) + chr(10)).encode())
+    f.write(
+        (
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "method": "hello",
+                    "params": {
+                        "protocol_version": 2,
+                        "client_version": "test",
+                        "capabilities": [],
+                        "last_seq": last_seq,
+                    },
+                }
+            )
+            + chr(10)
+        ).encode()
+    )
     f.flush()
     if n_to_recv is not None:
         for _ in range(n_to_recv):
@@ -104,9 +113,10 @@ def _client_hello_and_drain(sock_path, *, last_seq, n_to_recv=None,
         try:
             while True:
                 line = f.readline()
-                if not line: break
+                if not line:
+                    break
                 received.append(json.loads(line))
-        except (socket.timeout, TimeoutError):
+        except TimeoutError:
             pass
     c.close()
     return received
@@ -122,10 +132,12 @@ def test_queue_during_disconnect_ships_to_next_client(slow_heartbeats):
         _, sock_path = transport.env_var()
         # Client A: get 5 events, then drop
         a_recv = []
+
         def client_a():
-            a_recv.extend(_client_hello_and_drain(
-                sock_path, last_seq=0, n_to_recv=5))
-        ta = threading.Thread(target=client_a, daemon=True); ta.start()
+            a_recv.extend(_client_hello_and_drain(sock_path, last_seq=0, n_to_recv=5))
+
+        ta = threading.Thread(target=client_a, daemon=True)
+        ta.start()
         conn_a = transport.accept(2.0)
         gw._conn = conn_a
         gw._conn_reader = io.BufferedReader(socket.SocketIO(conn_a, "rb"))
@@ -149,8 +161,10 @@ def test_queue_during_disconnect_ships_to_next_client(slow_heartbeats):
         assert all(s > last_seq_a for s in seqs), f"duplicate seqs: {seqs}"
     finally:
         gw.close()
-        try: transport.close()
-        except Exception: pass
+        try:
+            transport.close()
+        except Exception:
+            pass
 
 
 def test_ring_replay_serves_missed_events(slow_heartbeats):
@@ -163,10 +177,12 @@ def test_ring_replay_serves_missed_events(slow_heartbeats):
         gw = _build_gateway(transport)
         _, sock_path = transport.env_var()
         a_recv = []
+
         def client_a():
-            a_recv.extend(_client_hello_and_drain(
-                sock_path, last_seq=0, n_to_recv=5))
-        ta = threading.Thread(target=client_a, daemon=True); ta.start()
+            a_recv.extend(_client_hello_and_drain(sock_path, last_seq=0, n_to_recv=5))
+
+        ta = threading.Thread(target=client_a, daemon=True)
+        ta.start()
         conn_a = transport.accept(2.0)
         gw._conn = conn_a
         gw._conn_reader = io.BufferedReader(socket.SocketIO(conn_a, "rb"))
@@ -188,5 +204,7 @@ def test_ring_replay_serves_missed_events(slow_heartbeats):
         assert contents == ["msg-3", "msg-4", "queued-0", "queued-1"]
     finally:
         gw.close()
-        try: transport.close()
-        except Exception: pass
+        try:
+            transport.close()
+        except Exception:
+            pass

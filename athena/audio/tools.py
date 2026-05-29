@@ -36,8 +36,9 @@ import logging
 import shutil
 import subprocess
 import wave
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..config import load_config, profile_dir
 from ..tools.registry import tool
@@ -65,9 +66,7 @@ def audio_audit_path(profile_dir_path: Path | str) -> Path:
 def _resolve_paths(cfg: Any) -> dict[str, Path]:
     pdir = profile_dir(getattr(cfg, "profile", "default"))
     out_dir = (
-        Path(cfg.audio_output_dir)
-        if getattr(cfg, "audio_output_dir", None)
-        else pdir / "audio"
+        Path(cfg.audio_output_dir) if getattr(cfg, "audio_output_dir", None) else pdir / "audio"
     )
     return {
         "profile": pdir,
@@ -86,8 +85,8 @@ def _resolve_backend(cfg: Any) -> AudioBackend | None:
     None when no provider declares ``audio_transcription`` or
     the chosen class can't be constructed."""
     # Import the backends package so registrations fire.
-    from . import backends  # noqa: F401
     from ..media.registry import MediaRegistry
+    from . import backends  # noqa: F401
 
     reg = MediaRegistry(cfg=cfg)
     cls = reg.backend_for("audio_transcription")
@@ -101,7 +100,8 @@ def _resolve_backend(cfg: Any) -> AudioBackend | None:
         return None
     if not hasattr(instance, "transcribe"):
         logger.warning(
-            "audio: backend %r does not implement transcribe()", cls.__name__,
+            "audio: backend %r does not implement transcribe()",
+            cls.__name__,
         )
         return None
     return instance  # type: ignore[return-value]
@@ -126,12 +126,17 @@ def _audio_duration_s(path: Path) -> float | None:
         try:
             out = subprocess.run(
                 [
-                    "ffprobe", "-v", "quiet",
-                    "-print_format", "json",
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
                     "-show_format",
                     str(path),
                 ],
-                capture_output=True, text=True, timeout=20,
+                capture_output=True,
+                text=True,
+                timeout=20,
             )
             data = json.loads(out.stdout) if out.stdout.strip() else {}
             dur = data.get("format", {}).get("duration")
@@ -201,9 +206,7 @@ def _stitch(
         prev_end = chunk_windows[idx - 1][1] if idx > 0 else 0.0
         for seg in res.segments:
             in_overlap = (
-                idx > 0
-                and seg.start < prev_end
-                and seg.start >= max(0.0, prev_end - overlap_s)
+                idx > 0 and seg.start < prev_end and seg.start >= max(0.0, prev_end - overlap_s)
             )
             # Cheap key — rounded start + text — to recognise
             # the same segment surfacing in two adjacent chunks.
@@ -272,14 +275,20 @@ def transcribe_track(
         if progress is not None:
             progress(1, 1)
         return backend.transcribe(
-            p, language=language, diarize=diarize, chunk_offset_s=0.0,
+            p,
+            language=language,
+            diarize=diarize,
+            chunk_offset_s=0.0,
         )
 
     windows = _chunk_boundaries(duration, chunk_s=chunk_s, overlap_s=overlap_s)
     chunks: list[TranscribeResult] = []
     for i, (start, _end) in enumerate(windows, start=1):
         res = backend.transcribe(
-            p, language=language, diarize=diarize, chunk_offset_s=start,
+            p,
+            language=language,
+            diarize=diarize,
+            chunk_offset_s=start,
         )
         chunks.append(res)
         if progress is not None:
@@ -321,9 +330,7 @@ def _write_transcript(
         encoding="utf-8",
     )
     lines = [
-        f"[{s.start:7.2f}-{s.end:7.2f}] "
-        + (f"{s.speaker}: " if s.speaker else "")
-        + s.text
+        f"[{s.start:7.2f}-{s.end:7.2f}] " + (f"{s.speaker}: " if s.speaker else "") + s.text
         for s in result.segments
     ]
     txt_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
@@ -346,68 +353,87 @@ def _run(
 ) -> str:
     cfg = _cfg if _cfg is not None else load_config()
     if not getattr(cfg, "audio_analyze_enabled", True):
-        return json.dumps({
-            "available": False,
-            "error": "audio_analyze_enabled=False; operator disabled audio_analyze",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "audio_analyze_enabled=False; operator disabled audio_analyze",
+                "mode": mode,
+            }
+        )
     if mode not in VALID_MODES:
-        return json.dumps({
-            "available": False,
-            "error": f"unknown mode {mode!r}; choose from {list(VALID_MODES)}",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": f"unknown mode {mode!r}; choose from {list(VALID_MODES)}",
+                "mode": mode,
+            }
+        )
     if not path:
-        return json.dumps({
-            "available": False, "error": "path is required", "mode": mode,
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": "path is required",
+                "mode": mode,
+            }
+        )
     p = Path(path)
     if not p.exists():
-        return json.dumps({
-            "available": False,
-            "error": f"file not found: {path}",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": f"file not found: {path}",
+                "mode": mode,
+            }
+        )
 
     backend = _backend if _backend is not None else _resolve_backend(cfg)
     if backend is None:
-        return json.dumps({
-            "available": False,
-            "mode": mode,
-            "reason": (
-                "no audio backend configured — declare an "
-                "audio_transcription-capable provider (e.g. "
-                "faster-whisper) or set cfg.audio_analyze_enabled=False"
-            ),
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "mode": mode,
+                "reason": (
+                    "no audio backend configured — declare an "
+                    "audio_transcription-capable provider (e.g. "
+                    "faster-whisper) or set cfg.audio_analyze_enabled=False"
+                ),
+            }
+        )
 
     paths = _resolve_paths(cfg)
     log = HashLogger(paths["audit"])
     sha = sha256_file(p)
 
-    diarize = (
-        mode in ("diarize", "full")
-        and bool(getattr(cfg, "audio_diarization_enabled", False))
-    )
+    diarize = mode in ("diarize", "full") and bool(getattr(cfg, "audio_diarization_enabled", False))
 
     try:
         result = transcribe_track(
-            p, cfg=cfg, backend=backend,
-            language=language, diarize=diarize,
+            p,
+            cfg=cfg,
+            backend=backend,
+            language=language,
+            diarize=diarize,
             progress=_progress,
         )
     except FileNotFoundError as e:
-        return json.dumps({
-            "available": False, "error": str(e), "mode": mode,
-        })
+        return json.dumps(
+            {
+                "available": False,
+                "error": str(e),
+                "mode": mode,
+            }
+        )
     except Exception as e:  # noqa: BLE001
         logger.exception("audio_analyze: transcribe failed")
-        return json.dumps({
-            "available": True,
-            "error": f"transcribe failed: {type(e).__name__}: {e}",
-            "mode": mode,
-            "path": str(p), "sha256": sha,
-        })
+        return json.dumps(
+            {
+                "available": True,
+                "error": f"transcribe failed: {type(e).__name__}: {e}",
+                "mode": mode,
+                "path": str(p),
+                "sha256": sha,
+            }
+        )
 
     if mode in ("classify", "full"):
         try:
@@ -421,12 +447,16 @@ def _run(
             logger.warning("audio_analyze: classify failed: %s", e)
 
     transcript_path = _write_transcript(
-        result, out_dir=paths["out_dir"],
-        source_sha=sha, source_path=p,
+        result,
+        out_dir=paths["out_dir"],
+        source_sha=sha,
+        source_path=p,
     )
 
     log.log(
-        mode=mode, path=p, sha256=sha,
+        mode=mode,
+        path=p,
+        sha256=sha,
         size_bytes=p.stat().st_size,
         extra={
             "segment_count": len(result.segments),
@@ -437,20 +467,22 @@ def _run(
         },
     )
 
-    return json.dumps({
-        "available": True,
-        "mode": mode,
-        "path": str(p),
-        "sha256": sha,
-        "transcript_path": str(transcript_path),
-        **result.to_dict(),
-    })
+    return json.dumps(
+        {
+            "available": True,
+            "mode": mode,
+            "path": str(p),
+            "sha256": sha,
+            "transcript_path": str(transcript_path),
+            **result.to_dict(),
+        }
+    )
 
 
 @tool(
     name="audio_analyze",
     toolset="vision",  # same toolset as vision / video; the model
-                       # sees them grouped under "media analysis"
+    # sees them grouped under "media analysis"
     description=(
         "Transcribe an audio file. Modes:\n"
         "  transcribe — text + segment timestamps (default)\n"

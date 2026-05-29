@@ -61,8 +61,8 @@ def _build_synthetic_exif() -> Image.Exif:
     raw bytes get silently stripped by Pillow's JPEG encoder).
     """
     ex = Image.Exif()
-    ex[0x010F] = "AthenaCam"        # Make
-    ex[0x0110] = "T4-01"            # Model
+    ex[0x010F] = "AthenaCam"  # Make
+    ex[0x0110] = "T4-01"  # Model
     ex[0x0132] = "2026:05:20 12:34:56"  # DateTime
     return ex
 

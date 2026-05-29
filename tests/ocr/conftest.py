@@ -50,11 +50,13 @@ class StubOCRBackend:
     ) -> OCRResult:
         if self._raise is not None:
             raise self._raise
-        self.recognize_calls.append({
-            "path": str(path),
-            "langs": list(langs) if langs else None,
-            "with_boxes": with_boxes,
-        })
+        self.recognize_calls.append(
+            {
+                "path": str(path),
+                "langs": list(langs) if langs else None,
+                "with_boxes": with_boxes,
+            }
+        )
         return OCRResult(blocks=list(self._blocks), language=self._lang)
 
 

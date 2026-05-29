@@ -127,8 +127,15 @@ class WindowsBackend:
                 gdi32.SelectObject(hdc_mem, hbm)
                 SRCCOPY = 0x00CC0020
                 ok = gdi32.BitBlt(
-                    hdc_mem, 0, 0, width, height,
-                    hdc_screen, x, y, SRCCOPY,
+                    hdc_mem,
+                    0,
+                    0,
+                    width,
+                    height,
+                    hdc_screen,
+                    x,
+                    y,
+                    SRCCOPY,
                 )
                 if not ok:
                     raise RuntimeError("BitBlt failed")
@@ -146,7 +153,7 @@ class WindowsBackend:
             scale=scale,
         )
 
-    def active_app(self) -> Optional[str]:
+    def active_app(self) -> str | None:
         """Return the foreground window's title. Best-effort —
         empty string when no foreground window, None on error."""
         if not self.is_available():
@@ -167,7 +174,7 @@ class WindowsBackend:
             logger.debug("active_app() failed: %s", e)
             return None
 
-    def accessibility_tree(self) -> Optional[dict]:
+    def accessibility_tree(self) -> dict | None:
         """Not implemented on Windows without an optional
         ``uiautomation`` / ``pywin32`` dep. Returning None means
         the classifier (T6-04.1) treats unreadable elements as
@@ -246,6 +253,7 @@ def _hbitmap_to_bmp(hbm: int, width: int, height: int, gdi32) -> bytes:
     """Extract pixel bytes from an HBITMAP + wrap with a minimal
     BMP header. Returned bytes are a valid BMP that any image
     library (or the OS preview) can read."""
+
     # 32-bit BI_RGB bitmap. Row stride is width * 4 bytes
     # (top-down rows when biHeight is negative).
     class BITMAPINFOHEADER(ctypes.Structure):
@@ -279,15 +287,24 @@ def _hbitmap_to_bmp(hbm: int, width: int, height: int, gdi32) -> bytes:
 
     pixel_count = width * height * 4
     buf = (ctypes.c_ubyte * pixel_count)()
-    rows = gdi32.GetDIBits(
-        ctypes.windll.user32.GetDC(None),
-        hbm,
-        0,
-        height,
-        ctypes.byref(buf),
-        ctypes.byref(bmi),
-        0,
-    )
+    # GetDC(NULL) returns a screen DC that we MUST release; the prior
+    # code passed it inline and never freed it, leaking one user-object
+    # DC per screenshot. Windows caps per-process user DCs around 10k,
+    # so a long-running computer-use loop eventually started silently
+    # failing screenshots (BitBlt/GetDIBits would return 0).
+    screen_dc = ctypes.windll.user32.GetDC(None)
+    try:
+        rows = gdi32.GetDIBits(
+            screen_dc,
+            hbm,
+            0,
+            height,
+            ctypes.byref(buf),
+            ctypes.byref(bmi),
+            0,
+        )
+    finally:
+        ctypes.windll.user32.ReleaseDC(None, screen_dc)
     if not rows:
         raise RuntimeError("GetDIBits failed")
 
@@ -298,14 +315,17 @@ def _hbitmap_to_bmp(hbm: int, width: int, height: int, gdi32) -> bytes:
     bmp = struct.pack("<2sIHHI", b"BM", file_size, 0, 0, 14 + 40)
     bmp += struct.pack(
         "<IiiHHIIiiII",
-        40,           # biSize
+        40,  # biSize
         width,
         -height,
-        1,            # planes
-        32,           # bits per pixel
-        0,            # BI_RGB
+        1,  # planes
+        32,  # bits per pixel
+        0,  # BI_RGB
         len(pixel_array),
-        0, 0, 0, 0,
+        0,
+        0,
+        0,
+        0,
     )
     bmp += pixel_array
     return bmp
@@ -337,19 +357,42 @@ _KEYEVENTF_UNICODE = 0x0004
 # typed-text path uses UNICODE keystrokes so we don't need a
 # full VK table.
 _VK = {
-    "return": 0x0D, "enter": 0x0D,
-    "escape": 0x1B, "esc": 0x1B,
-    "tab": 0x09, "space": 0x20, "backspace": 0x08,
-    "delete": 0x2E, "del": 0x2E,
-    "home": 0x24, "end": 0x23,
-    "pageup": 0x21, "pagedown": 0x22,
-    "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28,
-    "f1": 0x70, "f2": 0x71, "f3": 0x72, "f4": 0x73, "f5": 0x74,
-    "f6": 0x75, "f7": 0x76, "f8": 0x77, "f9": 0x78, "f10": 0x79,
-    "f11": 0x7A, "f12": 0x7B,
-    "ctrl": 0x11, "control": 0x11,
-    "alt": 0x12, "shift": 0x10,
-    "win": 0x5B, "meta": 0x5B, "cmd": 0x5B,
+    "return": 0x0D,
+    "enter": 0x0D,
+    "escape": 0x1B,
+    "esc": 0x1B,
+    "tab": 0x09,
+    "space": 0x20,
+    "backspace": 0x08,
+    "delete": 0x2E,
+    "del": 0x2E,
+    "home": 0x24,
+    "end": 0x23,
+    "pageup": 0x21,
+    "pagedown": 0x22,
+    "left": 0x25,
+    "up": 0x26,
+    "right": 0x27,
+    "down": 0x28,
+    "f1": 0x70,
+    "f2": 0x71,
+    "f3": 0x72,
+    "f4": 0x73,
+    "f5": 0x74,
+    "f6": 0x75,
+    "f7": 0x76,
+    "f8": 0x77,
+    "f9": 0x78,
+    "f10": 0x79,
+    "f11": 0x7A,
+    "f12": 0x7B,
+    "ctrl": 0x11,
+    "control": 0x11,
+    "alt": 0x12,
+    "shift": 0x10,
+    "win": 0x5B,
+    "meta": 0x5B,
+    "cmd": 0x5B,
 }
 
 
@@ -400,18 +443,14 @@ def _require_coords(action: Action) -> tuple[int, int]:
 def _mouse_input(*, flags: int, x: int = 0, y: int = 0, data: int = 0) -> _INPUT:
     inp = _INPUT()
     inp.type = _INPUT_MOUSE
-    inp.ii.mi = _MOUSEINPUT(
-        dx=x, dy=y, mouseData=data, dwFlags=flags, time=0, dwExtraInfo=None
-    )
+    inp.ii.mi = _MOUSEINPUT(dx=x, dy=y, mouseData=data, dwFlags=flags, time=0, dwExtraInfo=None)
     return inp
 
 
 def _keyboard_input(*, vk: int = 0, scan: int = 0, flags: int = 0) -> _INPUT:
     inp = _INPUT()
     inp.type = _INPUT_KEYBOARD
-    inp.ii.ki = _KEYBDINPUT(
-        wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=None
-    )
+    inp.ii.ki = _KEYBDINPUT(wVk=vk, wScan=scan, dwFlags=flags, time=0, dwExtraInfo=None)
     return inp
 
 
@@ -446,11 +485,7 @@ def _send_text(text: str) -> None:
     for ch in text:
         code = ord(ch)
         inputs.append(_keyboard_input(scan=code, flags=_KEYEVENTF_UNICODE))
-        inputs.append(
-            _keyboard_input(
-                scan=code, flags=_KEYEVENTF_UNICODE | _KEYEVENTF_KEYUP
-            )
-        )
+        inputs.append(_keyboard_input(scan=code, flags=_KEYEVENTF_UNICODE | _KEYEVENTF_KEYUP))
     if inputs:
         _send_input(*inputs)
 

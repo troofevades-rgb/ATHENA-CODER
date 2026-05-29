@@ -63,12 +63,8 @@ def test_stream_lifecycle_events_share_stream_id():
 def test_tool_complete_carries_ok_flag():
     """ok=False signals an error path so the TUI can render
     the activity-lane entry red instead of green."""
-    ok = ToolCompleteEvent(
-        call_id="c1", tool="Read", ok=True, result_preview="42 lines"
-    )
-    err = ToolCompleteEvent(
-        call_id="c2", tool="Bash", ok=False, result_preview="exit 1"
-    )
+    ok = ToolCompleteEvent(call_id="c1", tool="Read", ok=True, result_preview="42 lines")
+    err = ToolCompleteEvent(call_id="c2", tool="Bash", ok=False, result_preview="exit 1")
     assert ok.ok and not err.ok
 
 
@@ -84,9 +80,7 @@ def test_interrupt_decodes_with_empty_params():
 
 
 def test_slash_decodes_command_and_arg():
-    cmd = command_from_json_rpc(
-        "slash", {"command": "theme", "arg": "set cyber"}
-    )
+    cmd = command_from_json_rpc("slash", {"command": "theme", "arg": "set cyber"})
     assert isinstance(cmd, SlashCommand)
     assert cmd.command == "theme"
     assert cmd.arg == "set cyber"
@@ -138,9 +132,7 @@ def test_event_round_trips_through_json():
     """Wire format: JSON-RPC notification. Server strips ``type``
     from params (it's redundant with ``method``). Re-attach
     on decode."""
-    evt = ToolStartEvent(
-        call_id="c1", tool="Read", args_preview="file=foo.py"
-    )
+    evt = ToolStartEvent(call_id="c1", tool="Read", args_preview="file=foo.py")
     params = {k: v for k, v in asdict(evt).items() if k != "type"}
     frame = {
         "jsonrpc": "2.0",

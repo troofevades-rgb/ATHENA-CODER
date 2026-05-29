@@ -29,7 +29,6 @@ from athena.providers.social import (
     _read_bearer_token,
 )
 
-
 # ---------------------------------------------------------------
 # _read_bearer_token — module-level helper
 # ---------------------------------------------------------------
@@ -114,11 +113,13 @@ def test_is_available_false_when_neither_bearer_nor_oauth(tmp_path: Path):
     'no provider' message."""
     cfg = _cfg(social_bearer_token_path=str(tmp_path / "missing.txt"))
     sp = SocialProvider(cfg=cfg)
+
     # Stub the OAuth side to return False so the test doesn't
     # depend on a real on-disk OAuth token.
     class _NoOAuth:
         def has_valid_token(self):
             return False
+
     sp._oauth = _NoOAuth()
     assert sp.is_available() is False
 
@@ -126,9 +127,11 @@ def test_is_available_false_when_neither_bearer_nor_oauth(tmp_path: Path):
 def test_is_available_falls_back_to_oauth_when_no_bearer():
     cfg = _cfg(social_bearer_token_path=None)
     sp = SocialProvider(cfg=cfg)
+
     class _OAuth:
         def has_valid_token(self):
             return True
+
     sp._oauth = _OAuth()
     assert sp.is_available() is True
 
@@ -149,6 +152,7 @@ def test_social_search_uses_bearer_without_touching_oauth(tmp_path: Path):
     class _OAuthForbidden:
         def access_token(self):
             raise AssertionError("OAuth must NOT be consulted when bearer present")
+
         def has_valid_token(self):
             raise AssertionError("OAuth must NOT be consulted when bearer present")
 
@@ -189,6 +193,7 @@ def test_social_search_oauth_fallback_when_no_bearer():
     class _OAuth:
         def access_token(self):
             return "OAUTH-TOK"
+
         def has_valid_token(self):
             return True
 
@@ -257,9 +262,11 @@ def test_bearer_takes_priority_over_oauth(tmp_path: Path):
     class _OAuth:
         def __init__(self):
             self.calls = 0
+
         def access_token(self):
             self.calls += 1
             return "OAUTH-FALLBACK"
+
         def has_valid_token(self):
             self.calls += 1
             return True

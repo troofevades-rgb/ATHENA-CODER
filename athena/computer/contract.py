@@ -13,8 +13,7 @@ Tiering vocabulary lives here so the safety-boundary tests
 from __future__ import annotations
 
 import dataclasses
-from typing import Literal, Optional, Protocol, Tuple, runtime_checkable
-
+from typing import Literal, Optional, Protocol, runtime_checkable
 
 # ---------------------------------------------------------------------------
 # Action + tier vocabulary
@@ -68,11 +67,11 @@ class Action:
     """
 
     type: ActionType
-    coords: Optional[Tuple[int, int]] = None
-    text: Optional[str] = None
-    key: Optional[str] = None
-    target_desc: Optional[str] = None
-    app: Optional[str] = None
+    coords: tuple[int, int] | None = None
+    text: str | None = None
+    key: str | None = None
+    target_desc: str | None = None
+    app: str | None = None
 
     @property
     def is_input(self) -> bool:
@@ -143,6 +142,6 @@ class DesktopBackend(Protocol):
     def is_available(self) -> bool: ...
     def supports(self) -> list[ActionType]: ...
     def screenshot(self) -> Screenshot: ...
-    def active_app(self) -> Optional[str]: ...
-    def accessibility_tree(self) -> Optional[dict]: ...
+    def active_app(self) -> str | None: ...
+    def accessibility_tree(self) -> dict | None: ...
     def perform(self, action: Action) -> None: ...

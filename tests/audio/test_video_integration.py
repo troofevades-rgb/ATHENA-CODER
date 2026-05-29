@@ -24,7 +24,6 @@ import pytest
 from athena.video.analyze import _run as video_run
 from tests.video.fixtures import FIXTURES_DIR, have_ffmpeg
 
-
 _NEED_FFMPEG = pytest.mark.skipif(
     not have_ffmpeg(),
     reason="ffmpeg not on PATH",
@@ -32,16 +31,31 @@ _NEED_FFMPEG = pytest.mark.skipif(
 
 
 def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
-    base = dict(
+    # Phase 18.1 R4 stage 5 promoted the ``video_*`` flat fields into
+    # VideoAnalysisConfig. Translate legacy override kwargs into the
+    # nested shape so the post-R4 production code (``cfg.video_analysis.*``)
+    # sees them.
+    legacy_to_nested = {
+        "video_enabled": "enabled",
+        "video_ffmpeg_path": "ffmpeg_path",
+        "video_ffprobe_path": "ffprobe_path",
+        "video_frames_dir": "frames_dir",
+        "video_max_frames": "max_frames",
+        "video_default_extract": "default_extract",
+        "video_sampled_interval_s": "sampled_interval_s",
+    }
+    video_analysis_defaults = dict(
+        enabled=True,
+        ffmpeg_path="ffmpeg",
+        ffprobe_path="ffprobe",
+        frames_dir=str(tmp_path / "frames"),
+        max_frames=200,
+        default_extract="keyframes",
+        sampled_interval_s=5.0,
+    )
+    top_defaults: dict = dict(
         profile="default",
-        video_enabled=True,
         vision_enabled=True,
-        video_ffmpeg_path="ffmpeg",
-        video_ffprobe_path="ffprobe",
-        video_frames_dir=str(tmp_path / "frames"),
-        video_max_frames=200,
-        video_default_extract="keyframes",
-        video_sampled_interval_s=5.0,
         # Audio side — values mostly irrelevant since we inject
         # _audio_fn directly, but resolve_paths/load_config
         # might reach for them in error paths.
@@ -53,8 +67,17 @@ def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
         provider="ollama",
         model="stub",
     )
-    base.update(overrides)
-    return SimpleNamespace(**base)
+    for k, v in overrides.items():
+        if k in legacy_to_nested:
+            video_analysis_defaults[legacy_to_nested[k]] = v
+        elif k in video_analysis_defaults:
+            video_analysis_defaults[k] = v
+        else:
+            top_defaults[k] = v
+    return SimpleNamespace(
+        video_analysis=SimpleNamespace(**video_analysis_defaults),
+        **top_defaults,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -88,13 +111,15 @@ def test_analyze_mode_includes_transcript_when_audio_fn_available(
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return f"frame {Path(frame_path).name}"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path),
-        _provider_fn=_vision_stub,
-        _audio_fn=_audio_stub,
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path),
+            _provider_fn=_vision_stub,
+            _audio_fn=_audio_stub,
+        )
+    )
 
     assert out["mode"] == "analyze"
     assert "transcript" in out
@@ -116,13 +141,15 @@ def test_analyze_mode_omits_transcript_when_audio_fn_returns_none(
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return "described"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path),
-        _provider_fn=_vision_stub,
-        _audio_fn=lambda _path: None,
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path),
+            _provider_fn=_vision_stub,
+            _audio_fn=lambda _path: None,
+        )
+    )
 
     assert "transcript" not in out
     assert "analyses" in out  # frames-side still ran
@@ -140,13 +167,15 @@ def test_analyze_mode_handles_audio_fn_exception(tmp_path: Path):
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return "described"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path),
-        _provider_fn=_vision_stub,
-        _audio_fn=_audio_raises,
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path),
+            _provider_fn=_vision_stub,
+            _audio_fn=_audio_raises,
+        )
+    )
 
     # No transcript field, but no crash + frame analysis intact.
     assert "transcript" not in out
@@ -164,13 +193,15 @@ def test_analyze_mode_no_audio_fn_no_transcript(tmp_path: Path, monkeypatch):
     def _vision_stub(frame_path: Path, prompt: str) -> str:
         return "described"
 
-    out = json.loads(video_run(
-        mode="analyze",
-        path=str(FIXTURES_DIR / "sample.mp4"),
-        _cfg=_cfg(tmp_path, audio_analyze_enabled=False),
-        _provider_fn=_vision_stub,
-        # _audio_fn left None — the default factory will
-        # short-circuit because audio_analyze_enabled=False.
-    ))
+    out = json.loads(
+        video_run(
+            mode="analyze",
+            path=str(FIXTURES_DIR / "sample.mp4"),
+            _cfg=_cfg(tmp_path, audio_analyze_enabled=False),
+            _provider_fn=_vision_stub,
+            # _audio_fn left None — the default factory will
+            # short-circuit because audio_analyze_enabled=False.
+        )
+    )
 
     assert "transcript" not in out

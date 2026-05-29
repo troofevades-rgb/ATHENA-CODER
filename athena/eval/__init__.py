@@ -25,8 +25,8 @@ from .scorers import (
     Score,
     Scorer,
     get_scorer,
-    register_scorer,
     list_scorers,
+    register_scorer,
 )
 from .summary import EvalCase, EvalScore, EvalSummary
 

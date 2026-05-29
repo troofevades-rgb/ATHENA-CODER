@@ -57,9 +57,7 @@ def _agent(
     )
     a._profile_dir = lambda: tmp_path  # type: ignore[assignment]
     # Bind the real methods to the stub.
-    a._consult_goal_continuation = (
-        Agent._consult_goal_continuation.__get__(a)
-    )
+    a._consult_goal_continuation = Agent._consult_goal_continuation.__get__(a)
     a._persist_goal_state = Agent._persist_goal_state.__get__(a)
     return a
 

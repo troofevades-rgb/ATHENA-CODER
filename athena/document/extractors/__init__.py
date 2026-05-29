@@ -12,10 +12,9 @@ doesn't have to know about per-format modules.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..result import DocumentResult
-
 
 # Map of lowercase extension (no leading dot) → extractor module
 # name. Resolved lazily so importing the extractors package
@@ -42,6 +41,7 @@ def for_extension(ext: str) -> Callable[..., DocumentResult] | None:
     if module_name is None:
         return None
     import importlib
+
     try:
         mod = importlib.import_module(module_name)
     except Exception:  # noqa: BLE001 — defensive on optional deps
@@ -58,6 +58,7 @@ def rasterize_for_extension(ext: str) -> Callable[..., bytes] | None:
     if module_name is None:
         return None
     import importlib
+
     try:
         mod = importlib.import_module(module_name)
     except Exception:  # noqa: BLE001

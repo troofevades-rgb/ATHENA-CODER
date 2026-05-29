@@ -120,12 +120,13 @@
   - bundled/             plugins that ship in the package
     - shell_audit/       JSONL log per session for every Bash tool call
 - athena/memory/          persistent memory (Phase 5 made it a package)
-  - __init__.py          legacy workspace-keyed API (load_memory_index,
-                         list_memories, write_memory, delete_memory) — kept
-                         byte-for-byte; agent still uses this for the system
-                         prompt today
-  - store.py             profile-keyed facade over the active MemoryProvider;
-                         Phase 14 will migrate the legacy callers
+  - __init__.py          empty after R2 stage 5; legacy workspace-keyed API
+                         (load_memory_index, list_memories, write_memory,
+                         delete_memory, _slugify, MemoryFile) retired
+  - store.py             profile-keyed facade over the active MemoryProvider
+                         (load_index, write_entry, list_entries, read_entry,
+                         delete_entry, query, memory_dir); the canonical
+                         entry point
   - providers/base.py    `MemoryProvider` ABC + `MemoryEntry`
   - providers/builtin_file.py
                          Markdown-on-disk + SQLite ordering mirror under
@@ -265,8 +266,12 @@
   calls `on_install()` once, tracked in `~/.athena/plugins_installed`.
   Enable state lives in `~/.athena/plugins_state.json` (machine-managed JSON);
   `config.toml` stays hand-edited.
-- The agent loop fires plugin hooks on top of the legacy `athena/hooks.py`
-  settings.json hook system — both run; settings hooks first, plugins second.
+- The agent loop fires lifecycle events through the plugin layer only.
+  The legacy `athena/hooks.py` settings.json hook system was retired in
+  Phase 18.1 Refactor 5; the bundled `ShellHookPlugin`
+  (`athena/plugins/bundled/shell_hook/`) reads the same settings.json
+  hooks block and dispatches via the plugin layer. `athena/hooks.py`
+  survives one release as a deprecation shim.
 - `/goal` is read at session start AND on every system-prompt rebuild
   (after `/cwd`, `/clear`, `Agent.reload_goal()` etc.) so the invariant
   is always re-injected.

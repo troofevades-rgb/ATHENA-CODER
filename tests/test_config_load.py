@@ -23,7 +23,6 @@ import pytest
 
 from athena import config as cfg_mod
 
-
 # ---------------------------------------------------------------------------
 # Isolation fixture — redirect every config path into tmp_path
 # ---------------------------------------------------------------------------
@@ -39,10 +38,14 @@ def isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(cfg_mod, "CONFIG_PATH", athena_dir / "config.toml")
     monkeypatch.setattr(cfg_mod, "SESSIONS_DIR", athena_dir / "sessions")
     monkeypatch.setattr(
-        cfg_mod, "PLUGINS_STATE_PATH", athena_dir / "plugins_state.json",
+        cfg_mod,
+        "PLUGINS_STATE_PATH",
+        athena_dir / "plugins_state.json",
     )
     monkeypatch.setattr(
-        cfg_mod, "USER_MCP_PATH", athena_dir / "mcp.json",
+        cfg_mod,
+        "USER_MCP_PATH",
+        athena_dir / "mcp.json",
     )
     # Drop env vars that influence load_config so tests are deterministic
     monkeypatch.delenv("ATHENA_MODEL", raising=False)
@@ -75,10 +78,13 @@ def test_load_config_no_file_returns_defaults(isolated: Path) -> None:
 
 def test_load_config_with_simple_overrides(isolated: Path) -> None:
     """Top-level scalar fields override defaults."""
-    _write_toml(isolated, """
+    _write_toml(
+        isolated,
+        """
         model = "custom-model:7b"
         theme = "dusk"
-    """)
+    """,
+    )
     cfg = cfg_mod.load_config()
     assert cfg.model == "custom-model:7b"
     assert cfg.theme == "dusk"
@@ -90,7 +96,8 @@ def test_load_config_with_simple_overrides(isolated: Path) -> None:
 
 
 def test_athena_model_env_overrides_config_file(
-    isolated: Path, monkeypatch: pytest.MonkeyPatch,
+    isolated: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ATHENA_MODEL env var wins over the model field in config.toml.
     Common CI pattern — pin a model per job without rewriting the
@@ -102,7 +109,8 @@ def test_athena_model_env_overrides_config_file(
 
 
 def test_ollama_host_env_overrides_and_normalizes(
-    isolated: Path, monkeypatch: pytest.MonkeyPatch,
+    isolated: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """OLLAMA_HOST env var wins AND gets normalized through
     _normalize_ollama_host. So 0.0.0.0 in the env becomes 127.0.0.1
@@ -114,7 +122,8 @@ def test_ollama_host_env_overrides_and_normalizes(
 
 
 def test_ollama_host_env_overrides_default_when_no_file(
-    isolated: Path, monkeypatch: pytest.MonkeyPatch,
+    isolated: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Env-only — no config.toml. Common case for containerized runs."""
     monkeypatch.setenv("OLLAMA_HOST", "gpu-box.lan:11434")
@@ -128,7 +137,8 @@ def test_ollama_host_env_overrides_default_when_no_file(
 
 
 def test_deprecated_auto_approve_bash_renames_to_auto_approve_tools(
-    isolated: Path, capsys: pytest.CaptureFixture,
+    isolated: Path,
+    capsys: pytest.CaptureFixture,
 ) -> None:
     """Backward compat: ``auto_approve_bash = true`` in old configs
     gets renamed to ``auto_approve_tools`` with a stderr warning."""
@@ -141,17 +151,506 @@ def test_deprecated_auto_approve_bash_renames_to_auto_approve_tools(
 
 
 def test_new_name_wins_when_both_present(
-    isolated: Path, capsys: pytest.CaptureFixture,
+    isolated: Path,
+    capsys: pytest.CaptureFixture,
 ) -> None:
     """If a config has BOTH the old and new names (user mid-migration),
     the new ``auto_approve_tools`` wins and no rename happens (the
     old one is ignored, no warning)."""
-    _write_toml(isolated, """
+    _write_toml(
+        isolated,
+        """
         auto_approve_bash = false
         auto_approve_tools = true
-    """)
+    """,
+    )
     cfg = cfg_mod.load_config()
     assert cfg.auto_approve_tools is True
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 -- nested config migration (SkillsConfig + BashConfig pilot)
+# ---------------------------------------------------------------------------
+
+
+def test_skills_table_loads_into_nested_dataclass(isolated: Path) -> None:
+    """The new ``[skills]`` table sets the nested SkillsConfig directly --
+    no deprecation warning, no legacy shim involvement."""
+    _write_toml(
+        isolated,
+        """
+        [skills]
+        autoload = true
+        autoload_interval = 5.0
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.skills.autoload is True
+    assert cfg.skills.autoload_interval == 5.0
+
+
+def test_legacy_flat_skills_keys_fold_into_nested(
+    isolated: Path,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """Legacy flat ``skills_autoload`` at TOML root is folded into the new
+    nested location with a one-line stderr deprecation note."""
+    _write_toml(
+        isolated,
+        """
+        skills_autoload = true
+        skills_autoload_interval = 7.5
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.skills.autoload is True
+    assert cfg.skills.autoload_interval == 7.5
+    captured = capsys.readouterr()
+    assert "skills_autoload" in captured.err
+    assert "deprecated" in captured.err.lower()
+
+
+def test_legacy_flat_attribute_read_emits_deprecation_warning(
+    isolated: Path,
+) -> None:
+    """Reading ``cfg.skills_autoload`` still works (one release) but warns."""
+    import warnings
+
+    cfg = cfg_mod.Config()
+    cfg.skills.autoload = True
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert cfg.skills_autoload is True  # legacy attribute read
+    assert any(
+        issubclass(w.category, DeprecationWarning) and "skills_autoload" in str(w.message)
+        for w in caught
+    )
+
+
+def test_unknown_attribute_still_raises_attributeerror() -> None:
+    """The __getattr__ shim only resolves NAMES in ``_LEGACY_FIELD_MAP``;
+    truly unknown attrs must still raise so callers don't get a silent
+    surprise."""
+    cfg = cfg_mod.Config()
+    with pytest.raises(AttributeError):
+        cfg.this_attribute_does_not_exist  # noqa: B018
+
+
+def test_bash_table_loads_into_nested_dataclass(isolated: Path) -> None:
+    _write_toml(
+        isolated,
+        """
+        [bash]
+        allowlist = ["git", "ls"]
+        extra_denylist = ["rm.*-rf"]
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.bash.allowlist == ["git", "ls"]
+    assert cfg.bash.extra_denylist == ["rm.*-rf"]
+
+
+def test_new_table_wins_over_legacy_flat_for_same_field(
+    isolated: Path,
+) -> None:
+    """If both ``[skills] autoload = true`` AND legacy ``skills_autoload``
+    appear, the new-shape entry wins. No warning for the explicit
+    new-shape user."""
+    _write_toml(
+        isolated,
+        """
+        skills_autoload = false
+        [skills]
+        autoload = true
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.skills.autoload is True
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 2 -- SafetyConfig promotion
+# ---------------------------------------------------------------------------
+
+
+def test_safety_defaults_match_legacy_dict(isolated: Path) -> None:
+    """No [safety] table -> dataclass defaults match the dict the
+    promotion replaced. Users on factory settings see no behaviour
+    change."""
+    cfg = cfg_mod.load_config()
+    assert cfg.safety.snapshot_foreground is False
+    assert cfg.safety.retention_days == 90
+    assert cfg.safety.retention_count == 5_000
+    assert cfg.safety.retention_bytes == 5 * 1024**3
+
+
+def test_safety_table_overrides_defaults(isolated: Path) -> None:
+    """The [safety] TOML table maps onto SafetyConfig field-by-field
+    through the existing _assign_field dataclass-merge logic."""
+    _write_toml(
+        isolated,
+        """
+        [safety]
+        snapshot_foreground = true
+        retention_days = 30
+        retention_count = 100
+        retention_bytes = 1073741824
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.safety.snapshot_foreground is True
+    assert cfg.safety.retention_days == 30
+    assert cfg.safety.retention_count == 100
+    assert cfg.safety.retention_bytes == 1024**3
+
+
+def test_safety_partial_override_keeps_other_defaults(isolated: Path) -> None:
+    """Setting only retention_days must leave the other fields at their
+    defaults (the merge logic at _assign_field doesn't overwrite the
+    whole dataclass with a sparse TOML table)."""
+    _write_toml(
+        isolated,
+        """
+        [safety]
+        retention_days = 7
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.safety.retention_days == 7
+    assert cfg.safety.retention_count == 5_000  # default preserved
+    assert cfg.safety.snapshot_foreground is False  # default preserved
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 3 -- ComputerConfig promotion
+# ---------------------------------------------------------------------------
+
+
+def test_computer_defaults_match_legacy_flat(isolated: Path) -> None:
+    """No [computer] table -> nested dataclass defaults match the
+    legacy flat-field defaults exactly."""
+    cfg = cfg_mod.load_config()
+    assert cfg.computer.use_enabled is False
+    assert cfg.computer.permission_mode == "observe_only"
+    assert cfg.computer.app_allowlist == []
+    assert cfg.computer.kill_hotkey == "ctrl+alt+k"
+    assert cfg.computer.max_actions_per_task == 40
+    assert cfg.computer.deny_during_goal_loop is True
+    # Default denylist still contains the password / finance apps.
+    deny = cfg.computer.app_denylist
+    assert any("password" in d.lower() for d in deny)
+
+
+def test_computer_table_loads_into_nested(isolated: Path) -> None:
+    _write_toml(
+        isolated,
+        """
+        [computer]
+        use_enabled = true
+        permission_mode = "per_action"
+        max_actions_per_task = 5
+        kill_hotkey = "ctrl+alt+q"
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.computer.use_enabled is True
+    assert cfg.computer.permission_mode == "per_action"
+    assert cfg.computer.max_actions_per_task == 5
+    assert cfg.computer.kill_hotkey == "ctrl+alt+q"
+
+
+def test_legacy_flat_computer_read_emits_warning(
+    isolated: Path,
+) -> None:
+    """Reading cfg.computer_use_enabled still works for one release
+    but emits a DeprecationWarning routing the caller to the new path."""
+    import warnings
+
+    cfg = cfg_mod.Config()
+    cfg.computer.use_enabled = True
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert cfg.computer_use_enabled is True
+    assert any(
+        issubclass(w.category, DeprecationWarning) and "computer_use_enabled" in str(w.message)
+        for w in caught
+    )
+
+
+def test_legacy_flat_computer_write_routes_to_nested(
+    isolated: Path,
+) -> None:
+    """Test fixtures and operator scripts commonly write
+    cfg.computer_X = Y. Config.__setattr__ routes those through to
+    the nested instance so canonical readers (cfg.computer.X) and
+    legacy reads (cfg.computer_X) see the same value."""
+    cfg = cfg_mod.Config()
+    cfg.computer_use_enabled = True
+    assert cfg.computer.use_enabled is True
+    cfg.computer_permission_mode = "per_action"
+    assert cfg.computer.permission_mode == "per_action"
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 4 -- ParseltongueConfig promotion
+# ---------------------------------------------------------------------------
+
+
+def test_parseltongue_defaults_to_heuristic_policy(isolated: Path) -> None:
+    """No [parseltongue] table -> dataclass defaults match the dict
+    behaviour: heuristic policy with empty defaults / user_rules."""
+    cfg = cfg_mod.load_config()
+    assert cfg.parseltongue.policy == "heuristic"
+    assert cfg.parseltongue.defaults == {}
+    assert cfg.parseltongue.user_rules == []
+    assert cfg.parseltongue.classifier_model == "qwen2.5:1.5b"
+
+
+def test_parseltongue_table_loads_into_dataclass(isolated: Path) -> None:
+    _write_toml(
+        isolated,
+        """
+        [parseltongue]
+        policy = "static"
+
+        [parseltongue.defaults]
+        temperature = 0.2
+        top_p = 0.9
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.parseltongue.policy == "static"
+    assert cfg.parseltongue.defaults == {"temperature": 0.2, "top_p": 0.9}
+
+
+def test_policy_from_config_accepts_dataclass(isolated: Path) -> None:
+    """The promoted ParseltongueConfig instance is accepted by
+    policy_from_config directly -- canonical readers don't need to
+    convert to a dict first."""
+    from athena.agent.param_policy import StaticPolicy, policy_from_config
+
+    cfg = cfg_mod.Config()
+    cfg.parseltongue.policy = "static"
+    cfg.parseltongue.defaults = {"temperature": 0.1}
+    policy = policy_from_config(cfg.parseltongue)
+    assert isinstance(policy, StaticPolicy)
+    assert policy.defaults == {"temperature": 0.1}
+
+
+def test_policy_from_config_still_accepts_dict_for_back_compat() -> None:
+    """One-release back-compat: the eval runner + external scripts
+    can still pass a plain dict to policy_from_config so the migration
+    can happen at the caller's pace."""
+    from athena.agent.param_policy import StaticPolicy, policy_from_config
+
+    policy = policy_from_config({"policy": "static", "defaults": {"temperature": 0.3}})
+    assert isinstance(policy, StaticPolicy)
+    assert policy.defaults == {"temperature": 0.3}
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 4b -- PluginsConfig promotion
+# ---------------------------------------------------------------------------
+
+
+def test_plugins_defaults_match_legacy_dict(isolated: Path) -> None:
+    """No [plugins] table -> PluginsConfig has empty enabled +
+    empty per_plugin. Matches the legacy ``dict[str, Any] = {}``
+    behaviour."""
+    cfg = cfg_mod.load_config()
+    assert isinstance(cfg.plugins, cfg_mod.PluginsConfig)
+    assert cfg.plugins.enabled == {}
+    assert cfg.plugins.per_plugin == {}
+
+
+def test_plugins_table_loads_enabled_and_per_plugin(isolated: Path) -> None:
+    """The [plugins] block splits into ``enabled`` and per-plugin
+    sub-tables. Each ``[plugins.<name>]`` (not "enabled") goes into
+    PluginsConfig.per_plugin[<name>]."""
+    _write_toml(
+        isolated,
+        """
+        [plugins.enabled]
+        observability = true
+        shell_audit = false
+
+        [plugins.observability]
+        metrics_console = true
+        export_interval_s = 30
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.plugins.enabled == {"observability": True, "shell_audit": False}
+    assert cfg.plugins.per_plugin["observability"] == {
+        "metrics_console": True,
+        "export_interval_s": 30,
+    }
+
+
+def test_plugins_dict_style_readers_still_work(isolated: Path) -> None:
+    """Existing readers do ``cfg.plugins.get("enabled")`` and
+    ``cfg.plugins["plugin_name"]``. The dataclass implements
+    __getitem__ / get / __contains__ so they keep working."""
+    cfg = cfg_mod.Config()
+    cfg.plugins.enabled["observability"] = True
+    cfg.plugins.per_plugin["shell_audit"] = {"log_root": "/tmp/x"}
+
+    # ``cfg.plugins.get("enabled")`` returns the enable map.
+    assert cfg.plugins.get("enabled") == {"observability": True}
+    # ``cfg.plugins.get("<plugin_name>")`` returns the per-plugin slice.
+    assert cfg.plugins.get("shell_audit") == {"log_root": "/tmp/x"}
+    assert cfg.plugins.get("missing") is None
+    assert cfg.plugins.get("missing", {"default": True}) == {"default": True}
+    # ``"enabled" in cfg.plugins`` is always True; arbitrary plugin
+    # names test against per_plugin.
+    assert "enabled" in cfg.plugins
+    assert "shell_audit" in cfg.plugins
+    assert "missing" not in cfg.plugins
+    # __getitem__ honours the same routing.
+    assert cfg.plugins["enabled"] == {"observability": True}
+    assert cfg.plugins["shell_audit"] == {"log_root": "/tmp/x"}
+
+
+def test_plugins_as_dict_for_loader_reconstitutes_envelope(
+    isolated: Path,
+) -> None:
+    """The plugin loader takes a dict-shaped config. PluginsConfig
+    exposes ``as_dict_for_loader`` so the agent's _build_plugin_hooks
+    can hand the loader the legacy envelope without leaking the
+    dataclass through the loader's interface."""
+    cfg = cfg_mod.Config()
+    cfg.plugins.enabled = {"observability": True}
+    cfg.plugins.per_plugin = {"shell_audit": {"log_root": "/tmp/x"}}
+    out = cfg.plugins.as_dict_for_loader()
+    assert out == {
+        "enabled": {"observability": True},
+        "shell_audit": {"log_root": "/tmp/x"},
+    }
+    # ``as_dict_for_loader`` returns COPIES so the loader can't mutate
+    # the live PluginsConfig.
+    out["enabled"]["observability"] = False
+    out["shell_audit"]["log_root"] = "/somewhere/else"
+    assert cfg.plugins.enabled == {"observability": True}
+    assert cfg.plugins.per_plugin["shell_audit"] == {"log_root": "/tmp/x"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 5 -- OcrConfig + VideoGenerationConfig + VideoAnalysisConfig
+# ---------------------------------------------------------------------------
+
+
+def test_ocr_defaults_match_legacy_flat(isolated: Path) -> None:
+    cfg = cfg_mod.load_config()
+    assert cfg.ocr.enabled is True
+    assert cfg.ocr.backend_prefer == "local"
+    assert cfg.ocr.languages == ["eng"]
+    assert cfg.ocr.min_confidence == 0
+    assert cfg.ocr.tesseract_cmd is None
+
+
+def test_ocr_table_loads_into_dataclass(isolated: Path) -> None:
+    _write_toml(
+        isolated,
+        """
+        [ocr]
+        enabled = false
+        languages = ["eng", "fra"]
+        min_confidence = 60
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.ocr.enabled is False
+    assert cfg.ocr.languages == ["eng", "fra"]
+    assert cfg.ocr.min_confidence == 60
+
+
+def test_video_generation_defaults_match_legacy_flat(isolated: Path) -> None:
+    cfg = cfg_mod.load_config()
+    assert cfg.video_generation.enabled is False
+    assert cfg.video_generation.backend_prefer == "local"
+    assert cfg.video_generation.confirm_over_seconds == 60.0
+    assert cfg.video_generation.confirm_over_cost == 1.0
+    assert cfg.video_generation.poll_interval_s == 5.0
+    assert cfg.video_generation.backend is None
+
+
+def test_video_analysis_defaults_match_legacy_flat(isolated: Path) -> None:
+    cfg = cfg_mod.load_config()
+    assert cfg.video_analysis.enabled is True
+    assert cfg.video_analysis.ffmpeg_path == "ffmpeg"
+    assert cfg.video_analysis.ffprobe_path == "ffprobe"
+    assert cfg.video_analysis.max_frames == 200
+    assert cfg.video_analysis.default_extract == "keyframes"
+    assert cfg.video_analysis.sampled_interval_s == 5.0
+
+
+def test_video_tables_load_into_correct_subsystem(isolated: Path) -> None:
+    """[video_generation] vs [video_analysis] map to distinct
+    dataclasses -- the legacy ``video_*`` namespace was actually two
+    subsystems sharing a prefix."""
+    _write_toml(
+        isolated,
+        """
+        [video_generation]
+        enabled = true
+        backend = "xai_video"
+        confirm_over_cost = 5.0
+
+        [video_analysis]
+        ffmpeg_path = "/usr/local/bin/ffmpeg"
+        max_frames = 50
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.video_generation.enabled is True
+    assert cfg.video_generation.backend == "xai_video"
+    assert cfg.video_generation.confirm_over_cost == 5.0
+    assert cfg.video_analysis.ffmpeg_path == "/usr/local/bin/ffmpeg"
+    assert cfg.video_analysis.max_frames == 50
+
+
+def test_legacy_flat_video_writes_route_to_correct_subsystem(
+    isolated: Path,
+) -> None:
+    """``cfg.video_backend = "xai_video"`` legacy write must route to
+    the generation half (not analysis); ``cfg.video_ffmpeg_path = X``
+    must route to the analysis half. The __setattr__ shim uses the
+    _LEGACY_FIELD_MAP to disambiguate by name."""
+    cfg = cfg_mod.Config()
+    cfg.video_backend = "xai_video"
+    cfg.video_ffmpeg_path = "/opt/ffmpeg"
+    assert cfg.video_generation.backend == "xai_video"
+    assert cfg.video_analysis.ffmpeg_path == "/opt/ffmpeg"
+    # And the analysis half wasn't touched by the generation write.
+    assert cfg.video_analysis.enabled is True
+
+
+def test_snapshot_store_singleton_picks_up_safety_retention(
+    isolated: Path,
+    tmp_path: Path,
+) -> None:
+    """The Phase 18.1 R4 stage 2 wiring change: get_snapshot_store()
+    now reads cfg.safety so the user's [safety] table actually takes
+    effect on retention. Before this commit the singleton ignored cfg
+    entirely and used SnapshotStore's hardcoded defaults -- the
+    [safety] dict was advertised but dead."""
+    from athena.safety import context as ctx_mod
+
+    _write_toml(
+        isolated,
+        """
+        [safety]
+        retention_days = 14
+        retention_count = 50
+    """,
+    )
+    ctx_mod.reset_for_tests()
+    try:
+        store = ctx_mod.get_snapshot_store(profile_dir=tmp_path)
+        assert store.retention_days == 14
+        assert store.retention_count == 50
+    finally:
+        ctx_mod.reset_for_tests()
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +716,8 @@ def test_save_then_load_plugin_state_roundtrip(isolated: Path) -> None:
 
 
 def test_save_plugin_state_creates_parent_dir(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """If ~/.athena/ doesn't exist yet, save_plugin_state must
     create it. Otherwise a fresh install + first plugin toggle =
@@ -245,44 +745,52 @@ def test_save_plugin_state_writes_pretty_sorted(isolated: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_merge_plugin_state_no_sidecar_returns_config_unchanged(
+def test_merge_plugin_state_no_sidecar_leaves_config_unchanged(
     isolated: Path,
 ) -> None:
-    base = {"observability": {"metrics_console": False}}
-    out = cfg_mod._merge_plugin_state(base)
-    assert out == base
+    """R4 stage 4b changed _merge_plugin_state's signature from
+    ``dict -> dict`` to ``PluginsConfig -> None`` (in-place mutation)."""
+    plugins = cfg_mod.PluginsConfig()
+    plugins.per_plugin["observability"] = {"metrics_console": False}
+    cfg_mod._merge_plugin_state(plugins)
+    # No sidecar file present in isolated -> nothing to overlay.
+    assert plugins.enabled == {}
+    assert plugins.per_plugin["observability"] == {"metrics_console": False}
 
 
 def test_merge_plugin_state_overlays_enabled_dict(isolated: Path) -> None:
-    """plugins_state.json's `enabled` map overlays config.toml's
-    enable settings. Sidecar wins for keys it specifies; config
-    keys not in the sidecar are preserved."""
+    """plugins_state.json's ``enabled`` map overlays the PluginsConfig's
+    enable settings. Sidecar wins for keys it specifies; config keys
+    not in the sidecar are preserved."""
     cfg_mod.save_plugin_state({"enabled": {"observability": False}})
-    cfg = {"enabled": {"observability": True, "shell_audit": True}}
-    out = cfg_mod._merge_plugin_state(cfg)
-    assert out["enabled"]["observability"] is False  # sidecar wins
-    assert out["enabled"]["shell_audit"] is True  # preserved from cfg
+    plugins = cfg_mod.PluginsConfig(
+        enabled={"observability": True, "shell_audit": True},
+    )
+    cfg_mod._merge_plugin_state(plugins)
+    assert plugins.enabled["observability"] is False  # sidecar wins
+    assert plugins.enabled["shell_audit"] is True  # preserved
 
 
-def test_merge_plugin_state_handles_missing_cfg_enabled(
+def test_merge_plugin_state_handles_empty_initial_enabled(
     isolated: Path,
 ) -> None:
-    """Config has no [plugins.enabled] section but sidecar does —
+    """Config has no [plugins.enabled] section but sidecar does --
     overlay still works, doesn't crash."""
     cfg_mod.save_plugin_state({"enabled": {"new_plugin": True}})
-    out = cfg_mod._merge_plugin_state({})
-    assert out["enabled"]["new_plugin"] is True
+    plugins = cfg_mod.PluginsConfig()
+    cfg_mod._merge_plugin_state(plugins)
+    assert plugins.enabled["new_plugin"] is True
 
 
 def test_merge_plugin_state_ignores_non_dict_state_enabled(
     isolated: Path,
 ) -> None:
-    """If the sidecar has `enabled` as a non-dict (corruption /
-    schema drift), don't crash — just don't overlay."""
+    """If the sidecar has ``enabled`` as a non-dict (corruption /
+    schema drift), don't crash -- just don't overlay."""
     cfg_mod.save_plugin_state({"enabled": "not a dict"})
-    cfg = {"enabled": {"x": True}}
-    out = cfg_mod._merge_plugin_state(cfg)
-    assert out["enabled"] == {"x": True}
+    plugins = cfg_mod.PluginsConfig(enabled={"x": True})
+    cfg_mod._merge_plugin_state(plugins)
+    assert plugins.enabled == {"x": True}
 
 
 # ---------------------------------------------------------------------------
@@ -310,7 +818,8 @@ def test_profile_dir_custom_home(tmp_path: Path) -> None:
 
 
 def test_mcp_config_paths_returns_three_in_precedence_order(
-    isolated: Path, tmp_path: Path,
+    isolated: Path,
+    tmp_path: Path,
 ) -> None:
     """MCP config precedence: user → project-hidden → project-visible.
     LATER paths in the list WIN (loader merges in order). Pin the
@@ -322,3 +831,127 @@ def test_mcp_config_paths_returns_three_in_precedence_order(
     assert paths[0] == cfg_mod.USER_MCP_PATH
     assert paths[1] == workspace / ".athena" / "mcp.json"
     assert paths[2] == workspace / "mcp.json"
+
+
+# ---------------------------------------------------------------------------
+# Phase 18.1 R4 stage 6 -- ProvidersConfig promotion (closes R4)
+# ---------------------------------------------------------------------------
+
+
+def test_providers_defaults_match_legacy_dict(isolated: Path) -> None:
+    """No [providers] table -> ProvidersConfig has empty routing +
+    empty per_provider. Matches the legacy ``dict[str, Any] = {}``
+    behaviour."""
+    cfg = cfg_mod.load_config()
+    assert isinstance(cfg.providers, cfg_mod.ProvidersConfig)
+    assert cfg.providers.routing == {}
+    assert cfg.providers.per_provider == {}
+    # The empty dataclass is falsy so ``(cfg.providers or {}).get(...)``
+    # still short-circuits the way the runtime resolver expects.
+    assert not cfg.providers
+
+
+def test_providers_routing_table_loads(isolated: Path) -> None:
+    """``[providers.routing]`` populates ProvidersConfig.routing."""
+    _write_toml(
+        isolated,
+        """
+        [providers.routing]
+        "qwen-special" = "anthropic"
+        "my-vllm-model" = "openai_compat"
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.providers.routing == {
+        "qwen-special": "anthropic",
+        "my-vllm-model": "openai_compat",
+    }
+    assert cfg.providers.per_provider == {}
+
+
+def test_providers_per_provider_tables_load(isolated: Path) -> None:
+    """Each ``[providers.<name>]`` (not "routing") goes into
+    ProvidersConfig.per_provider[<name>]."""
+    _write_toml(
+        isolated,
+        """
+        [providers.openai_compat]
+        host = "http://vllm.local:8000"
+
+        [providers.anthropic]
+        fallback = ["openrouter", "ollama"]
+        base_url = "https://eu.anthropic.test/v1"
+    """,
+    )
+    cfg = cfg_mod.load_config()
+    assert cfg.providers.per_provider["openai_compat"] == {"host": "http://vllm.local:8000"}
+    assert cfg.providers.per_provider["anthropic"] == {
+        "fallback": ["openrouter", "ollama"],
+        "base_url": "https://eu.anthropic.test/v1",
+    }
+    # Routing left untouched when only per-provider tables are set.
+    assert cfg.providers.routing == {}
+
+
+def test_providers_dict_style_readers_still_work(isolated: Path) -> None:
+    """Existing readers in athena.providers.runtime_resolver do
+    ``(cfg.providers or {}).get("routing")`` and ``.get(name, {})``.
+    The dataclass implements __getitem__ / get / __contains__ so the
+    pattern keeps working without changes."""
+    cfg = cfg_mod.Config()
+    cfg.providers.routing["qwen-x"] = "anthropic"
+    cfg.providers.per_provider["openai_compat"] = {"host": "http://x:1"}
+
+    assert cfg.providers.get("routing") == {"qwen-x": "anthropic"}
+    assert cfg.providers.get("openai_compat") == {"host": "http://x:1"}
+    assert cfg.providers.get("missing") is None
+    assert cfg.providers.get("missing", {"d": 1}) == {"d": 1}
+
+    assert "routing" in cfg.providers
+    assert "openai_compat" in cfg.providers
+    assert "missing" not in cfg.providers
+
+    assert cfg.providers["routing"] == {"qwen-x": "anthropic"}
+    assert cfg.providers["openai_compat"] == {"host": "http://x:1"}
+
+
+def test_providers_dict_constructor_coerces_to_dataclass() -> None:
+    """``Config(providers={...})`` -- the legacy fixture shape used
+    by 20+ existing test sites -- is coerced into a ProvidersConfig
+    by __post_init__. The routing key splits out from per-provider
+    slices. Non-dict garbage in the dict is dropped, not crashing."""
+    cfg = cfg_mod.Config(
+        providers={
+            "routing": {"qwen-x": "anthropic"},
+            "openai_compat": {"host": "http://x"},
+            "anthropic": {"fallback": ["openrouter"]},
+            # The next entry is malformed (str value where the dict
+            # expects a sub-table). Verified silent drop.
+            "garbage": "not-a-dict",
+        }
+    )
+    assert isinstance(cfg.providers, cfg_mod.ProvidersConfig)
+    assert cfg.providers.routing == {"qwen-x": "anthropic"}
+    assert cfg.providers.per_provider == {
+        "openai_compat": {"host": "http://x"},
+        "anthropic": {"fallback": ["openrouter"]},
+    }
+
+
+def test_providers_from_dict_classmethod_isolates_nonsense() -> None:
+    """``ProvidersConfig.from_dict`` is the coercion entry point.
+    Confirm it tolerates non-string routing values and non-dict
+    per-provider slices without raising."""
+    out = cfg_mod.ProvidersConfig.from_dict(
+        {
+            "routing": {"ok": "anthropic", "bad": 12345, 42: "also-bad"},
+            "openai_compat": {"host": "http://x"},
+            "broken": 7,
+        }
+    )
+    assert out.routing == {"ok": "anthropic"}
+    assert out.per_provider == {"openai_compat": {"host": "http://x"}}
+
+    # Also: ``from_dict`` called on something that isn't a dict at all
+    # returns an empty ProvidersConfig rather than blowing up.
+    assert cfg_mod.ProvidersConfig.from_dict(None) == cfg_mod.ProvidersConfig()  # type: ignore[arg-type]

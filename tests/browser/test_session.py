@@ -67,13 +67,13 @@ def test_unavailable_when_playwright_absent(tmp_path: Path):
     def _raise_import(*_a, **_kw):
         raise ImportError("no module named playwright")
 
-    with patch("athena.browser.session.sync_playwright",
-               side_effect=_raise_import, create=True):
+    with patch("athena.browser.session.sync_playwright", side_effect=_raise_import, create=True):
         # Some Python builds raise at the from-import site;
         # mock the imported symbol when it exists, and the
         # ImportError reaches ensure_started either way.
         try:
             from playwright import sync_api  # noqa: F401
+
             playwright_installed = True
         except Exception:
             playwright_installed = False
@@ -85,6 +85,7 @@ def test_unavailable_when_playwright_absent(tmp_path: Path):
             # Patch the local import inside ensure_started by
             # monkeypatching sys.modules
             import sys
+
             orig = sys.modules.get("playwright.sync_api")
             sys.modules["playwright.sync_api"] = None  # ImportError on import
             try:
@@ -105,6 +106,7 @@ def test_unavailable_when_playwright_absent(tmp_path: Path):
 def _playwright_with_chromium() -> bool:
     try:
         from playwright.sync_api import sync_playwright
+
         with sync_playwright() as p:
             # Lazy attribute check — touches the chromium descriptor
             _ = p.chromium

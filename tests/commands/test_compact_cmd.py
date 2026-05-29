@@ -17,8 +17,7 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.compact.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     return lines, patches
@@ -44,7 +43,9 @@ def _agent(
 ):
     """Build an agent stub with the surface compact.py reads."""
     return SimpleNamespace(
-        messages=messages if messages is not None else [
+        messages=messages
+        if messages is not None
+        else [
             {"role": "system", "content": "sys"},
             {"role": "user", "content": "u1"},
             {"role": "assistant", "content": "a1"},
@@ -75,10 +76,12 @@ def _agent(
 def test_short_transcript_does_nothing() -> None:
     """≤ 2 messages means nothing to compact — early-return with
     an info message, no compress() call."""
-    agent = _agent(messages=[
-        {"role": "system", "content": "sys"},
-        {"role": "user", "content": "only one user msg"},
-    ])
+    agent = _agent(
+        messages=[
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "only one user msg"},
+        ]
+    )
     with patch("athena.commands.compact.compress") as cmpr:
         out = _run(agent)
     cmpr.assert_not_called()
@@ -141,9 +144,9 @@ def test_successful_compaction_replaces_messages_and_reports() -> None:
     # User-facing report mentions the numbers
     assert "5,000" in out  # tokens_before formatted with thousands sep
     assert "1,200" in out  # tokens_after
-    assert "76%" in out    # reduction percentage
+    assert "76%" in out  # reduction percentage
     assert "10 messages" in out
-    assert "300" in out    # summary tokens
+    assert "300" in out  # summary tokens
 
 
 def test_compaction_with_one_new_message_skips_persist() -> None:
@@ -176,11 +179,17 @@ def test_no_ingest_thread_when_ingest_on_compact_disabled() -> None:
     agent = _agent(ingest_on_compact=False, user_model_backend="local")
     result = SimpleNamespace(
         new_messages=agent.messages,
-        tokens_before=1000, tokens_after=500, tokens_compressed=500,
-        compression_ratio=0.5, middle_message_count=1, summary_tokens=100,
+        tokens_before=1000,
+        tokens_after=500,
+        tokens_compressed=500,
+        compression_ratio=0.5,
+        middle_message_count=1,
+        summary_tokens=100,
     )
-    with patch("athena.commands.compact.compress", return_value=result), \
-         patch("athena.commands.compact.threading.Thread") as thread_mock:
+    with (
+        patch("athena.commands.compact.compress", return_value=result),
+        patch("athena.commands.compact.threading.Thread") as thread_mock,
+    ):
         _run(agent)
     thread_mock.assert_not_called()
 
@@ -190,11 +199,17 @@ def test_no_ingest_thread_when_backend_is_none() -> None:
     agent = _agent(ingest_on_compact=True, user_model_backend="none")
     result = SimpleNamespace(
         new_messages=agent.messages,
-        tokens_before=1000, tokens_after=500, tokens_compressed=500,
-        compression_ratio=0.5, middle_message_count=1, summary_tokens=100,
+        tokens_before=1000,
+        tokens_after=500,
+        tokens_compressed=500,
+        compression_ratio=0.5,
+        middle_message_count=1,
+        summary_tokens=100,
     )
-    with patch("athena.commands.compact.compress", return_value=result), \
-         patch("athena.commands.compact.threading.Thread") as thread_mock:
+    with (
+        patch("athena.commands.compact.compress", return_value=result),
+        patch("athena.commands.compact.threading.Thread") as thread_mock,
+    ):
         _run(agent)
     thread_mock.assert_not_called()
 
@@ -204,15 +219,21 @@ def test_ingest_thread_fires_when_enabled_and_backend_set() -> None:
     agent = _agent(ingest_on_compact=True, user_model_backend="local")
     result = SimpleNamespace(
         new_messages=agent.messages,
-        tokens_before=1000, tokens_after=500, tokens_compressed=500,
-        compression_ratio=0.5, middle_message_count=1, summary_tokens=100,
+        tokens_before=1000,
+        tokens_after=500,
+        tokens_compressed=500,
+        compression_ratio=0.5,
+        middle_message_count=1,
+        summary_tokens=100,
     )
     fake_thread = MagicMock()
-    with patch("athena.commands.compact.compress", return_value=result), \
-         patch(
-             "athena.commands.compact.threading.Thread",
-             return_value=fake_thread,
-         ) as thread_cls:
+    with (
+        patch("athena.commands.compact.compress", return_value=result),
+        patch(
+            "athena.commands.compact.threading.Thread",
+            return_value=fake_thread,
+        ) as thread_cls,
+    ):
         _run(agent)
     thread_cls.assert_called_once()
     # Must be daemon — never block process exit on a stuck ingest

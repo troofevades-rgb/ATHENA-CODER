@@ -20,7 +20,6 @@ from athena.vision import analyze
 from athena.vision.analyze import VALID_MODES, _run
 from tests.vision.fixtures import FIXTURES_DIR, ensure_fixtures
 
-
 # ---------------------------------------------------------------
 # stub plumbing
 # ---------------------------------------------------------------
@@ -72,11 +71,13 @@ class _StubProvider:
 
 def test_exif_mode_returns_camera_fields(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="exif",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="exif",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["mode"] == "exif"
     assert out["exif"]["Make"] == "AthenaCam"
     assert out["exif"]["DateTime"].startswith("2026:")
@@ -103,11 +104,13 @@ def test_exif_mode_logs_audit_row(tmp_path: Path):
 
 def test_ela_mode_returns_patches(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="ela",
-        path=str(FIXTURES_DIR / "edited.jpg"),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="ela",
+            path=str(FIXTURES_DIR / "edited.jpg"),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["mode"] == "ela"
     assert "patches" in out
     assert out["quality"] == 80
@@ -115,12 +118,15 @@ def test_ela_mode_returns_patches(tmp_path: Path):
 
 def test_ela_mode_honours_overrides(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="ela",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        quality=50, threshold=5,
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="ela",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            quality=50,
+            threshold=5,
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["quality"] == 50
     assert out["threshold"] == 5
 
@@ -132,12 +138,14 @@ def test_ela_mode_honours_overrides(tmp_path: Path):
 
 def test_crop_mode_writes_artifact(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="crop",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        box=[10, 10, 110, 110],
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="crop",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            box=[10, 10, 110, 110],
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["mode"] == "crop"
     assert Path(out["out_path"]).exists()
     assert out["width"] == 100
@@ -146,11 +154,13 @@ def test_crop_mode_writes_artifact(tmp_path: Path):
 
 def test_crop_missing_box_returns_error(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="crop",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="crop",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert "error" in out
     assert "box" in out["error"]
 
@@ -162,12 +172,14 @@ def test_crop_missing_box_returns_error(tmp_path: Path):
 
 def test_histogram_mode_returns_bins(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="histogram",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        bins=8,
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="histogram",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            bins=8,
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["mode"] == "histogram"
     assert out["bins"] == 8
     assert len(out["data"]["R"]) == 8
@@ -180,11 +192,13 @@ def test_histogram_mode_returns_bins(tmp_path: Path):
 
 def test_phash_mode_returns_hex(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="phash",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="phash",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["mode"] == "phash"
     assert out["algorithm"] == "phash"
     assert len(out["hex"]) == 16
@@ -197,14 +211,16 @@ def test_phash_mode_returns_hex(tmp_path: Path):
 
 def test_compare_mode_detects_stripped(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="compare",
-        paths=[
-            str(FIXTURES_DIR / "original.jpg"),
-            str(FIXTURES_DIR / "stripped.jpg"),
-        ],
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="compare",
+            paths=[
+                str(FIXTURES_DIR / "original.jpg"),
+                str(FIXTURES_DIR / "stripped.jpg"),
+            ],
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert out["mode"] == "compare"
     assert out["metadata_strip_check"]["verdict"] == "stripped"
     assert "Make" in out["metadata_strip_check"]["missing_keys"]
@@ -212,27 +228,32 @@ def test_compare_mode_detects_stripped(tmp_path: Path):
 
 
 def test_compare_mode_requires_two_paths(tmp_path: Path):
-    out = json.loads(_run(
-        mode="compare",
-        paths=["just-one.jpg"],
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="compare",
+            paths=["just-one.jpg"],
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert "error" in out
 
 
 def test_compare_mode_strong_match_label(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="compare",
-        paths=[
-            str(FIXTURES_DIR / "original.jpg"),
-            str(FIXTURES_DIR / "recompressed.jpg"),
-        ],
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="compare",
+            paths=[
+                str(FIXTURES_DIR / "original.jpg"),
+                str(FIXTURES_DIR / "recompressed.jpg"),
+            ],
+            _cfg=_cfg(tmp_path),
+        )
+    )
     # "identical" or "strong-match" — both fine.
     assert out["phash_distance_reading"] in (
-        "identical", "strong-match (mild transform)",
+        "identical",
+        "strong-match (mild transform)",
     )
 
 
@@ -244,13 +265,15 @@ def test_compare_mode_strong_match_label(tmp_path: Path):
 def test_describe_passes_text_and_image_to_provider(tmp_path: Path):
     ensure_fixtures()
     stub = _StubProvider(response="It is a synthetic photo of trees.")
-    out = json.loads(_run(
-        mode="describe",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        prompt="What's in this image?",
-        _cfg=_cfg(tmp_path),
-        _provider_factory=lambda cfg: stub,
-    ))
+    out = json.loads(
+        _run(
+            mode="describe",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            prompt="What's in this image?",
+            _cfg=_cfg(tmp_path),
+            _provider_factory=lambda cfg: stub,
+        )
+    )
     assert out["mode"] == "describe"
     assert out["answer"] == "It is a synthetic photo of trees."
     assert out["tiled"] is False
@@ -270,39 +293,47 @@ def test_describe_passes_text_and_image_to_provider(tmp_path: Path):
 def test_describe_tiles_large_image(tmp_path: Path):
     ensure_fixtures()
     stub = _StubProvider(response="A landscape with trees.")
-    out = json.loads(_run(
-        mode="describe",
-        path=str(FIXTURES_DIR / "large.png"),
-        _cfg=_cfg(tmp_path),
-        _provider_factory=lambda cfg: stub,
-    ))
+    out = json.loads(
+        _run(
+            mode="describe",
+            path=str(FIXTURES_DIR / "large.png"),
+            _cfg=_cfg(tmp_path),
+            _provider_factory=lambda cfg: stub,
+        )
+    )
     assert out["tiled"] is True
     assert out["tiles"] > 1
 
 
 def test_describe_no_provider_returns_clear_error(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="describe",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        _cfg=_cfg(tmp_path),
-        _provider_factory=lambda cfg: None,
-    ))
+    out = json.loads(
+        _run(
+            mode="describe",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            _cfg=_cfg(tmp_path),
+            _provider_factory=lambda cfg: None,
+        )
+    )
     assert "error" in out
     assert "no vision-capable provider" in out["error"]
 
 
 def test_describe_provider_exception_surfaces_as_error(tmp_path: Path):
     ensure_fixtures()
+
     class _Boom:
         def describe(self, _):
             raise RuntimeError("model offline")
-    out = json.loads(_run(
-        mode="describe",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        _cfg=_cfg(tmp_path),
-        _provider_factory=lambda cfg: _Boom(),
-    ))
+
+    out = json.loads(
+        _run(
+            mode="describe",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            _cfg=_cfg(tmp_path),
+            _provider_factory=lambda cfg: _Boom(),
+        )
+    )
     assert "error" in out
     assert "model offline" in out["error"]
 
@@ -314,11 +345,13 @@ def test_describe_provider_exception_surfaces_as_error(tmp_path: Path):
 
 def test_vision_disabled_short_circuits(tmp_path: Path):
     ensure_fixtures()
-    out = json.loads(_run(
-        mode="exif",
-        path=str(FIXTURES_DIR / "original.jpg"),
-        _cfg=_cfg(tmp_path, vision_enabled=False),
-    ))
+    out = json.loads(
+        _run(
+            mode="exif",
+            path=str(FIXTURES_DIR / "original.jpg"),
+            _cfg=_cfg(tmp_path, vision_enabled=False),
+        )
+    )
     assert "error" in out
     assert "vision_enabled=False" in out["error"]
     # And NO audit row was written when gate refuses.
@@ -327,21 +360,25 @@ def test_vision_disabled_short_circuits(tmp_path: Path):
 
 
 def test_unknown_mode_rejected(tmp_path: Path):
-    out = json.loads(_run(
-        mode="rotate",  # not in VALID_MODES
-        path="foo.jpg",
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="rotate",  # not in VALID_MODES
+            path="foo.jpg",
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert "error" in out
     assert "unknown mode" in out["error"]
 
 
 def test_missing_file_returns_error(tmp_path: Path):
-    out = json.loads(_run(
-        mode="exif",
-        path=str(tmp_path / "nope.jpg"),
-        _cfg=_cfg(tmp_path),
-    ))
+    out = json.loads(
+        _run(
+            mode="exif",
+            path=str(tmp_path / "nope.jpg"),
+            _cfg=_cfg(tmp_path),
+        )
+    )
     assert "error" in out
     assert "file not found" in out["error"]
 
@@ -354,6 +391,7 @@ def test_missing_file_returns_error(tmp_path: Path):
 def test_tool_registered_under_vision_toolset():
     import athena.tools  # noqa: F401 — register all tools
     from athena.tools.registry import all_tools
+
     names = {t.name for t in all_tools()}
     assert "vision_analyze" in names
     # And under the vision toolset
@@ -366,6 +404,7 @@ def test_tool_describes_all_seven_modes():
     must appear in the enum."""
     import athena.tools  # noqa: F401
     from athena.tools.registry import get_tool
+
     t = get_tool("vision_analyze")
     enum = t.parameters["properties"]["mode"]["enum"]
     assert set(enum) == set(VALID_MODES)

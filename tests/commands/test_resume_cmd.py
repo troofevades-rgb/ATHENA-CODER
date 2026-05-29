@@ -19,15 +19,13 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.resume.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             "athena.commands.resume.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -76,6 +74,7 @@ def test_no_arg_lists_recent_sessions(fake_sessions_dir: Path) -> None:
     """Populate three session files; the listing must show all of
     them in newest-first order."""
     import time
+
     paths = []
     for i, name in enumerate(["oldest.json", "middle.json", "newest.json"]):
         p = fake_sessions_dir / name
@@ -83,6 +82,7 @@ def test_no_arg_lists_recent_sessions(fake_sessions_dir: Path) -> None:
         # Stagger mtimes so newest sorts first deterministically.
         ts = 1000 + i * 100
         import os
+
         os.utime(p, (ts, ts))
         paths.append(p)
     out = _run(_agent_with_system(), "")
@@ -105,22 +105,25 @@ def test_no_arg_caps_listing_at_10(fake_sessions_dir: Path) -> None:
 # ---- arg: load a specific session -----------------------------------
 
 
-def test_load_absolute_path_replaces_history(
-    fake_sessions_dir: Path, tmp_path: Path
-) -> None:
+def test_load_absolute_path_replaces_history(fake_sessions_dir: Path, tmp_path: Path) -> None:
     """Saved messages should replace the agent's history EXCEPT the
     original system prompt (which must be preserved)."""
     saved = tmp_path / "saved.json"
-    saved.write_text(json.dumps([
-        {"role": "system", "content": "OLD system prompt — must be dropped"},
-        {"role": "user", "content": "previous question"},
-        {"role": "assistant", "content": "previous answer"},
-    ]))
+    saved.write_text(
+        json.dumps(
+            [
+                {"role": "system", "content": "OLD system prompt — must be dropped"},
+                {"role": "user", "content": "previous question"},
+                {"role": "assistant", "content": "previous answer"},
+            ]
+        )
+    )
     agent = _agent_with_system("KEEP THIS SYSTEM PROMPT")
     out = _run(agent, str(saved))
     # Agent's original system prompt preserved
     assert agent.messages[0] == {
-        "role": "system", "content": "KEEP THIS SYSTEM PROMPT",
+        "role": "system",
+        "content": "KEEP THIS SYSTEM PROMPT",
     }
     # Saved system prompt was dropped
     assert all("OLD system prompt" not in m.get("content", "") for m in agent.messages)
@@ -152,9 +155,7 @@ def test_load_nonexistent_file_errors(fake_sessions_dir: Path) -> None:
     assert len(agent.messages) == 1
 
 
-def test_load_malformed_json_errors(
-    fake_sessions_dir: Path, tmp_path: Path
-) -> None:
+def test_load_malformed_json_errors(fake_sessions_dir: Path, tmp_path: Path) -> None:
     bad = tmp_path / "bad.json"
     bad.write_text("{ not valid json")
     agent = _agent_with_system()
@@ -164,9 +165,7 @@ def test_load_malformed_json_errors(
     assert len(agent.messages) == 1
 
 
-def test_load_non_list_json_errors(
-    fake_sessions_dir: Path, tmp_path: Path
-) -> None:
+def test_load_non_list_json_errors(fake_sessions_dir: Path, tmp_path: Path) -> None:
     """File parses as JSON but is a dict, not a list — refuse."""
     bad = tmp_path / "wrong-shape.json"
     bad.write_text(json.dumps({"role": "user", "content": "single message dict"}))

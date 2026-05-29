@@ -54,8 +54,8 @@ from pathlib import Path
 from typing import Any
 
 from .events import (
-    Command,
     AskQuestionReplyCommand,
+    Command,
     ConfirmReplyCommand,
     Event,
     ExitEvent,
@@ -75,13 +75,16 @@ logger = logging.getLogger(__name__)
 _ERR_METHOD_NOT_FOUND = -32601
 _ERR_PARSE = -32700
 
+
 # Wire-protocol version (TUI sprint step 4). Bumped whenever an event
 # or command is added/removed/changed in a way that an older peer
 # can't process. Read from ``athena.tui_gateway.schema`` so the
 # schema file remains the single source of truth.
 def _protocol_version() -> int:
     from .schema import load_protocol
+
     return int(load_protocol().get("protocol_version", 1))
+
 
 # Heartbeat cadence and dead-TUI threshold. The server pings every
 # _PING_INTERVAL_S; if no pong arrives within _DEAD_TIMEOUT_S of the
@@ -89,13 +92,16 @@ def _protocol_version() -> int:
 _PING_INTERVAL_S = 5.0
 _DEAD_TIMEOUT_S = 15.0
 
+
 # ATHENA package version (best-effort; falls back to "unknown").
 def _athena_version() -> str:
     try:
         from athena import __version__
+
         return str(__version__)
     except Exception:  # noqa: BLE001
         return "unknown"
+
 
 # Capabilities the gateway advertises in its hello. Clients can use
 # these to enable optional behaviors. Keep this list in lockstep
@@ -234,9 +240,7 @@ class _UnixDomainTransport(_Transport):
 
     def __init__(self) -> None:
         self._sock: socket.socket | None = None
-        self._path = (
-            f"/tmp/athena-tui-{os.getpid()}-{secrets.token_hex(4)}.sock"
-        )
+        self._path = f"/tmp/athena-tui-{os.getpid()}-{secrets.token_hex(4)}.sock"
 
     def bind(self) -> None:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -282,7 +286,9 @@ class _UnixDomainTransport(_Transport):
             pass
         except OSError:
             logger.debug(
-                "failed to unlink UDS path %s", self._path, exc_info=True,
+                "failed to unlink UDS path %s",
+                self._path,
+                exc_info=True,
             )
 
     def describe(self) -> str:
@@ -301,9 +307,7 @@ def _make_transport(override: str | None = None) -> _Transport:
     pipes here (no callers need it yet; adding it later is its
     own step).
     """
-    chosen = (
-        (override or os.environ.get("ATHENA_TUI_TRANSPORT", "")).lower()
-    )
+    chosen = (override or os.environ.get("ATHENA_TUI_TRANSPORT", "")).lower()
     if chosen == "tcp":
         return _TcpLoopbackTransport()
     if chosen == "uds":
@@ -311,10 +315,7 @@ def _make_transport(override: str | None = None) -> _Transport:
             raise RuntimeError("UDS transport not supported on Windows")
         return _UnixDomainTransport()
     if chosen:
-        raise ValueError(
-            f"unknown ATHENA_TUI_TRANSPORT={chosen!r} "
-            "(expected 'tcp' or 'uds')"
-        )
+        raise ValueError(f"unknown ATHENA_TUI_TRANSPORT={chosen!r} (expected 'tcp' or 'uds')")
     if sys.platform == "win32":
         return _TcpLoopbackTransport()
     return _UnixDomainTransport()
@@ -393,11 +394,11 @@ class _OutboundQueue:
             if (
                 getattr(prev_ev, "type", None) == "stream.delta"
                 and getattr(curr_ev, "type", None) == "stream.delta"
-                and getattr(prev_ev, "stream_id", None)
-                    == getattr(curr_ev, "stream_id", None)
+                and getattr(prev_ev, "stream_id", None) == getattr(curr_ev, "stream_id", None)
             ):
                 merged = dataclasses.replace(
-                    prev_ev, text=prev_ev.text + curr_ev.text,
+                    prev_ev,
+                    text=prev_ev.text + curr_ev.text,
                 )
                 # Keep the newer seq — the client's lastSeq jumps to
                 # the highest one in the run.
@@ -441,9 +442,7 @@ class _EventRing:
     """
 
     def __init__(self, *, maxsize: int = _RING_MAXSIZE) -> None:
-        self._items: collections.deque[tuple[int, Any]] = (
-            collections.deque(maxlen=maxsize)
-        )
+        self._items: collections.deque[tuple[int, Any]] = collections.deque(maxlen=maxsize)
         self._lock = threading.Lock()
 
     def record(self, seq: int, event: Any) -> None:
@@ -598,7 +597,7 @@ class TuiGateway:
 
         try:
             conn = self._transport.accept(self._accept_timeout_s)
-        except socket.timeout as e:
+        except TimeoutError as e:
             self.close()
             raise RuntimeError(
                 f"TUI did not connect to gateway within "
@@ -701,18 +700,12 @@ class TuiGateway:
         # to re-bind a new conn while we're tearing down.
         self._accept_stop.set()
         self._conn_died.set()  # unblock its main wait
-        if (
-            self._accept_loop_thread is not None
-            and self._accept_loop_thread.is_alive()
-        ):
+        if self._accept_loop_thread is not None and self._accept_loop_thread.is_alive():
             self._accept_loop_thread.join(timeout=2.0)
         # Stop the heartbeat thread before reaping the reader.
         # The stop event also unblocks the wait() inside the loop.
         self._heartbeat_stop.set()
-        if (
-            self._heartbeat_thread is not None
-            and self._heartbeat_thread.is_alive()
-        ):
+        if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
             self._heartbeat_thread.join(timeout=1.0)
         # Step 4b: tell any recv_command caller in the REPL that
         # the gateway is going down (replaces the per-disconnect
@@ -725,10 +718,7 @@ class TuiGateway:
         self._writer_stop.set()
         self._conn_ready.set()
         self._outbound.close()
-        if (
-            self._writer_thread is not None
-            and self._writer_thread.is_alive()
-        ):
+        if self._writer_thread is not None and self._writer_thread.is_alive():
             self._writer_thread.join(timeout=1.0)
         # Reap the reader thread so it can't put stale frames
         # into the queue (or read from a recycled fd) after we
@@ -781,7 +771,7 @@ class TuiGateway:
         self._conn.settimeout(self._accept_timeout_s)
         try:
             raw = self._conn_reader.readline()
-        except (socket.timeout, TimeoutError) as e:
+        except TimeoutError as e:
             raise _HandshakeError(
                 f"client did not send hello within {self._accept_timeout_s}s"
             ) from e
@@ -797,9 +787,7 @@ class TuiGateway:
         try:
             frame = json.loads(raw.decode("utf-8", errors="replace").strip())
         except json.JSONDecodeError as e:
-            self._send_protocol_error(
-                "malformed_hello", f"could not parse hello: {e}"
-            )
+            self._send_protocol_error("malformed_hello", f"could not parse hello: {e}")
             raise _HandshakeError(f"malformed client hello: {e}") from e
 
         if not isinstance(frame, dict) or frame.get("method") != "hello":
@@ -807,9 +795,7 @@ class TuiGateway:
                 "malformed_hello",
                 f"expected hello as first frame, got method={frame!r}",
             )
-            raise _HandshakeError(
-                f"expected first frame to be hello, got {frame!r}"
-            )
+            raise _HandshakeError(f"expected first frame to be hello, got {frame!r}")
         params = frame.get("params") or {}
         if not isinstance(params, dict):
             params = {}
@@ -833,8 +819,7 @@ class TuiGateway:
                 ),
             )
             raise _HandshakeError(
-                f"protocol version mismatch: server={my_pv} "
-                f"client={client_hello.protocol_version}"
+                f"protocol version mismatch: server={my_pv} client={client_hello.protocol_version}"
             )
 
         logger.debug(
@@ -849,7 +834,8 @@ class TuiGateway:
             count = self._replay_to_current_conn(client_hello.last_seq)
             logger.info(
                 "tui replay: shipped %d event(s) since seq %d",
-                count, client_hello.last_seq,
+                count,
+                client_hello.last_seq,
             )
 
     def _send_protocol_error(self, code: str, message: str) -> None:
@@ -904,9 +890,9 @@ class TuiGateway:
                 try:
                     new_conn = self._transport.accept(accept_timeout_s)
                     break
-                except socket.timeout:
+                except TimeoutError:
                     continue
-                except (TimeoutError, OSError, RuntimeError) as e:
+                except (OSError, RuntimeError) as e:
                     # Transport closed (close() was called) or other
                     # OS error — abort the loop. RuntimeError is the
                     # expected "transport not bound" raised by the
@@ -930,7 +916,8 @@ class TuiGateway:
                 self._do_handshake()
             except _HandshakeError as e:
                 logger.warning(
-                    "reconnect handshake failed; closing: %s", e,
+                    "reconnect handshake failed; closing: %s",
+                    e,
                 )
                 with self._conn_lock:
                     if self._conn is not None:
@@ -953,7 +940,8 @@ class TuiGateway:
             self._last_pong_at = time.monotonic()
             self._conn_ready.set()
             logger.info(
-                "tui reconnected; ring depth=%d", len(self._ring),
+                "tui reconnected; ring depth=%d",
+                len(self._ring),
             )
 
             # Spawn a fresh reader for this connection era.
@@ -984,9 +972,9 @@ class TuiGateway:
             # be visible to the model. (Future: emit a synthetic
             # "replay incomplete" status event.)
             logger.warning(
-                "replay incomplete: client last_seq=%d, "
-                "ring oldest=%d (missing %d events)",
-                last_seq, oldest_available,
+                "replay incomplete: client last_seq=%d, ring oldest=%d (missing %d events)",
+                last_seq,
+                oldest_available,
                 oldest_available - (last_seq + 1),
             )
         for seq, event in entries:
@@ -996,9 +984,7 @@ class TuiGateway:
                 "params": _strip_type(asdict(event)),
                 "seq": seq,
             }
-            line = (
-                json.dumps(payload, separators=(",", ":")) + "\n"
-            ).encode("utf-8")
+            line = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
             with self._write_lock:
                 if self._conn is None:
                     return 0
@@ -1104,9 +1090,7 @@ class TuiGateway:
                 "params": _strip_type(asdict(event)),
                 "seq": seq,
             }
-            line = (
-                json.dumps(payload, separators=(",", ":")) + "\n"
-            ).encode("utf-8")
+            line = (json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8")
             with self._write_lock:
                 if self._conn is None:
                     # Conn was torn down between get() and write.
@@ -1122,8 +1106,8 @@ class TuiGateway:
                     # will re-bind a new conn. Just clear ready and
                     # re-queue the failed item.
                     logger.warning(
-                        "TUI socket closed in writer thread; "
-                        "awaiting reconnect: %s", e,
+                        "TUI socket closed in writer thread; awaiting reconnect: %s",
+                        e,
                     )
                     self._conn_ready.clear()
                     self._conn_died.set()
@@ -1254,6 +1238,7 @@ class TuiGateway:
                     #      Users saw this as "ESC does nothing — I
                     #      have to kill the terminal."
                     import _thread
+
                     try:
                         _thread.interrupt_main()
                     except RuntimeError:
@@ -1263,6 +1248,7 @@ class TuiGateway:
                         self._cmd_queue.put(cmd)
                     try:
                         from .. import interrupt_hooks
+
                         interrupt_hooks.fire_cancel_hooks()
                     except Exception:  # noqa: BLE001
                         logger.exception("cancel hooks dispatch failed")

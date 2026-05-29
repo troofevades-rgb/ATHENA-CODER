@@ -154,9 +154,7 @@ class SocialProvider(Provider):
 
         url_base = getattr(cfg, "social_search_url", None)
         if not url_base:
-            logger.warning(
-                "social search: cfg.social_search_url not configured"
-            )
+            logger.warning("social search: cfg.social_search_url not configured")
             return []
         query_param = getattr(cfg, "social_search_query_param", "query")
         params = {
@@ -253,8 +251,10 @@ class SocialProvider(Provider):
             logger.warning("social user_timeline: cfg.social_user_timeline_url not configured")
             return [], None
 
-        total_wanted = int(max_results) if max_results else int(
-            getattr(cfg, "social_user_timeline_max_results", 50)
+        total_wanted = (
+            int(max_results)
+            if max_results
+            else int(getattr(cfg, "social_user_timeline_max_results", 50))
         )
         per_page = min(total_wanted, 100)
 
@@ -376,7 +376,9 @@ class SocialProvider(Provider):
                 err_body = ""
             logger.warning(
                 "social search HTTP %s on %s: %s",
-                e.code, url, err_body or "(no body)",
+                e.code,
+                url,
+                err_body or "(no body)",
             )
             return None
         except Exception as e:  # noqa: BLE001
@@ -517,14 +519,10 @@ def _read_bearer_token(cfg: Any) -> str | None:
     try:
         raw = p.read_text(encoding="utf-8")
     except OSError as e:
-        logger.warning(
-            "social bearer token unreadable at %s: %s", p, e
-        )
+        logger.warning("social bearer token unreadable at %s: %s", p, e)
         return None
     tok = raw.strip()
     if not tok:
         return None
-    logger.debug(
-        "social bearer token loaded from %s (len=%d)", p, len(tok)
-    )
+    logger.debug("social bearer token loaded from %s (len=%d)", p, len(tok))
     return tok

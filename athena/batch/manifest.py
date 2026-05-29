@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 # Max chars of task text we copy into the manifest summary so
 # the file stays manageable for inspection. The full task lives
 # in the per-run envelope on disk.
@@ -43,7 +42,7 @@ class BatchEntry:
     model: str | None = None
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "BatchEntry":
+    def from_dict(cls, d: dict[str, Any]) -> BatchEntry:
         """Parse one JSONL line. Tolerates extra keys (forward-
         compat) by ignoring them. Raises ``ValueError`` when
         the required ``task`` field is missing or empty."""
@@ -54,9 +53,7 @@ class BatchEntry:
             task=str(task),
             run_id=str(d["run_id"]) if d.get("run_id") else None,
             cwd=str(d["cwd"]) if d.get("cwd") else None,
-            timeout_s=(
-                float(d["timeout_s"]) if d.get("timeout_s") is not None else None
-            ),
+            timeout_s=(float(d["timeout_s"]) if d.get("timeout_s") is not None else None),
             model=str(d["model"]) if d.get("model") else None,
         )
 
@@ -94,7 +91,7 @@ class ManifestEntry:
         *,
         envelope: dict[str, Any],
         envelope_path: Path | str,
-    ) -> "ManifestEntry":
+    ) -> ManifestEntry:
         """Build a manifest row from a serialised RunResult dict
         plus the path the envelope was written to."""
         task = str(envelope.get("task", ""))
@@ -132,14 +129,14 @@ class BatchManifest:
     ``status="not_started"``).
     """
 
-    batch_id: str            # operator-supplied or auto-minted
-    started_at: str          # ISO-8601 UTC
+    batch_id: str  # operator-supplied or auto-minted
+    started_at: str  # ISO-8601 UTC
     finished_at: str
     duration_s: float
     output_dir: str
-    total: int               # entries in the input
-    completed: int           # status ∈ {ok, error, timeout, interrupted, invalid}
-    skipped: int             # resume: already-done outputs
+    total: int  # entries in the input
+    completed: int  # status ∈ {ok, error, timeout, interrupted, invalid}
+    skipped: int  # resume: already-done outputs
     by_status: dict[str, int] = dataclasses.field(default_factory=dict)
     entries: list[ManifestEntry] = dataclasses.field(default_factory=list)
 
@@ -169,6 +166,7 @@ def mint_batch_id() -> str:
     run IDs and ``t-<uuid12>`` task IDs so the prefix tells
     you the kind at a glance."""
     import uuid
+
     return f"b-{uuid.uuid4().hex[:12]}"
 
 
