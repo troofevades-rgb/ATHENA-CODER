@@ -50,6 +50,31 @@ def get_provider(name: str = "builtin_file") -> MemoryProvider:
 # ---- Profile-keyed convenience API --------------------------------------
 
 
+def memory_dir(
+    profile: str,
+    *,
+    workspace: Path | None = None,
+    provider_name: str = "builtin_file",
+) -> Path:
+    """Return the on-disk directory for ``(profile, workspace)``.
+
+    The ``/memory dir`` slash subcommand uses this to show users where
+    their memories live; the Phase 14 :mod:`athena.profiles.migration`
+    importer will use it to know where to copy legacy data.
+
+    Only works for file-backed providers (the built-in
+    :class:`BuiltinFileProvider`). Plugin providers that aren't
+    file-backed should raise ``NotImplementedError``.
+    """
+    provider = get_provider(provider_name)
+    method = getattr(provider, "_memory_dir", None)
+    if method is None:
+        raise NotImplementedError(
+            f"{provider.name!r} provider is not file-backed; memory_dir() unavailable."
+        )
+    return method(profile, workspace=workspace)
+
+
 def load_index(
     profile: str,
     *,
