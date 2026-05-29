@@ -93,8 +93,7 @@ def test_archive_rolls_back_on_frontmatter_failure(
     # Directory must be back at its original location; .archive/ must
     # not contain a half-archived entry.
     assert original.exists(), (
-        "archive_skill failed to roll back the move; "
-        "skill is orphaned under .archive/"
+        "archive_skill failed to roll back the move; skill is orphaned under .archive/"
     )
     archive_dir = user_skills / ".archive"
     if archive_dir.exists():

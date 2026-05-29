@@ -25,7 +25,8 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 
 @dataclasses.dataclass(frozen=True)
@@ -68,8 +69,7 @@ class Scorer(Protocol):
         expected: Any,
         *,
         context: dict[str, Any],
-    ) -> Score:
-        ...
+    ) -> Score: ...
 
 
 # ---------------------------------------------------------------
@@ -96,10 +96,7 @@ def get_scorer(name: str) -> Scorer:
     not found — typos in ``--scorer NAME`` should fail fast,
     not silently no-op."""
     if name not in _REGISTRY:
-        raise KeyError(
-            f"unknown scorer {name!r}; available: "
-            + ", ".join(sorted(_REGISTRY))
-        )
+        raise KeyError(f"unknown scorer {name!r}; available: " + ", ".join(sorted(_REGISTRY)))
     return _REGISTRY[name]
 
 
@@ -123,11 +120,9 @@ def _exact(actual: str, expected: Any, *, context: dict[str, Any]) -> Score:
     if a == e:
         return Score(passed=True, score=1.0, details="exact match")
     return Score(
-        passed=False, score=0.0,
-        details=(
-            f"actual {_quote(a, 80)} does not equal expected "
-            f"{_quote(e, 80)}"
-        ),
+        passed=False,
+        score=0.0,
+        details=(f"actual {_quote(a, 80)} does not equal expected {_quote(e, 80)}"),
     )
 
 
@@ -138,16 +133,19 @@ def _contains(actual: str, expected: Any, *, context: dict[str, Any]) -> Score:
     e = str(expected if expected is not None else "")
     if not e:
         return Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details="expected is empty (nothing to check for)",
         )
     if e in a:
         return Score(
-            passed=True, score=1.0,
+            passed=True,
+            score=1.0,
             details=f"actual contains expected {_quote(e, 80)}",
         )
     return Score(
-        passed=False, score=0.0,
+        passed=False,
+        score=0.0,
         details=f"actual does not contain expected {_quote(e, 80)}",
     )
 
@@ -160,27 +158,31 @@ def _regex(actual: str, expected: Any, *, context: dict[str, Any]) -> Score:
     pattern = str(expected if expected is not None else "")
     if not pattern:
         return Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details="expected pattern is empty",
         )
     try:
         compiled = re.compile(pattern)
     except re.error as e:
         return Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details=f"invalid regex pattern: {e}",
         )
     match = compiled.search(a)
     if match:
         return Score(
-            passed=True, score=1.0,
+            passed=True,
+            score=1.0,
             details=(
                 f"regex matched at offset {match.start()}-{match.end()}: "
                 f"{_quote(match.group(0), 60)}"
             ),
         )
     return Score(
-        passed=False, score=0.0,
+        passed=False,
+        score=0.0,
         details=f"regex pattern {_quote(pattern, 80)} did not match",
     )
 
@@ -197,10 +199,10 @@ def _json_path(actual: str, expected: Any, *, context: dict[str, Any]) -> Score:
     """
     if not isinstance(expected, dict) or "path" not in expected:
         return Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details=(
-                "json_path scorer requires expected = "
-                '{"path": "<dotted>", "value": <expected>}'
+                'json_path scorer requires expected = {"path": "<dotted>", "value": <expected>}'
             ),
         )
     path = str(expected["path"])
@@ -210,7 +212,8 @@ def _json_path(actual: str, expected: Any, *, context: dict[str, Any]) -> Score:
         parsed = json.loads(actual or "")
     except json.JSONDecodeError as e:
         return Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details=f"actual is not valid JSON: {e}",
         )
 
@@ -218,31 +221,31 @@ def _json_path(actual: str, expected: Any, *, context: dict[str, Any]) -> Score:
         got = _resolve_path(parsed, path)
     except (KeyError, IndexError, TypeError) as e:
         return Score(
-            passed=False, score=0.0,
-            details=(
-                f"path {path!r} did not resolve in actual JSON: "
-                f"{type(e).__name__}: {e}"
-            ),
+            passed=False,
+            score=0.0,
+            details=(f"path {path!r} did not resolve in actual JSON: {type(e).__name__}: {e}"),
         )
     except ValueError as e:
         # _resolve_path raises ValueError for malformed paths
         # (unbalanced brackets). Report as a scorer config error
         # rather than letting the runner's outer except mis-tag it.
         return Score(
-            passed=False, score=0.0,
+            passed=False,
+            score=0.0,
             details=f"json_path scorer: {e}",
         )
 
     if got == want:
         return Score(
-            passed=True, score=1.0,
+            passed=True,
+            score=1.0,
             details=f"path {path!r} resolved to expected value",
         )
     return Score(
-        passed=False, score=0.0,
+        passed=False,
+        score=0.0,
         details=(
-            f"path {path!r} resolved to {_quote(repr(got), 60)}, "
-            f"expected {_quote(repr(want), 60)}"
+            f"path {path!r} resolved to {_quote(repr(got), 60)}, expected {_quote(repr(want), 60)}"
         ),
     )
 
@@ -266,10 +269,12 @@ def _resolve_path(obj: Any, path: str) -> Any:
         ch = path[i]
         if ch == ".":
             if buf:
-                tokens.append(buf); buf = ""
+                tokens.append(buf)
+                buf = ""
         elif ch == "[":
             if buf:
-                tokens.append(buf); buf = ""
+                tokens.append(buf)
+                buf = ""
             try:
                 j = path.index("]", i)
             except ValueError as e:
@@ -277,10 +282,8 @@ def _resolve_path(obj: Any, path: str) -> Any:
                 # bubbled as a ValueError that the eval runner
                 # mis-reported as "scorer raised". Surface a clear
                 # error tied to the path string instead.
-                raise ValueError(
-                    f"json_path scorer: unbalanced '[' in {path!r}"
-                ) from e
-            tokens.append(path[i + 1: j])
+                raise ValueError(f"json_path scorer: unbalanced '[' in {path!r}") from e
+            tokens.append(path[i + 1 : j])
             i = j  # skip past ]
         else:
             buf += ch
@@ -294,9 +297,7 @@ def _resolve_path(obj: Any, path: str) -> Any:
             try:
                 idx = int(tok)
             except ValueError:
-                raise TypeError(
-                    f"expected integer index at {tok!r}, list at this depth"
-                )
+                raise TypeError(f"expected integer index at {tok!r}, list at this depth")
             cur = cur[idx]
         elif isinstance(cur, dict):
             if tok in cur:
@@ -309,9 +310,7 @@ def _resolve_path(obj: Any, path: str) -> Any:
                 except (KeyError, ValueError):
                     raise KeyError(tok)
         else:
-            raise TypeError(
-                f"can't navigate into {type(cur).__name__} at {tok!r}"
-            )
+            raise TypeError(f"can't navigate into {type(cur).__name__} at {tok!r}")
     return cur
 
 
@@ -320,7 +319,7 @@ def _quote(s: str, limit: int) -> str:
     them inspector-friendly."""
     s = s.replace("\n", " ").replace("\r", " ")
     if len(s) > limit:
-        return f'"{s[:limit - 1]}…"'
+        return f'"{s[: limit - 1]}…"'
     return f'"{s}"'
 
 

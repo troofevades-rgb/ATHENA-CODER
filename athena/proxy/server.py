@@ -373,9 +373,7 @@ async def _stream_response(
                 # the loop side one at a time, preserving the
                 # protocol-level "chunked" feel for clients.
                 def _collect() -> list[str]:
-                    chunks_iter: Iterator[StreamChunk] = provider.stream_chat(
-                        **stream_kwargs
-                    )
+                    chunks_iter: Iterator[StreamChunk] = provider.stream_chat(**stream_kwargs)
                     return list(
                         stream_chunks_to_openai_sse(
                             chunks_iter,

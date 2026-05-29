@@ -28,9 +28,8 @@ from pathlib import Path
 
 import pytest
 
-from athena.tools.skill_tools import skill_manage
 from athena.tools.registry import get_tool
-
+from athena.tools.skill_tools import skill_manage
 
 # ---------------------------------------------------------------------------
 # Schema discoverability — required keys are documented
@@ -44,9 +43,7 @@ def test_tool_description_lists_per_action_requirements():
     spec = get_tool("skill_manage")
     desc = spec.description
     # Every action's name appears in the per-action section.
-    for action in (
-        "create", "patch", "delete", "unarchive", "pin", "unpin", "write_file"
-    ):
+    for action in ("create", "patch", "delete", "unarchive", "pin", "unpin", "write_file"):
         assert action in desc
     # create's requirement is explicit.
     assert "frontmatter" in desc
@@ -160,9 +157,7 @@ def test_create_with_empty_description_string_explains_fix(tmp_path: Path):
     from athena.tools import file_ops
 
     file_ops._WORKSPACE = tmp_path
-    result = skill_manage(
-        action="create", name="my-skill", frontmatter={"description": "  "}
-    )
+    result = skill_manage(action="create", name="my-skill", frontmatter={"description": "  "})
     payload = json.loads(result)
     assert payload["success"] is False
     assert "description" in payload["message"]
@@ -172,8 +167,8 @@ def test_create_with_proper_frontmatter_succeeds(tmp_path: Path, monkeypatch):
     """Sanity: the new pre-flight doesn't break the happy
     path. With frontmatter['description'] set, create still
     works."""
-    from athena.tools import file_ops
     from athena.skills import manager as skill_manager_module
+    from athena.tools import file_ops
 
     file_ops._WORKSPACE = tmp_path
 
@@ -200,9 +195,7 @@ def test_write_file_without_content_explains_fix(tmp_path: Path):
     from athena.tools import file_ops
 
     file_ops._WORKSPACE = tmp_path
-    result = skill_manage(
-        action="write_file", name="my-skill", file_path="SKILL.md"
-    )
+    result = skill_manage(action="write_file", name="my-skill", file_path="SKILL.md")
     payload = json.loads(result)
     assert payload["success"] is False
     assert "file_path" in payload["message"]
@@ -218,9 +211,7 @@ def test_write_file_without_file_path_explains_fix(tmp_path: Path):
     from athena.tools import file_ops
 
     file_ops._WORKSPACE = tmp_path
-    result = skill_manage(
-        action="write_file", name="my-skill", file_content="hello"
-    )
+    result = skill_manage(action="write_file", name="my-skill", file_content="hello")
     payload = json.loads(result)
     assert payload["success"] is False
     assert "file_path" in payload["message"]
@@ -230,8 +221,8 @@ def test_write_file_without_file_path_explains_fix(tmp_path: Path):
 def test_write_file_with_both_works(tmp_path: Path, monkeypatch):
     """Sanity: with both args, write_file proceeds to the
     underlying manager."""
-    from athena.tools import file_ops
     from athena.skills import manager as skill_manager_module
+    from athena.tools import file_ops
 
     file_ops._WORKSPACE = tmp_path
 

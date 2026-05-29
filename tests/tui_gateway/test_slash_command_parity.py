@@ -20,7 +20,6 @@ from pathlib import Path
 
 from athena.commands.help import SLASH_HELP
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SLASH_POPUP_TS = REPO_ROOT / "ui-tui" / "src" / "components" / "SlashPopup.tsx"
 

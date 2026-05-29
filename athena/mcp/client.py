@@ -188,9 +188,7 @@ class MCPStdioClient:
                     if not self.is_alive():
                         with self._pending_lock:
                             self._pending.pop(req_id, None)
-                        raise MCPError(
-                            f"server '{self.name}' exited while waiting for {method!r}"
-                        )
+                        raise MCPError(f"server '{self.name}' exited while waiting for {method!r}")
                     elapsed += step
         except FutTimeout:
             with self._pending_lock:

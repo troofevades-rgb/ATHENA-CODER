@@ -20,12 +20,11 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Skip-when-no-LLM gating
@@ -55,7 +54,8 @@ def _ollama_reachable() -> bool:
 def _target_model_loaded(model_substr: str) -> bool:
     try:
         with urllib.request.urlopen(
-            f"{_ollama_host()}/api/tags", timeout=2,
+            f"{_ollama_host()}/api/tags",
+            timeout=2,
         ) as r:
             body = json.loads(r.read().decode("utf-8"))
     except Exception:
@@ -98,11 +98,11 @@ def real_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # llama3.1:8b are reliably bad at it; coder-tuned tags and
     # the user's own athena tag are reliably good.
     candidates = [
-        "qwen2.5-coder:14b",    # 14B — coder-tuned, reliable tools
+        "qwen2.5-coder:14b",  # 14B — coder-tuned, reliable tools
         "troofevades-q35:athena",  # user's tuned 30B-MoE
-        "qwen3-coder:30b",       # 30B coder
-        "llama3.2:3b",           # 3B — fast but tool-flaky; last resort
-        "llama3.1:8b",           # 8B — same flakiness; last resort
+        "qwen3-coder:30b",  # 30B coder
+        "llama3.2:3b",  # 3B — fast but tool-flaky; last resort
+        "llama3.1:8b",  # 8B — same flakiness; last resort
     ]
     chosen = next((m for m in candidates if _target_model_loaded(m)), None)
     if chosen is None:
@@ -113,11 +113,16 @@ def real_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # so we need a Console-shaped object — not a bare stub. Use
     # Rich's Console writing to devnull.
     import io
+
     from rich.console import Console
+
     import athena.ui as _ui
 
     silent = Console(
-        file=io.StringIO(), force_terminal=False, no_color=True, quiet=True,
+        file=io.StringIO(),
+        force_terminal=False,
+        no_color=True,
+        quiet=True,
     )
     monkeypatch.setattr(_ui, "console", silent)
     monkeypatch.setattr(_ui, "info", lambda *a, **k: None)
@@ -137,6 +142,7 @@ def real_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # may timeout). Also reset module-level nudge counters in case
     # a prior test leaked state.
     from athena.review import nudge as _nudge
+
     _nudge.reset_all()
 
     cfg = Config()
@@ -155,9 +161,10 @@ def real_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # without prompting — model gets a denied result, can continue.
     from athena.safety.approval_callback import (
         AUTO_DENY,
-        set_approval_callback,
         reset_approval_callback,
+        set_approval_callback,
     )
+
     _approval_token = set_approval_callback(AUTO_DENY)
 
     agent = Agent(cfg=cfg, workspace=workspace)
@@ -212,12 +219,14 @@ def test_single_turn_completes_and_records_assistant_message(real_agent) -> None
     assert after_count > before_count, "no new messages after run_turn"
 
     # The last message should be assistant role
-    assert real_agent.messages[-1]["role"] == "assistant", \
+    assert real_agent.messages[-1]["role"] == "assistant", (
         f"last message is {real_agent.messages[-1]['role']!r}, expected 'assistant'"
+    )
 
     # Stats should have updated
-    assert real_agent.stats.eval_tokens > before_eval, \
+    assert real_agent.stats.eval_tokens > before_eval, (
         "eval_tokens didn't increment; provider may not be reporting usage"
+    )
 
 
 @pytest.mark.timeout(300)
@@ -226,24 +235,18 @@ def test_multi_turn_context_accumulates(real_agent) -> None:
     asks for it back — if context isn't accumulating the model
     can't recall."""
     real_agent.run_turn(
-        "Remember this secret: the magic word is BANANA42. "
-        "Just acknowledge briefly."
+        "Remember this secret: the magic word is BANANA42. Just acknowledge briefly."
     )
     # The assistant message should be present in history
-    assert any(
-        m["role"] == "assistant" for m in real_agent.messages
-    )
+    assert any(m["role"] == "assistant" for m in real_agent.messages)
 
-    real_agent.run_turn(
-        "What was the magic word I told you? Reply with just the word."
-    )
+    real_agent.run_turn("What was the magic word I told you? Reply with just the word.")
     last = real_agent.messages[-1]
     assert last["role"] == "assistant"
     content = (last.get("content") or "").upper()
     # The model should produce BANANA42 somewhere in the response.
     assert "BANANA42" in content, (
-        f"model did not recall planted fact across turns. "
-        f"Got: {content!r}"
+        f"model did not recall planted fact across turns. Got: {content!r}"
     )
 
 
@@ -265,9 +268,7 @@ def test_user_message_appears_in_history(real_agent) -> None:
 
 
 @pytest.mark.timeout(300)
-def test_model_can_call_read_tool_and_use_result(
-    real_agent, tmp_path: Path
-) -> None:
+def test_model_can_call_read_tool_and_use_result(real_agent, tmp_path: Path) -> None:
     """End-to-end tool round-trip: model is asked about a file,
     must call Read, get the bytes back, and reference what it saw
     in the response. Catches bugs in:
@@ -291,8 +292,7 @@ def test_model_can_call_read_tool_and_use_result(
 
     # Verify a tool call happened
     tool_messages = [
-        m for m in real_agent.messages
-        if m.get("role") == "tool" or m.get("tool_calls")
+        m for m in real_agent.messages if m.get("role") == "tool" or m.get("tool_calls")
     ]
     assert len(tool_messages) > 0, (
         "model never called any tool — either schema is wrong or "
@@ -300,13 +300,10 @@ def test_model_can_call_read_tool_and_use_result(
     )
 
     # Verify the assistant referenced the secret content
-    assistant_msgs = [
-        m for m in real_agent.messages if m.get("role") == "assistant"
-    ]
+    assistant_msgs = [m for m in real_agent.messages if m.get("role") == "assistant"]
     final = (assistant_msgs[-1].get("content") or "").upper()
     assert "PINEAPPLE" in final, (
-        f"model called tool but didn't surface result. "
-        f"Final assistant message: {final!r}"
+        f"model called tool but didn't surface result. Final assistant message: {final!r}"
     )
 
 
@@ -317,21 +314,26 @@ def test_model_can_call_read_tool_and_use_result(
 
 
 def test_save_resume_preserves_messages_byte_for_byte(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The /save command writes JSON, /resume reads it. The two
     must round-trip. No LLM needed — this is a storage test."""
     import athena.ui as _ui
+
     class _S:
-        def print(self, *a, **k): pass
+        def print(self, *a, **k):
+            pass
+
     monkeypatch.setattr(_ui, "console", _S())
     monkeypatch.setattr(_ui, "info", lambda *a, **k: None)
     monkeypatch.setattr(_ui, "warn", lambda *a, **k: None)
     monkeypatch.setattr(_ui, "error", lambda *a, **k: None)
 
-    from athena.commands.save import cmd_save
-    from athena.commands.resume import cmd_resume
     from types import SimpleNamespace
+
+    from athena.commands.resume import cmd_resume
+    from athena.commands.save import cmd_save
 
     save_target = tmp_path / "sess.json"
 
@@ -377,14 +379,18 @@ def test_compact_reduces_token_count_on_long_history(real_agent) -> None:
     # Build a long synthetic transcript: head + many filler turns
     real_agent.messages = [real_agent.messages[0]]  # keep system
     for i in range(20):
-        real_agent.messages.append({
-            "role": "user",
-            "content": f"Turn {i}: " + ("placeholder text " * 80),
-        })
-        real_agent.messages.append({
-            "role": "assistant",
-            "content": f"Reply {i}: " + ("padded response text " * 80),
-        })
+        real_agent.messages.append(
+            {
+                "role": "user",
+                "content": f"Turn {i}: " + ("placeholder text " * 80),
+            }
+        )
+        real_agent.messages.append(
+            {
+                "role": "assistant",
+                "content": f"Reply {i}: " + ("padded response text " * 80),
+            }
+        )
 
     tokens_before = total_tokens(real_agent.messages)
     msg_count_before = len(real_agent.messages)
@@ -396,8 +402,7 @@ def test_compact_reduces_token_count_on_long_history(real_agent) -> None:
 
     # Compaction should reduce token count substantially
     assert tokens_after < tokens_before, (
-        f"compact did not reduce tokens "
-        f"({tokens_before} → {tokens_after})"
+        f"compact did not reduce tokens ({tokens_before} → {tokens_after})"
     )
     # Should compress to fewer messages (head + summary + tail)
     assert msg_count_after < msg_count_before, (
@@ -422,9 +427,7 @@ def test_goal_sentinel_achievement_detected() -> None:
 def test_goal_sentinel_blocked_extracts_reason() -> None:
     from athena.goal.loop import scan_sentinels
 
-    achieved, reason = scan_sentinels(
-        "I can't proceed.\nGOAL BLOCKED: missing API credentials"
-    )
+    achieved, reason = scan_sentinels("I can't proceed.\nGOAL BLOCKED: missing API credentials")
     assert achieved is False
     assert reason == "missing API credentials"
 

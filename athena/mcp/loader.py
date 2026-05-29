@@ -117,7 +117,10 @@ def load_mcp_servers(
             _register_mcp_tool(name, client, tdef, log)
             registered += 1
         visibility = "hidden" if name in _HIDDEN_SERVERS else "active"
-        log("info", f"mcp server '{name}': {registered}/{len(tools)} tools registered ({visibility})")
+        log(
+            "info",
+            f"mcp server '{name}': {registered}/{len(tools)} tools registered ({visibility})",
+        )
         started.append(client)
 
     _ACTIVE_CLIENTS.extend(started)

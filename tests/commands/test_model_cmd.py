@@ -23,8 +23,7 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.model.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     return lines, patches
@@ -100,11 +99,12 @@ def test_swap_across_providers_replaces_provider_object() -> None:
     agent = _fake_agent(model="qwen", provider_name="ollama")
     new_provider = SimpleNamespace(name="anthropic", close=lambda: None)
 
-    with patch(
-        "athena.commands.model._route", return_value="anthropic"
-    ), patch(
-        "athena.commands.model.resolve_provider",
-        return_value=(new_provider, "claude-opus-4"),
+    with (
+        patch("athena.commands.model._route", return_value="anthropic"),
+        patch(
+            "athena.commands.model.resolve_provider",
+            return_value=(new_provider, "claude-opus-4"),
+        ),
     ):
         out = _run(agent, "anthropic/claude-opus-4")
     assert agent.provider is new_provider
@@ -129,11 +129,12 @@ def test_swap_across_providers_closes_owned_client() -> None:
     agent._owns_client = True
     new_provider = SimpleNamespace(name="anthropic", close=lambda: None)
 
-    with patch(
-        "athena.commands.model._route", return_value="anthropic"
-    ), patch(
-        "athena.commands.model.resolve_provider",
-        return_value=(new_provider, "claude-opus-4"),
+    with (
+        patch("athena.commands.model._route", return_value="anthropic"),
+        patch(
+            "athena.commands.model.resolve_provider",
+            return_value=(new_provider, "claude-opus-4"),
+        ),
     ):
         _run(agent, "anthropic/claude-opus-4")
     assert closed == ["old-closed"]
@@ -150,11 +151,12 @@ def test_swap_across_providers_skips_close_when_not_owner() -> None:
     )
     agent._owns_client = False
     new_provider = SimpleNamespace(name="anthropic", close=lambda: None)
-    with patch(
-        "athena.commands.model._route", return_value="anthropic"
-    ), patch(
-        "athena.commands.model.resolve_provider",
-        return_value=(new_provider, "claude"),
+    with (
+        patch("athena.commands.model._route", return_value="anthropic"),
+        patch(
+            "athena.commands.model.resolve_provider",
+            return_value=(new_provider, "claude"),
+        ),
     ):
         _run(agent, "anthropic/claude")
     assert closed == []
@@ -164,16 +166,19 @@ def test_close_failure_during_swap_is_swallowed() -> None:
     """Closing the old client must never block the swap — if .close()
     raises, the swap still completes."""
     agent = _fake_agent(model="qwen", provider_name="ollama")
+
     def _raising_close():
         raise OSError("socket already gone")
+
     agent.provider = SimpleNamespace(name="ollama", close=_raising_close)
     agent._owns_client = True
     new_provider = SimpleNamespace(name="anthropic", close=lambda: None)
-    with patch(
-        "athena.commands.model._route", return_value="anthropic"
-    ), patch(
-        "athena.commands.model.resolve_provider",
-        return_value=(new_provider, "claude"),
+    with (
+        patch("athena.commands.model._route", return_value="anthropic"),
+        patch(
+            "athena.commands.model.resolve_provider",
+            return_value=(new_provider, "claude"),
+        ),
     ):
         # Must not raise.
         _run(agent, "anthropic/claude")
@@ -187,11 +192,12 @@ def test_swap_resolve_failure_surfaces_error_and_leaves_state() -> None:
     provider."""
     agent = _fake_agent(model="qwen", provider_name="ollama")
     original_provider = agent.provider
-    with patch(
-        "athena.commands.model._route", return_value="anthropic"
-    ), patch(
-        "athena.commands.model.resolve_provider",
-        side_effect=ValueError("no ATHENA_ANTHROPIC_API_KEY in ~/.athena/.env"),
+    with (
+        patch("athena.commands.model._route", return_value="anthropic"),
+        patch(
+            "athena.commands.model.resolve_provider",
+            side_effect=ValueError("no ATHENA_ANTHROPIC_API_KEY in ~/.athena/.env"),
+        ),
     ):
         out = _run(agent, "anthropic/claude")
     assert agent.model == "qwen"  # unchanged

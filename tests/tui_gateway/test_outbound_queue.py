@@ -2,10 +2,13 @@
 
 Two layers:
   - Direct unit tests of :class:`_OutboundQueue`: coalescing
-    merges contiguous same-stream deltas; drop policy never
-    targets non-stream events; close() wakes a blocked get.
+    merges contiguous same-stream deltas
+    drop policy never
+    targets non-stream events
+    close() wakes a blocked get.
   - End-to-end gateway pressure tests through a real socket
-    with a fake-Python client: lossless single-stream burst,
+    with a fake-Python client:
+        lossless single-stream burst,
     non-stream events survive heavy drop pressure.
 """
 
@@ -21,6 +24,7 @@ import time
 
 import pytest
 
+from athena.tui_gateway import server as srv
 from athena.tui_gateway.events import (
     MessageAppendEvent,
     StatusUpdateEvent,
@@ -28,8 +32,6 @@ from athena.tui_gateway.events import (
     StreamEndEvent,
     StreamStartEvent,
 )
-from athena.tui_gateway import server as srv
-
 
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
@@ -50,12 +52,12 @@ def test_coalesce_merges_contiguous_same_stream_deltas():
     items = []
     while True:
         item = q.get(timeout=0.01)
-        if item is None: break
+        if item is None:
+            break
         items.append(item)
     # Reassemble all delta text.
     text = "".join(
-        getattr(ev, "text", "") for _seq, ev in items
-        if getattr(ev, "type", None) == "stream.delta"
+        getattr(ev, "text", "") for _seq, ev in items if getattr(ev, "type", None) == "stream.delta"
     )
     assert text == "x0x1x2x3x4x5x6x7x8x9"
 
@@ -72,7 +74,8 @@ def test_coalesce_does_not_cross_streams():
     items = []
     while True:
         item = q.get(timeout=0.01)
-        if item is None: break
+        if item is None:
+            break
         items.append(item)
     assert len(items) == 3
 
@@ -90,7 +93,8 @@ def test_drop_only_targets_stream_deltas():
     items = []
     while True:
         item = q.get(timeout=0.01)
-        if item is None: break
+        if item is None:
+            break
         items.append(item)
     types = [getattr(ev, "type", None) for _seq, ev in items]
     assert "status" in types
@@ -103,8 +107,10 @@ def test_drop_only_targets_stream_deltas():
 def test_close_unblocks_get():
     q = srv._OutboundQueue()
     result = []
+
     def waiter():
         result.append(q.get(timeout=2.0))
+
     t = threading.Thread(target=waiter, daemon=True)
     t.start()
     time.sleep(0.05)
@@ -156,15 +162,28 @@ def _fake_ink_drain(sock_path, sentinel, state, done_evt):
         c.connect(sock_path)
         f = c.makefile("rwb", buffering=0)
         f.readline()  # server hello
-        f.write((json.dumps({
-            "jsonrpc": "2.0", "method": "hello",
-            "params": {"protocol_version": 2, "client_version": "stress",
-                       "capabilities": [], "last_seq": 0},
-        }) + chr(10)).encode("utf-8"))
+        f.write(
+            (
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "hello",
+                        "params": {
+                            "protocol_version": 2,
+                            "client_version": "stress",
+                            "capabilities": [],
+                            "last_seq": 0,
+                        },
+                    }
+                )
+                + chr(10)
+            ).encode("utf-8")
+        )
         f.flush()
         while True:
             line = f.readline()
-            if not line: break
+            if not line:
+                break
             msg = json.loads(line.decode("utf-8"))
             method = msg.get("method")
             params = msg.get("params") or {}
@@ -201,8 +220,10 @@ def _teardown(gw, conn, transport):
     gw._outbound.close()
     if gw._writer_thread:
         gw._writer_thread.join(timeout=1.0)
-    try: conn.close()
-    except OSError: pass
+    try:
+        conn.close()
+    except OSError:
+        pass
     transport.close()
 
 
@@ -237,17 +258,17 @@ def test_single_stream_burst_is_lossless(slow_heartbeats):
             done.wait(timeout=10.0)
             assert state.get("err") is None, state.get("err")
             got = "".join(state.get("deltas", []))
-            assert got == expected, (
-                f"lost text! got {len(got)} bytes vs expected {len(expected)}"
-            )
+            assert got == expected, f"lost text! got {len(got)} bytes vs expected {len(expected)}"
             final = gw.stats()
             assert final["outbound_coalesced"] > 0
             assert final["outbound_dropped"] == 0
         finally:
             _teardown(gw, conn, transport)
     finally:
-        try: transport.close()
-        except Exception: pass
+        try:
+            transport.close()
+        except Exception:
+            pass
 
 
 def test_non_stream_events_never_dropped_under_pressure(slow_heartbeats):
@@ -278,29 +299,32 @@ def test_non_stream_events_never_dropped_under_pressure(slow_heartbeats):
                 # Interleave 20 deltas across two streams to defeat
                 # coalescing, then one status update.
                 for j in range(20):
-                    gw.send_event(StreamDeltaEvent(
-                        stream_id="A" if j % 2 == 0 else "B",
-                        text=f"d{i}.{j}",
-                    ))
+                    gw.send_event(
+                        StreamDeltaEvent(
+                            stream_id="A" if j % 2 == 0 else "B",
+                            text=f"d{i}.{j}",
+                        )
+                    )
                 gw.send_event(StatusUpdateEvent(tokens_up=i))
             gw.send_event(MessageAppendEvent(role="system", content="DONE-PRESSURE"))
             done.wait(timeout=10.0)
             assert state.get("err") is None, state.get("err")
             from collections import Counter
+
             methods = Counter(m for m, _ in state.get("other", []))
             # The whole point: every status survived.
             assert methods.get("status", 0) == STATUS_COUNT, (
-                f"status events dropped! got {methods.get('status', 0)}/"
-                f"{STATUS_COUNT}"
+                f"status events dropped! got {methods.get('status', 0)}/{STATUS_COUNT}"
             )
             # We expect some delta drops (pressure was real).
             final = gw.stats()
             assert final["outbound_dropped"] > 0, (
-                "expected delta drops under pressure but got 0; "
-                "maxsize may have been too generous"
+                "expected delta drops under pressure but got 0; maxsize may have been too generous"
             )
         finally:
             _teardown(gw, conn, transport)
     finally:
-        try: transport.close()
-        except Exception: pass
+        try:
+            transport.close()
+        except Exception:
+            pass

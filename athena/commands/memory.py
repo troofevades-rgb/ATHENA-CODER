@@ -32,9 +32,7 @@ def cmd_memory(agent, arg: str = "") -> str:
         ui.console.print(f"[dim]dir: {d}[/]")
         for entry in entries:
             fname = entry.path.name if entry.path is not None else f"{entry.name}.md"
-            ui.console.print(
-                f"  [bold]{fname}[/]  [dim][{entry.type}][/]  {entry.name}"
-            )
+            ui.console.print(f"  [bold]{fname}[/]  [dim][{entry.type}][/]  {entry.name}")
             if entry.description:
                 ui.console.print(f"    [dim]{entry.description}[/]")
         return ""

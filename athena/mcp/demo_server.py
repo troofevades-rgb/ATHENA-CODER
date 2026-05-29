@@ -38,14 +38,20 @@ def _log_call(name: Any, args: dict[str, Any], result: str, is_error: bool) -> N
         return
     try:
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "tool": name,
-                "args": args,
-                "result": result,
-                "is_error": is_error,
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "tool": name,
+                        "args": args,
+                        "result": result,
+                        "is_error": is_error,
+                    }
+                )
+                + "\n"
+            )
     except OSError:
         pass
+
 
 TOOLS = [
     {

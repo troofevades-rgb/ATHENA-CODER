@@ -87,7 +87,7 @@ def test_loop_polls_and_halts():
     def _stub_loop() -> str:
         nonlocal iterations
         while iterations < 100:  # safety bound — kill switch
-                                 # should halt us before this
+            # should halt us before this
             if killswitch.is_engaged():
                 return "halted"
             iterations += 1

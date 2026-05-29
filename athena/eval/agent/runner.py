@@ -228,9 +228,7 @@ def run_task(
         # Snapshot stats BEFORE close (close may reset them on some paths).
         turns = getattr(getattr(agent, "stats", None), "turns", 0)
         eval_tokens = getattr(getattr(agent, "stats", None), "eval_tokens", 0)
-        tool_calls_count = getattr(
-            getattr(agent, "stats", None), "tool_calls", 0
-        )
+        tool_calls_count = getattr(getattr(agent, "stats", None), "tool_calls", 0)
         # Tool call trace (per-call breakdown), separate from the
         # count metric.
         try:
@@ -293,9 +291,8 @@ def run_task(
             verify_error = ""
         except Exception as e:
             ok = False
-            verify_error = (
-                f"verify_fn raised: {type(e).__name__}: {e}\n"
-                + traceback.format_exc(limit=3)
+            verify_error = f"verify_fn raised: {type(e).__name__}: {e}\n" + traceback.format_exc(
+                limit=3
             )
 
         return TaskResult(
@@ -353,9 +350,7 @@ def run_eval(
 
     finished = time.time()
     policy_label = (
-        (policy_config or {}).get("policy", "default")
-        if policy_config is not None
-        else "default"
+        (policy_config or {}).get("policy", "default") if policy_config is not None else "default"
     )
     return EvalReport(
         model=model,
@@ -379,9 +374,7 @@ def _excerpt(text: str, limit: int = 400) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def _start_mcp_servers(
-    workspace: Path, factories: Iterable[Callable[[Path], Any]]
-) -> list[Any]:
+def _start_mcp_servers(workspace: Path, factories: Iterable[Callable[[Path], Any]]) -> list[Any]:
     """Default mock-MCP starter. Each factory is a callable that
     takes the workspace and returns a server handle. The handle is
     expected to be self-contained; the runner only retains references

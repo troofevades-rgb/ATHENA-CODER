@@ -7,7 +7,6 @@ from pathlib import Path
 
 from athena.browser.capture import CaptureLogger
 
-
 # ---------------------------------------------------------------
 # capture log
 # ---------------------------------------------------------------
@@ -45,7 +44,11 @@ def test_log_empty_content_hash_when_no_content(tmp_path: Path):
         title="Example",
         # no content arg
     )
-    rows = [json.loads(l) for l in (tmp_path / "browser_capture.jsonl").read_text().splitlines() if l.strip()]
+    rows = [
+        json.loads(l)
+        for l in (tmp_path / "browser_capture.jsonl").read_text().splitlines()
+        if l.strip()
+    ]
     assert rows[0]["content_sha256"] == ""
 
 
@@ -53,15 +56,13 @@ def test_log_parent_dir_created_lazily(tmp_path: Path):
     nested = tmp_path / "deep" / "nested" / "browser_capture.jsonl"
     cl = CaptureLogger(nested)
     assert not nested.parent.exists()
-    cl.log(session_id="s", url="u", final_url="u", status=0,
-           title="t", content="x")
+    cl.log(session_id="s", url="u", final_url="u", status=0, title="t", content="x")
     assert nested.exists()
 
 
 def test_log_status_none_recorded_as_zero(tmp_path: Path):
     cl = CaptureLogger(tmp_path / "c.jsonl")
-    cl.log(session_id="s", url="u", final_url="u", status=None,
-           title="t", content="")
+    cl.log(session_id="s", url="u", final_url="u", status=None, title="t", content="")
     rows = [json.loads(l) for l in (tmp_path / "c.jsonl").read_text().splitlines() if l.strip()]
     assert rows[0]["status"] == 0
 
@@ -69,8 +70,9 @@ def test_log_status_none_recorded_as_zero(tmp_path: Path):
 def test_tail_returns_recent_entries(tmp_path: Path):
     cl = CaptureLogger(tmp_path / "c.jsonl")
     for i in range(5):
-        cl.log(session_id="s", url=f"u{i}", final_url=f"u{i}",
-               status=200, title=f"t{i}", content="")
+        cl.log(
+            session_id="s", url=f"u{i}", final_url=f"u{i}", status=200, title=f"t{i}", content=""
+        )
     tailed = cl.tail()
     assert [t["url"] for t in tailed] == [f"u{i}" for i in range(5)]
 

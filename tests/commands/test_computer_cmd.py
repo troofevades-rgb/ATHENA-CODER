@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from athena.commands.computer import cmd_computer, main as computer_main
+from athena.commands.computer import cmd_computer
+from athena.commands.computer import main as computer_main
 
 
 def _capture():
@@ -25,15 +26,13 @@ def _capture():
         patches.append(
             patch(
                 f"athena.commands.computer.ui.{fn}",
-                side_effect=lambda msg, *a, _n=fn, **kw:
-                    lines.append(f"{_n}: {msg}"),
+                side_effect=lambda msg, *a, _n=fn, **kw: lines.append(f"{_n}: {msg}"),
             )
         )
     patches.append(
         patch(
             "athena.commands.computer.ui.console.print",
-            side_effect=lambda *a, **kw:
-                lines.append(" ".join(str(x) for x in a)),
+            side_effect=lambda *a, **kw: lines.append(" ".join(str(x) for x in a)),
         )
     )
     return lines, patches
@@ -236,12 +235,20 @@ def test_no_audit_entries_shows_placeholder() -> None:
 def test_audit_tail_renders_entries() -> None:
     entries = [
         SimpleNamespace(
-            ts="2026-05-23T12:00:00", type="click", tier="trusted",
-            app="vscode", executed=True, result="ok",
+            ts="2026-05-23T12:00:00",
+            type="click",
+            tier="trusted",
+            app="vscode",
+            executed=True,
+            result="ok",
         ),
         SimpleNamespace(
-            ts="2026-05-23T12:01:00", type="type", tier="confirm_needed",
-            app="terminal", executed=False, result="denied",
+            ts="2026-05-23T12:01:00",
+            type="type",
+            tier="confirm_needed",
+            app="terminal",
+            executed=False,
+            result="denied",
         ),
     ]
     out = _run_with_patches("", audit_entries=entries)
@@ -297,8 +304,12 @@ def test_main_status_tail_arg_honored() -> None:
     the audit log tail."""
     entries = [
         SimpleNamespace(
-            ts=f"t{i}", type="click", tier="auto", app="a",
-            executed=True, result="ok",
+            ts=f"t{i}",
+            type="click",
+            tier="auto",
+            app="a",
+            executed=True,
+            result="ok",
         )
         for i in range(5)
     ]

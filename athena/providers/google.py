@@ -112,9 +112,8 @@ class GoogleProvider(Provider):
             nxt = self._credential_pool.rotate_to_next(self.name)
         except Exception:
             import logging
-            logging.getLogger(__name__).exception(
-                "[%s] credential pool rotation raised", self.name
-            )
+
+            logging.getLogger(__name__).exception("[%s] credential pool rotation raised", self.name)
             return False
         if nxt is None:
             return False
@@ -160,12 +159,16 @@ class GoogleProvider(Provider):
         # we can't replay them.
         outer_stack = contextlib.ExitStack()
         try:
+
             def _open_response() -> Any:
                 tmp_stack = contextlib.ExitStack()
                 try:
                     r = tmp_stack.enter_context(
                         self._client.stream(
-                            "POST", path, params={"alt": "sse"}, json=payload,
+                            "POST",
+                            path,
+                            params={"alt": "sse"},
+                            json=payload,
                         )
                     )
                     _raise_with_body(r)

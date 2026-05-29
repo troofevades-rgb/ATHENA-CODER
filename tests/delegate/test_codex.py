@@ -15,13 +15,12 @@ from types import SimpleNamespace
 import pytest
 
 from athena.delegate.codex import (
-    CodexDetection,
     RECOMMENDED_COMMAND,
+    CodexDetection,
     detect_codex,
     recommended_config_snippet,
     write_config_snippet,
 )
-
 
 # ---------------------------------------------------------------
 # detect_codex
@@ -51,8 +50,10 @@ def test_detect_codex_found_with_version(monkeypatch, tmp_path: Path):
     def _fake_run(argv, *_a, **_kw):
         return SimpleNamespace(
             returncode=0,
-            stdout="codex 0.42.1\n", stderr="",
+            stdout="codex 0.42.1\n",
+            stderr="",
         )
+
     monkeypatch.setattr(subprocess, "run", _fake_run)
 
     d = detect_codex()
@@ -71,6 +72,7 @@ def test_detect_codex_found_but_version_fails(monkeypatch, tmp_path: Path):
 
     def _timeout(*_a, **_kw):
         raise subprocess.TimeoutExpired(cmd="codex", timeout=10)
+
     monkeypatch.setattr(subprocess, "run", _timeout)
 
     d = detect_codex()
@@ -83,9 +85,11 @@ def test_detect_codex_custom_binary_name(monkeypatch):
     """An operator with a wrapper script can pass a different
     binary name."""
     seen: list[str] = []
+
     def _which(name):
         seen.append(name)
         return None
+
     monkeypatch.setattr(shutil, "which", _which)
     detect_codex(binary_name="my-codex")
     assert seen == ["my-codex"]
@@ -222,9 +226,12 @@ def test_cli_verify_happy_path(monkeypatch, capsys, tmp_path: Path):
     monkeypatch.setattr("athena.cli.delegate.load_config", lambda: cfg)
     monkeypatch.setattr(shutil, "which", lambda _: str(fake))
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda *a, **kw: SimpleNamespace(
-            returncode=0, stdout="codex 0.42.1\n", stderr="",
+            returncode=0,
+            stdout="codex 0.42.1\n",
+            stderr="",
         ),
     )
 
@@ -248,9 +255,12 @@ def test_cli_verify_json_mode(monkeypatch, capsys, tmp_path: Path):
     monkeypatch.setattr("athena.cli.delegate.load_config", lambda: cfg)
     monkeypatch.setattr(shutil, "which", lambda _: str(fake))
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda *a, **kw: SimpleNamespace(
-            returncode=0, stdout="codex 0.42.1\n", stderr="",
+            returncode=0,
+            stdout="codex 0.42.1\n",
+            stderr="",
         ),
     )
 
@@ -265,6 +275,7 @@ def test_cli_verify_json_mode(monkeypatch, capsys, tmp_path: Path):
 
 def test_cli_setup_codex_when_not_installed(monkeypatch, capsys):
     from athena.cli.delegate import main as delegate_main
+
     monkeypatch.setattr(shutil, "which", lambda _: None)
 
     code = delegate_main(["setup-codex"])
@@ -281,9 +292,12 @@ def test_cli_setup_codex_dry_run(monkeypatch, capsys, tmp_path: Path):
     fake.touch()
     monkeypatch.setattr(shutil, "which", lambda _: str(fake))
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda *a, **kw: SimpleNamespace(
-            returncode=0, stdout="codex 0.42.1\n", stderr="",
+            returncode=0,
+            stdout="codex 0.42.1\n",
+            stderr="",
         ),
     )
 
@@ -296,7 +310,9 @@ def test_cli_setup_codex_dry_run(monkeypatch, capsys, tmp_path: Path):
 
 
 def test_cli_setup_codex_writes_with_yes(
-    monkeypatch, capsys, tmp_path: Path,
+    monkeypatch,
+    capsys,
+    tmp_path: Path,
 ):
     from athena.cli.delegate import main as delegate_main
 
@@ -305,17 +321,23 @@ def test_cli_setup_codex_writes_with_yes(
     config = tmp_path / "config.toml"
     monkeypatch.setattr(shutil, "which", lambda _: str(fake))
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda *a, **kw: SimpleNamespace(
-            returncode=0, stdout="codex 0.42.1\n", stderr="",
+            returncode=0,
+            stdout="codex 0.42.1\n",
+            stderr="",
         ),
     )
 
-    code = delegate_main([
-        "setup-codex",
-        "--config-path", str(config),
-        "--yes",
-    ])
+    code = delegate_main(
+        [
+            "setup-codex",
+            "--config-path",
+            str(config),
+            "--yes",
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0
     assert config.exists()
@@ -329,9 +351,12 @@ def test_cli_setup_codex_detect_only(monkeypatch, capsys, tmp_path: Path):
     fake.touch()
     monkeypatch.setattr(shutil, "which", lambda _: str(fake))
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda *a, **kw: SimpleNamespace(
-            returncode=0, stdout="codex 0.42.1\n", stderr="",
+            returncode=0,
+            stdout="codex 0.42.1\n",
+            stderr="",
         ),
     )
 

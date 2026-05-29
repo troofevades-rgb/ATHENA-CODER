@@ -73,11 +73,14 @@ def test_assistant_message_with_tool_calls_round_trips(store: SessionStore) -> N
         ],
     }
     store.append_turn(sid, asst)
-    store.append_turn(sid, {
-        "role": "tool",
-        "tool_call_id": "call_abc123",
-        "content": "ATHENA.md\nREADME.md\nathena/\ntests/",
-    })
+    store.append_turn(
+        sid,
+        {
+            "role": "tool",
+            "tool_call_id": "call_abc123",
+            "content": "ATHENA.md\nREADME.md\nathena/\ntests/",
+        },
+    )
 
     # Round-trip
     loaded = list(store.load(sid))
@@ -155,11 +158,14 @@ def test_large_tool_result_round_trips(store: SessionStore) -> None:
     storage layer."""
     sid = _open_session(store)
     big = "x" * 50_000  # 50KB tool result
-    store.append_turn(sid, {
-        "role": "tool",
-        "tool_call_id": "call_big",
-        "content": big,
-    })
+    store.append_turn(
+        sid,
+        {
+            "role": "tool",
+            "tool_call_id": "call_big",
+            "content": big,
+        },
+    )
     loaded = list(store.load(sid))
     assert len(loaded[0]["content"]) == 50_000
     assert loaded[0]["content"] == big
@@ -231,7 +237,10 @@ def test_full_session_loads_after_close_and_reopen(tmp_path: Path) -> None:
     assert len(loaded) == 4
     contents = [m["content"] for m in loaded]
     assert contents == [
-        "remember alpha", "got it", "remember beta", "alpha + beta noted",
+        "remember alpha",
+        "got it",
+        "remember beta",
+        "alpha + beta noted",
     ]
     # The session shows up in list_sessions on the new instance
     sessions = list(store_b.list_sessions())
@@ -248,6 +257,7 @@ def test_concurrent_append_during_load_does_not_split_turn(
     /resume. Reading while writing must not return a half-line."""
     import threading
     import time
+
     profile = tmp_path / "profile"
     profile.mkdir()
     store = SessionStore(profile)
@@ -258,9 +268,13 @@ def test_concurrent_append_during_load_does_not_split_turn(
 
     def _writer() -> None:
         while not stop.is_set():
-            store.append_turn(sid, {
-                "role": "user", "content": f"msg-{write_count[0]}",
-            })
+            store.append_turn(
+                sid,
+                {
+                    "role": "user",
+                    "content": f"msg-{write_count[0]}",
+                },
+            )
             write_count[0] += 1
             time.sleep(0.001)
 
@@ -288,7 +302,8 @@ def test_concurrent_append_during_load_does_not_split_turn(
 
 
 def test_save_resume_preserves_tool_call_messages(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The /save command writes JSON, /resume reads it back. Must
     preserve tool_calls + tool_call_id correlations exactly."""
@@ -298,9 +313,10 @@ def test_save_resume_preserves_tool_call_messages(
     monkeypatch.setattr(_ui, "warn", lambda *a, **k: None)
     monkeypatch.setattr(_ui, "error", lambda *a, **k: None)
 
+    from types import SimpleNamespace
+
     from athena.commands.resume import cmd_resume
     from athena.commands.save import cmd_save
-    from types import SimpleNamespace
 
     target = tmp_path / "session.json"
 
@@ -309,11 +325,15 @@ def test_save_resume_preserves_tool_call_messages(
         {"role": "system", "content": "You are athena"},
         {"role": "user", "content": "show me ATHENA.md"},
         {
-            "role": "assistant", "content": "",
-            "tool_calls": [{
-                "id": "call_aa", "type": "function",
-                "function": {"name": "Read", "arguments": '{"file_path": "ATHENA.md"}'},
-            }],
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call_aa",
+                    "type": "function",
+                    "function": {"name": "Read", "arguments": '{"file_path": "ATHENA.md"}'},
+                }
+            ],
         },
         {"role": "tool", "tool_call_id": "call_aa", "content": "# athena\n..."},
         {"role": "assistant", "content": "It's the project doc."},

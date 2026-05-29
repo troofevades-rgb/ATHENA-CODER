@@ -24,7 +24,6 @@ from rich.console import Console
 
 from athena.commands import help as help_cmd
 
-
 PLACEHOLDERS = (
     "[file]",
     "[path]",

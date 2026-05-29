@@ -64,10 +64,7 @@ class FakeTuiGateway:
 
     def events_of_type(self, type_literal: str) -> list[Any]:
         """All events whose ``.type`` matches the literal."""
-        return [
-            e for e in self._events
-            if getattr(e, "type", None) == type_literal
-        ]
+        return [e for e in self._events if getattr(e, "type", None) == type_literal]
 
     def last_of_type(self, type_literal: str) -> Any | None:
         """The most-recent event of the given type, or None."""

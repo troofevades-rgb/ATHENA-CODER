@@ -14,7 +14,6 @@ import pytest
 from athena.computer.contract import Action
 from athena.computer.permission import classify
 
-
 # ---------------------------------------------------------------------------
 # observe tier
 # ---------------------------------------------------------------------------

@@ -36,8 +36,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..config import load_config, profile_dir
 from ..vision.hashlog import HashLogger, sha256_file
@@ -49,8 +50,13 @@ logger = logging.getLogger(__name__)
 
 
 VALID_MODES = (
-    "probe", "atoms", "gop", "encoder_fingerprint",
-    "inspect", "frames", "analyze",
+    "probe",
+    "atoms",
+    "gop",
+    "encoder_fingerprint",
+    "inspect",
+    "frames",
+    "analyze",
 )
 VALID_EXTRACT = ("keyframes", "sampled", "range")
 
@@ -113,6 +119,7 @@ def _default_audio_transcribe_fn(cfg: Any) -> AudioTranscribeFn | None:
     if not getattr(cfg, "audio_analyze_enabled", True):
         return None
     import shutil as _shutil
+
     va = getattr(cfg, "video_analysis", None)
     ffmpeg_path = va.ffmpeg_path if va is not None else "ffmpeg"
     if not _shutil.which(ffmpeg_path):
@@ -124,6 +131,7 @@ def _default_audio_transcribe_fn(cfg: Any) -> AudioTranscribeFn | None:
             return None
         try:
             from ..audio.tools import transcribe_track
+
             result = transcribe_track(wav_path, cfg=cfg)
             return result.to_dict()
         except Exception as e:  # noqa: BLE001
@@ -161,15 +169,22 @@ def _extract_audio_track(
     try:
         proc = subprocess.run(
             [
-                ffmpeg, "-y",
-                "-i", str(video_path),
-                "-vn",                  # no video
-                "-ac", "1",             # mono
-                "-ar", "16000",         # 16 kHz
-                "-acodec", "pcm_s16le",
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_path),
+                "-vn",  # no video
+                "-ac",
+                "1",  # mono
+                "-ar",
+                "16000",  # 16 kHz
+                "-acodec",
+                "pcm_s16le",
                 str(tmp),
             ],
-            capture_output=True, timeout=timeout_s, check=False,
+            capture_output=True,
+            timeout=timeout_s,
+            check=False,
         )
     except subprocess.TimeoutExpired:
         logger.warning("ffmpeg audio demux timed out for %s", video_path)
@@ -188,9 +203,7 @@ def _resolve_paths(cfg: Any) -> dict[str, Path]:
     pdir = profile_dir(getattr(cfg, "profile", "default"))
     va = getattr(cfg, "video_analysis", None)
     frames_root = (
-        Path(va.frames_dir)
-        if va is not None and va.frames_dir
-        else pdir / "video" / "frames"
+        Path(va.frames_dir) if va is not None and va.frames_dir else pdir / "video" / "frames"
     )
     return {
         "profile": pdir,
@@ -208,13 +221,12 @@ def _handle_probe(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
     sha = sha256_file(path)
     try:
         probe = probe_mod.ffprobe_json(
-            path, ffprobe=cfg.video_analysis.ffprobe_path,
+            path,
+            ffprobe=cfg.video_analysis.ffprobe_path,
         )
     except probe_mod.FFprobeMissing as e:
-        return {"mode": "probe", "path": str(path), "sha256": sha,
-                "error": str(e)}
-    log.log(mode="probe", path=path, sha256=sha,
-            size_bytes=path.stat().st_size)
+        return {"mode": "probe", "path": str(path), "sha256": sha, "error": str(e)}
+    log.log(mode="probe", path=path, sha256=sha, size_bytes=path.stat().st_size)
     return {
         "mode": "probe",
         "path": str(path),
@@ -228,46 +240,50 @@ def _handle_atoms(path: Path, log: HashLogger) -> dict[str, Any]:
     a = atoms_mod.parse_top_level_atoms(path)
     sig = atoms_mod.faststart_remux_signature(a)
     log.log(
-        mode="atoms", path=path, sha256=sha,
+        mode="atoms",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"atom_order": sig["atom_order"]},
     )
-    return {"mode": "atoms", "path": str(path), "sha256": sha,
-            **sig}
+    return {"mode": "atoms", "path": str(path), "sha256": sha, **sig}
 
 
 def _handle_gop(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
     sha = sha256_file(path)
     try:
         gop = probe_mod.gop_structure(
-            path, ffprobe=cfg.video_analysis.ffprobe_path,
+            path,
+            ffprobe=cfg.video_analysis.ffprobe_path,
         )
     except probe_mod.FFprobeMissing as e:
-        return {"mode": "gop", "path": str(path), "sha256": sha,
-                "error": str(e)}
-    log.log(mode="gop", path=path, sha256=sha,
-            size_bytes=path.stat().st_size)
+        return {"mode": "gop", "path": str(path), "sha256": sha, "error": str(e)}
+    log.log(mode="gop", path=path, sha256=sha, size_bytes=path.stat().st_size)
     return {"mode": "gop", "path": str(path), "sha256": sha, **gop}
 
 
 def _handle_encoder_fingerprint(
-    path: Path, cfg: Any, log: HashLogger,
+    path: Path,
+    cfg: Any,
+    log: HashLogger,
 ) -> dict[str, Any]:
     sha = sha256_file(path)
     try:
         probe = probe_mod.ffprobe_json(
-            path, ffprobe=cfg.video_analysis.ffprobe_path,
+            path,
+            ffprobe=cfg.video_analysis.ffprobe_path,
         )
     except probe_mod.FFprobeMissing as e:
-        return {"mode": "encoder_fingerprint", "path": str(path),
-                "sha256": sha, "error": str(e)}
+        return {"mode": "encoder_fingerprint", "path": str(path), "sha256": sha, "error": str(e)}
     fp = probe_mod.encoder_fingerprint(probe)
-    log.log(mode="encoder_fingerprint", path=path, sha256=sha,
-            size_bytes=path.stat().st_size,
-            extra={"software_encoder_likely":
-                   fp.get("software_encoder_likely", False)})
-    return {"mode": "encoder_fingerprint", "path": str(path),
-            "sha256": sha, **fp}
+    log.log(
+        mode="encoder_fingerprint",
+        path=path,
+        sha256=sha,
+        size_bytes=path.stat().st_size,
+        extra={"software_encoder_likely": fp.get("software_encoder_likely", False)},
+    )
+    return {"mode": "encoder_fingerprint", "path": str(path), "sha256": sha, **fp}
 
 
 def _handle_inspect(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
@@ -285,7 +301,8 @@ def _handle_inspect(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
     sig = atoms_mod.faststart_remux_signature(a)
     try:
         probe = probe_mod.ffprobe_json(
-            path, ffprobe=cfg.video_analysis.ffprobe_path,
+            path,
+            ffprobe=cfg.video_analysis.ffprobe_path,
         )
     except probe_mod.FFprobeMissing:
         probe = {}
@@ -293,13 +310,16 @@ def _handle_inspect(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
     fp = probe_mod.encoder_fingerprint(probe) if probe else {}
     try:
         gop = probe_mod.gop_structure(
-            path, ffprobe=cfg.video_analysis.ffprobe_path,
+            path,
+            ffprobe=cfg.video_analysis.ffprobe_path,
         )
     except probe_mod.FFprobeMissing:
         gop = {"error": "ffprobe missing"}
 
     log.log(
-        mode="inspect", path=path, sha256=sha,
+        mode="inspect",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"moov_before_mdat": sig["moov_before_mdat"]},
     )
@@ -323,8 +343,7 @@ def _handle_inspect(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
             "frame_rate": summary.get("frame_rate"),
             "duration": summary.get("duration"),
             "stream_encoder_tags": fp.get("stream_encoder_tags"),
-            "software_encoder_likely":
-                fp.get("software_encoder_likely", False),
+            "software_encoder_likely": fp.get("software_encoder_likely", False),
             "encoder_interpretation": fp.get("interpretation"),
             "gop": gop,
         },
@@ -341,8 +360,13 @@ def _handle_inspect(path: Path, cfg: Any, log: HashLogger) -> dict[str, Any]:
 
 
 def _do_extract(
-    path: Path, *, mode: str, cfg: Any,
-    interval_s: float, start: str | None, end: str | None,
+    path: Path,
+    *,
+    mode: str,
+    cfg: Any,
+    interval_s: float,
+    start: str | None,
+    end: str | None,
     out_dir: Path,
 ) -> list[Path]:
     va = cfg.video_analysis
@@ -350,12 +374,15 @@ def _do_extract(
     ffmpeg_path = va.ffmpeg_path
     if mode == "keyframes":
         return extract_mod.extract_keyframes(
-            path, out_dir, ffmpeg=ffmpeg_path,
+            path,
+            out_dir,
+            ffmpeg=ffmpeg_path,
             max_frames=cap,
         )
     if mode == "sampled":
         return extract_mod.extract_sampled(
-            path, out_dir,
+            path,
+            out_dir,
             interval_s=interval_s,
             ffmpeg=ffmpeg_path,
             max_frames=cap,
@@ -364,7 +391,10 @@ def _do_extract(
         if not start or not end:
             raise ValueError("extract=range requires start and end")
         return extract_mod.extract_range(
-            path, out_dir, start=start, end=end,
+            path,
+            out_dir,
+            start=start,
+            end=end,
             ffmpeg=ffmpeg_path,
             max_frames=cap,
         )
@@ -372,7 +402,9 @@ def _do_extract(
 
 
 def _handle_frames(
-    path: Path, cfg: Any, log: HashLogger,
+    path: Path,
+    cfg: Any,
+    log: HashLogger,
     *,
     extract: str,
     interval_s: float,
@@ -384,15 +416,20 @@ def _handle_frames(
     out_dir = paths["frames_root"] / sha[:16]
     try:
         frames = _do_extract(
-            path, mode=extract, cfg=cfg,
-            interval_s=interval_s, start=start, end=end,
+            path,
+            mode=extract,
+            cfg=cfg,
+            interval_s=interval_s,
+            start=start,
+            end=end,
             out_dir=out_dir,
         )
     except extract_mod.FFmpegMissing as e:
-        return {"mode": "frames", "path": str(path), "sha256": sha,
-                "error": str(e)}
+        return {"mode": "frames", "path": str(path), "sha256": sha, "error": str(e)}
     log.log(
-        mode="frames", path=path, sha256=sha,
+        mode="frames",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"extract": extract, "frame_count": len(frames)},
     )
@@ -408,7 +445,9 @@ def _handle_frames(
 
 
 def _handle_analyze(
-    path: Path, cfg: Any, log: HashLogger,
+    path: Path,
+    cfg: Any,
+    log: HashLogger,
     *,
     extract: str,
     interval_s: float,
@@ -432,15 +471,20 @@ def _handle_analyze(
     out_dir = paths["frames_root"] / sha[:16]
     try:
         frames = _do_extract(
-            path, mode=extract, cfg=cfg,
-            interval_s=interval_s, start=start, end=end,
+            path,
+            mode=extract,
+            cfg=cfg,
+            interval_s=interval_s,
+            start=start,
+            end=end,
             out_dir=out_dir,
         )
     except extract_mod.FFmpegMissing as e:
-        return {"mode": "analyze", "path": str(path), "sha256": sha,
-                "error": str(e)}
+        return {"mode": "analyze", "path": str(path), "sha256": sha, "error": str(e)}
     log.log(
-        mode="analyze", path=path, sha256=sha,
+        mode="analyze",
+        path=path,
+        sha256=sha,
         size_bytes=path.stat().st_size,
         extra={"extract": extract, "frame_count": len(frames)},
     )
@@ -517,15 +561,19 @@ def _run(
     cfg = _cfg if _cfg is not None else load_config()
     va = getattr(cfg, "video_analysis", None)
     if va is not None and not va.enabled:
-        return json.dumps({
-            "error": "cfg.video_analysis.enabled=False; operator disabled video_analyze",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "error": "cfg.video_analysis.enabled=False; operator disabled video_analyze",
+                "mode": mode,
+            }
+        )
     if mode not in VALID_MODES:
-        return json.dumps({
-            "error": f"unknown mode {mode!r}; choose from {list(VALID_MODES)}",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "error": f"unknown mode {mode!r}; choose from {list(VALID_MODES)}",
+                "mode": mode,
+            }
+        )
     if not path:
         return json.dumps({"error": "path is required", "mode": mode})
     p = Path(path)
@@ -535,18 +583,16 @@ def _run(
     paths_resolved = _resolve_paths(cfg)
     log = HashLogger(paths_resolved["audit"])
 
-    chosen_extract = extract or (
-        va.default_extract if va is not None else "keyframes"
-    )
+    chosen_extract = extract or (va.default_extract if va is not None else "keyframes")
     if chosen_extract not in VALID_EXTRACT:
-        return json.dumps({
-            "error": f"unknown extract {chosen_extract!r}; "
-                     f"choose from {list(VALID_EXTRACT)}",
-            "mode": mode,
-        })
+        return json.dumps(
+            {
+                "error": f"unknown extract {chosen_extract!r}; choose from {list(VALID_EXTRACT)}",
+                "mode": mode,
+            }
+        )
     interval = (
-        interval_s if interval_s is not None
-        else (va.sampled_interval_s if va is not None else 5.0)
+        interval_s if interval_s is not None else (va.sampled_interval_s if va is not None else 5.0)
     )
 
     try:
@@ -561,24 +607,36 @@ def _run(
         if mode == "inspect":
             return json.dumps(_handle_inspect(p, cfg, log))
         if mode == "frames":
-            return json.dumps(_handle_frames(
-                p, cfg, log,
-                extract=chosen_extract, interval_s=interval,
-                start=start, end=end, paths=paths_resolved,
-            ))
+            return json.dumps(
+                _handle_frames(
+                    p,
+                    cfg,
+                    log,
+                    extract=chosen_extract,
+                    interval_s=interval,
+                    start=start,
+                    end=end,
+                    paths=paths_resolved,
+                )
+            )
         if mode == "analyze":
             fn = _provider_fn or _default_provider_fn(cfg)
-            afn = (
-                _audio_fn if _audio_fn is not None
-                else _default_audio_transcribe_fn(cfg)
+            afn = _audio_fn if _audio_fn is not None else _default_audio_transcribe_fn(cfg)
+            return json.dumps(
+                _handle_analyze(
+                    p,
+                    cfg,
+                    log,
+                    extract=chosen_extract,
+                    interval_s=interval,
+                    start=start,
+                    end=end,
+                    prompt=prompt,
+                    provider_fn=fn,
+                    audio_fn=afn,
+                    paths=paths_resolved,
+                )
             )
-            return json.dumps(_handle_analyze(
-                p, cfg, log,
-                extract=chosen_extract, interval_s=interval,
-                start=start, end=end, prompt=prompt,
-                provider_fn=fn, audio_fn=afn,
-                paths=paths_resolved,
-            ))
     except ValueError as e:
         return json.dumps({"error": str(e), "mode": mode})
     except Exception as e:
@@ -646,22 +704,16 @@ from ..tools.registry import tool  # noqa: E402 — late import to avoid cycles
             "interval_s": {
                 "type": "number",
                 "description": (
-                    "Sampled-extract interval (seconds). Only used "
-                    "when extract=sampled. Default 5."
+                    "Sampled-extract interval (seconds). Only used when extract=sampled. Default 5."
                 ),
             },
             "start": {
                 "type": "string",
-                "description": (
-                    "Start timestamp (HH:MM:SS or seconds); only "
-                    "extract=range."
-                ),
+                "description": ("Start timestamp (HH:MM:SS or seconds); only extract=range."),
             },
             "end": {
                 "type": "string",
-                "description": (
-                    "End timestamp; only extract=range."
-                ),
+                "description": ("End timestamp; only extract=range."),
             },
             "prompt": {
                 "type": "string",

@@ -12,7 +12,6 @@ import dataclasses
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-
 ContentType = Literal["speech", "music", "silence", "mixed", "unknown"]
 
 

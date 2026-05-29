@@ -117,10 +117,22 @@ def test_to_dict_contains_headline_fields():
     r = _make_report(task_outcomes={"a": "passed", "b": "failed"})
     d = r.to_dict()
     for key in (
-        "model", "policy", "task_set", "started_at", "finished_at",
-        "total", "passed", "failed", "timed_out", "errored",
-        "pass_rate", "by_bucket", "mean_turns", "mean_tool_calls",
-        "mean_eval_tokens", "results",
+        "model",
+        "policy",
+        "task_set",
+        "started_at",
+        "finished_at",
+        "total",
+        "passed",
+        "failed",
+        "timed_out",
+        "errored",
+        "pass_rate",
+        "by_bucket",
+        "mean_turns",
+        "mean_tool_calls",
+        "mean_eval_tokens",
+        "results",
     ):
         assert key in d, f"missing key: {key}"
 
@@ -155,36 +167,24 @@ def test_write_json_atomic(tmp_path: Path):
 
 
 def test_compare_identifies_regressions():
-    base = _make_report(
-        model="base", task_outcomes={"a": "passed", "b": "passed"}
-    )
-    new = _make_report(
-        model="lora", task_outcomes={"a": "passed", "b": "failed"}
-    )
+    base = _make_report(model="base", task_outcomes={"a": "passed", "b": "passed"})
+    new = _make_report(model="lora", task_outcomes={"a": "passed", "b": "failed"})
     diff = compare_reports(base, new)
     assert diff.regressions == ["b"]
     assert diff.improvements == []
 
 
 def test_compare_identifies_improvements():
-    base = _make_report(
-        model="base", task_outcomes={"a": "failed", "b": "passed"}
-    )
-    new = _make_report(
-        model="lora", task_outcomes={"a": "passed", "b": "passed"}
-    )
+    base = _make_report(model="base", task_outcomes={"a": "failed", "b": "passed"})
+    new = _make_report(model="lora", task_outcomes={"a": "passed", "b": "passed"})
     diff = compare_reports(base, new)
     assert diff.improvements == ["a"]
     assert diff.regressions == []
 
 
 def test_compare_separates_unchanged_groups():
-    base = _make_report(
-        task_outcomes={"a": "passed", "b": "failed", "c": "passed"}
-    )
-    new = _make_report(
-        task_outcomes={"a": "passed", "b": "failed", "c": "passed"}
-    )
+    base = _make_report(task_outcomes={"a": "passed", "b": "failed", "c": "passed"})
+    new = _make_report(task_outcomes={"a": "passed", "b": "failed", "c": "passed"})
     diff = compare_reports(base, new)
     assert diff.unchanged_pass == ["a", "c"]
     assert diff.unchanged_fail == ["b"]
@@ -203,12 +203,8 @@ def test_compare_surfaces_task_set_drift():
 
 
 def test_compare_delta_pass_rate():
-    base = _make_report(
-        task_outcomes={"a": "passed", "b": "failed", "c": "failed"}
-    )
-    new = _make_report(
-        task_outcomes={"a": "passed", "b": "passed", "c": "failed"}
-    )
+    base = _make_report(task_outcomes={"a": "passed", "b": "failed", "c": "failed"})
+    new = _make_report(task_outcomes={"a": "passed", "b": "passed", "c": "failed"})
     diff = compare_reports(base, new)
     assert diff.baseline_pass_rate == pytest.approx(1 / 3)
     assert diff.current_pass_rate == pytest.approx(2 / 3)

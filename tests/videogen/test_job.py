@@ -22,7 +22,6 @@ from athena.videogen.job import (
     run_generation,
 )
 
-
 # ---------------------------------------------------------------------------
 # Stub backend
 # ---------------------------------------------------------------------------
@@ -139,9 +138,7 @@ def test_job_polls_until_done(tmp_path: Path):
             {"status": "done", "progress": 1.0},
         ]
     )
-    request = GenerationRequest(
-        mode="text_to_video", prompt="a paper boat", duration_s=5.0
-    )
+    request = GenerationRequest(mode="text_to_video", prompt="a paper boat", duration_s=5.0)
     result = run_generation(
         request,
         backend=backend,
@@ -161,9 +158,7 @@ def test_output_hash_logged(tmp_path: Path):
     """A done job lands in the media_log.jsonl in the output
     directory alongside the file."""
     backend = _StubBackend(fetch_payload=b"clip-bytes-here")
-    request = GenerationRequest(
-        mode="text_to_video", prompt="hello", duration_s=3.0
-    )
+    request = GenerationRequest(mode="text_to_video", prompt="hello", duration_s=3.0)
     result = run_generation(
         request,
         backend=backend,

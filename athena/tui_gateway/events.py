@@ -19,8 +19,7 @@ correlated by request_id.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, Union
-
+from typing import Any, Literal
 
 # ---- gateway → TUI events ------------------------------------------------
 
@@ -292,25 +291,25 @@ class ProtocolErrorEvent(_Event):
     type: Literal["protocol.error"] = "protocol.error"
 
 
-Event = Union[
-    HelloEvent,
-    PingEvent,
-    ProtocolErrorEvent,
-    BannerEvent,
-    MessageAppendEvent,
-    StreamStartEvent,
-    StreamDeltaEvent,
-    StreamEndEvent,
-    ToolStartEvent,
-    ToolProgressEvent,
-    ToolCompleteEvent,
-    StatusUpdateEvent,
-    StatusFlashEvent,
-    ThemeChangeEvent,
-    ExitEvent,
-    ConfirmRequestEvent,
-    AskQuestionRequestEvent,
-]
+Event = (
+    HelloEvent
+    | PingEvent
+    | ProtocolErrorEvent
+    | BannerEvent
+    | MessageAppendEvent
+    | StreamStartEvent
+    | StreamDeltaEvent
+    | StreamEndEvent
+    | ToolStartEvent
+    | ToolProgressEvent
+    | ToolCompleteEvent
+    | StatusUpdateEvent
+    | StatusFlashEvent
+    | ThemeChangeEvent
+    | ExitEvent
+    | ConfirmRequestEvent
+    | AskQuestionRequestEvent
+)
 
 
 # ---- TUI → gateway commands ---------------------------------------------
@@ -403,16 +402,16 @@ class PongCommand:
     type: Literal["pong"] = "pong"
 
 
-Command = Union[
-    HelloCommand,
-    PongCommand,
-    UserInputCommand,
-    InterruptCommand,
-    SlashCommand,
-    ResizeCommand,
-    ConfirmReplyCommand,
-    AskQuestionReplyCommand,
-]
+Command = (
+    HelloCommand
+    | PongCommand
+    | UserInputCommand
+    | InterruptCommand
+    | SlashCommand
+    | ResizeCommand
+    | ConfirmReplyCommand
+    | AskQuestionReplyCommand
+)
 
 
 def command_from_json_rpc(method: str, params: dict[str, Any]) -> Command | None:

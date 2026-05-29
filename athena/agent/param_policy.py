@@ -55,8 +55,9 @@ Design notes:
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 # ---- Predicate input bundle --------------------------------------------
 
@@ -423,9 +424,7 @@ def user_rules_from_config(entries: list[dict[str, Any]]) -> list[Rule]:
                 )
             )
         elif when == "always":
-            rules.append(
-                Rule(name=f"user:{name}", predicate=lambda _: True, params=dict(params))
-            )
+            rules.append(Rule(name=f"user:{name}", predicate=lambda _: True, params=dict(params)))
         elif when == "tool_calls_at_least":
             count = int(entry.get("count", 1))
             rules.append(
@@ -471,7 +470,9 @@ def policy_from_config(config_section: Any) -> ParamPolicy:
             "defaults": getattr(config_section, "defaults", {}),
             "user_rules": getattr(config_section, "user_rules", []),
             "classifier_model": getattr(
-                config_section, "classifier_model", "qwen2.5:1.5b",
+                config_section,
+                "classifier_model",
+                "qwen2.5:1.5b",
             ),
         }
     name = cfg.get("policy") or "heuristic"

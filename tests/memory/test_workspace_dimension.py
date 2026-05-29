@@ -113,15 +113,7 @@ def test_workspace_lands_under_legacy_subdir(provider, tmp_path: Path) -> None:
         workspace=workspace,
     )
     slug = BuiltinFileProvider.workspace_slug(workspace)
-    expected_parent = (
-        tmp_path
-        / "fake-home"
-        / "profiles"
-        / "default"
-        / "memory"
-        / "legacy"
-        / slug
-    )
+    expected_parent = tmp_path / "fake-home" / "profiles" / "default" / "memory" / "legacy" / slug
     assert path.parent == expected_parent
 
 
@@ -167,9 +159,7 @@ def test_workspace_isolated_from_classic_store(provider, tmp_path: Path) -> None
         workspace=workspace,
     )
     assert [e.name for e in provider.list_entries("default")] == []
-    assert [e.name for e in provider.list_entries("default", workspace=workspace)] == [
-        "ws_only"
-    ]
+    assert [e.name for e in provider.list_entries("default", workspace=workspace)] == ["ws_only"]
 
 
 def test_same_workspace_isolated_across_profiles(provider, tmp_path: Path) -> None:
@@ -185,9 +175,7 @@ def test_same_workspace_isolated_across_profiles(provider, tmp_path: Path) -> No
         write_origin="foreground",
         workspace=workspace,
     )
-    assert [
-        e.name for e in provider.list_entries("alpha", workspace=workspace)
-    ] == ["alpha_entry"]
+    assert [e.name for e in provider.list_entries("alpha", workspace=workspace)] == ["alpha_entry"]
     assert provider.list_entries("beta", workspace=workspace) == []
 
 

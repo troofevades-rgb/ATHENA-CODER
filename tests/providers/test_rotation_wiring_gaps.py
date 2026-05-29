@@ -37,7 +37,6 @@ from athena.providers.credential_pool import Credential, CredentialPool
 from athena.providers.error_classifier import ErrorAction, classify
 from athena.providers.retry_utils import RetryBudgetExceeded, with_retry
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROVIDERS_DIR = REPO_ROOT / "athena" / "providers"
 
@@ -52,7 +51,9 @@ _HOSTED_PROVIDERS = ("anthropic", "openai", "google", "openrouter", "nous")
 # ---------------------------------------------------------------------------
 
 
-def _http_status_error(code: int, *, headers: dict[str, str] | None = None) -> httpx.HTTPStatusError:
+def _http_status_error(
+    code: int, *, headers: dict[str, str] | None = None
+) -> httpx.HTTPStatusError:
     req = httpx.Request("POST", "https://example.com/v1/messages")
     resp = httpx.Response(code, headers=headers or {}, request=req)
     return httpx.HTTPStatusError(f"{code}", request=req, response=resp)
@@ -163,10 +164,7 @@ def test_every_hosted_provider_has_rotate_helper() -> None:
         ("nous", NousProvider),
         ("openai_compat", OpenAICompatProvider),
     ]
-    missing = [
-        name for name, cls in classes
-        if not hasattr(cls, "_rotate_credential")
-    ]
+    missing = [name for name, cls in classes if not hasattr(cls, "_rotate_credential")]
     assert not missing, (
         f"providers missing _rotate_credential helper: {missing}. "
         f"Rotation will silently no-op for these."
@@ -221,8 +219,7 @@ def test_components_wired_manually_rotate_on_repeated_429(
     with pytest.raises(httpx.HTTPStatusError):
         operation()
     assert on_rotate() is True, (
-        "rotate_to_next returned None despite having a second cred — "
-        "pool/cooldown logic broken"
+        "rotate_to_next returned None despite having a second cred — pool/cooldown logic broken"
     )
     assert operation() == "ok"
     assert op_attempts[0].endswith("AAAAAAAA")
@@ -255,6 +252,7 @@ def test_with_retry_invokes_rotate_callback_when_classifier_returns_rotate(
 
     # Inject a classifier that always says ROTATE_CREDENTIAL once
     call_count = [0]
+
     def _fake_classify(exc, **kw):
         call_count[0] += 1
         if call_count[0] == 1:
@@ -272,6 +270,7 @@ def test_with_retry_invokes_rotate_callback_when_classifier_returns_rotate(
         )
 
     op_calls = [0]
+
     def operation() -> str:
         op_calls[0] += 1
         if op_calls[0] == 1:
@@ -279,6 +278,7 @@ def test_with_retry_invokes_rotate_callback_when_classifier_returns_rotate(
         return "rotated ok"
 
     import unittest.mock as _mock
+
     with _mock.patch.object(_ru, "_classify_from_exc", _fake_classify):
         result = with_retry(
             operation,
@@ -395,14 +395,15 @@ def test_openai_provider_rotates_auth_header_on_consecutive_429s(
     # Consume the stream — the chunks themselves don't matter; what
     # matters is that the third underlying HTTP request used a
     # DIFFERENT Authorization header than the first two.
-    list(provider.stream_chat(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
-    ))
+    list(
+        provider.stream_chat(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    )
 
     assert call_count[0] == 3, (
-        f"expected 3 underlying requests (2 × 429 + 1 success); "
-        f"got {call_count[0]}"
+        f"expected 3 underlying requests (2 × 429 + 1 success); got {call_count[0]}"
     )
     assert seen_auth_headers[0].endswith("aaa"), (
         f"first request used wrong key: {seen_auth_headers[0]!r}"
@@ -441,7 +442,7 @@ def test_anthropic_provider_rotates_x_api_key_on_consecutive_429s(
                 json={"error": {"message": "rate limit"}},
             )
         # Minimal valid Anthropic SSE: message_stop event
-        body = b"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+        body = b'event: message_stop\ndata: {"type":"message_stop"}\n\n'
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
@@ -467,10 +468,12 @@ def test_anthropic_provider_rotates_x_api_key_on_consecutive_429s(
     provider._retry_max = 5
     provider._retry_backoff_s = 0.01
 
-    list(provider.stream_chat(
-        model="claude-3-5-sonnet-latest",
-        messages=[{"role": "user", "content": "hi"}],
-    ))
+    list(
+        provider.stream_chat(
+            model="claude-3-5-sonnet-latest",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    )
 
     assert call_count[0] == 3
     assert seen_keys[0] == "sk-ant-AAA1"

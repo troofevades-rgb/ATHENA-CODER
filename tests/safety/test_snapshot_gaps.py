@@ -52,7 +52,8 @@ def _make_skill(workspace: Path, name: str, body: str = "v1") -> Path:
     skill = workspace / "skills" / name
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text(
-        f"---\nname: {name}\n---\n\n{body}\n", encoding="utf-8",
+        f"---\nname: {name}\n---\n\n{body}\n",
+        encoding="utf-8",
     )
     return skill
 
@@ -79,6 +80,7 @@ def test_prune_respects_retention_bytes(tmp_path: Path) -> None:
     Strategy: make a store with retention_bytes set to fit ~2 snapshots
     of our test data; create 5; verify prune brings total under budget."""
     import secrets
+
     store = SnapshotStore(
         root=tmp_path / "snaps",
         retention_days=99999,
@@ -94,7 +96,8 @@ def test_prune_respects_retention_bytes(tmp_path: Path) -> None:
             # Use incompressible random hex so gzip can't collapse our
             # carefully-distinct payloads into nothing
             (skill / "SKILL.md").write_text(
-                secrets.token_hex(800), encoding="utf-8",
+                secrets.token_hex(800),
+                encoding="utf-8",
             )
             time.sleep(1.05)  # distinct second so snapshot IDs differ
             with store.snapshot_and_mutate([skill], tool_name="test") as s:
@@ -107,9 +110,7 @@ def test_prune_respects_retention_bytes(tmp_path: Path) -> None:
         "snapshots collapsed by content addressing; test setup bad"
     )
     total_before = sum(s.tarball_path.stat().st_size for s in snaps if s.tarball_path.exists())
-    assert total_before > 2000, (
-        f"test invalid: total bytes {total_before} already under budget"
-    )
+    assert total_before > 2000, f"test invalid: total bytes {total_before} already under budget"
 
     summary = store.prune()
 
@@ -117,12 +118,9 @@ def test_prune_respects_retention_bytes(tmp_path: Path) -> None:
     surviving = list((tmp_path / "snaps").rglob("*.tar.gz"))
     total_after = sum(p.stat().st_size for p in surviving)
     assert total_after <= 2000, (
-        f"prune left {total_after} bytes on disk; budget was 2000. "
-        f"retention_bytes is not enforced"
+        f"prune left {total_after} bytes on disk; budget was 2000. retention_bytes is not enforced"
     )
-    assert summary["removed"] >= 1, (
-        f"prune removed nothing despite over-budget; summary={summary}"
-    )
+    assert summary["removed"] >= 1, f"prune removed nothing despite over-budget; summary={summary}"
 
 
 def test_prune_byte_budget_never_evicts_pinned(tmp_path: Path) -> None:
@@ -130,6 +128,7 @@ def test_prune_byte_budget_never_evicts_pinned(tmp_path: Path) -> None:
     even when that means staying over budget. Operators rely on this
     when they pin a forensically-important capture."""
     import secrets
+
     store = SnapshotStore(
         root=tmp_path / "snaps",
         retention_days=99999,
@@ -143,7 +142,8 @@ def test_prune_byte_budget_never_evicts_pinned(tmp_path: Path) -> None:
     try:
         for _ in range(3):
             (skill / "SKILL.md").write_text(
-                secrets.token_hex(400), encoding="utf-8",
+                secrets.token_hex(400),
+                encoding="utf-8",
             )
             time.sleep(1.05)
             with store.snapshot_and_mutate([skill], tool_name="test") as s:
@@ -169,7 +169,8 @@ def test_prune_byte_budget_never_evicts_pinned(tmp_path: Path) -> None:
 
 
 def test_list_snapshots_skips_corrupt_sidecar(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """A partially-written sidecar (interrupted disk write, manual
     edit gone wrong) must NOT break ``list_snapshots`` for everyone
@@ -191,7 +192,8 @@ def test_list_snapshots_skips_corrupt_sidecar(
 
 
 def test_list_snapshots_skips_sidecar_missing_required_field(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """A sidecar with valid JSON but missing required fields (e.g.
     schema drift from an older version) must also drop out silently
@@ -213,7 +215,8 @@ def test_list_snapshots_skips_sidecar_missing_required_field(
 
 
 def test_list_snapshots_still_returns_record_when_tarball_missing(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """If someone deletes the .tar.gz manually but leaves the sidecar,
     the metadata is still queryable (you can see the snapshot
@@ -242,7 +245,8 @@ def test_list_snapshots_still_returns_record_when_tarball_missing(
 
 
 def test_restore_recreates_a_file_deleted_after_snapshot(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """The actual recovery scenario when a user wants to undo a
     ``skill_delete``: the file is gone from the live tree, but the
@@ -254,6 +258,7 @@ def test_restore_recreates_a_file_deleted_after_snapshot(
 
     # Simulate skill_delete: blow away the whole tree
     import shutil
+
     shutil.rmtree(skill)
     assert not skill.exists()
 
@@ -265,7 +270,8 @@ def test_restore_recreates_a_file_deleted_after_snapshot(
 
 
 def test_restore_does_not_touch_files_outside_snapshot(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """Restoration must be SCOPED to what was actually snapshotted.
     A sibling file the user created AFTER the snapshot must survive
@@ -291,7 +297,8 @@ def test_restore_does_not_touch_files_outside_snapshot(
 
 
 def test_snapshot_of_nonexistent_path_does_not_crash(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """skill_create's snapshot captures the soon-to-exist directory
     BEFORE creation — so the path may not exist yet. Must not raise."""
@@ -311,7 +318,8 @@ def test_snapshot_of_nonexistent_path_does_not_crash(
 
 
 def test_two_snapshots_of_identical_state_in_same_second_collapse(
-    store: SnapshotStore, workspace: Path,
+    store: SnapshotStore,
+    workspace: Path,
 ) -> None:
     """If a curator runs twice within one second touching the same
     unchanged tree, the second snapshot must collapse to the first.
@@ -322,8 +330,7 @@ def test_two_snapshots_of_identical_state_in_same_second_collapse(
     snap_b = _take_snapshot(store, [skill])
 
     assert snap_a.snapshot_id == snap_b.snapshot_id, (
-        "identical content in same second produced distinct IDs; "
-        "collapse-by-content is broken"
+        "identical content in same second produced distinct IDs; collapse-by-content is broken"
     )
     # Only one tarball on disk
     tars = list(snap_a.tarball_path.parent.glob("*.tar.gz"))

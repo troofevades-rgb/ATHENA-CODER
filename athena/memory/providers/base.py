@@ -79,9 +79,7 @@ class MemoryProvider(ABC):
         """
 
     @abstractmethod
-    def list_entries(
-        self, profile: str, *, workspace: Path | None = None
-    ) -> list[MemoryEntry]:
+    def list_entries(self, profile: str, *, workspace: Path | None = None) -> list[MemoryEntry]:
         """Return every memory under ``profile``, sorted by
         ``last_activity_at`` descending (newest first).
         ``workspace`` -- see :meth:`load_index`."""
@@ -94,9 +92,7 @@ class MemoryProvider(ABC):
         ``workspace`` -- see :meth:`load_index`."""
 
     @abstractmethod
-    def delete_entry(
-        self, profile: str, name: str, *, workspace: Path | None = None
-    ) -> bool:
+    def delete_entry(self, profile: str, name: str, *, workspace: Path | None = None) -> bool:
         """Remove an entry. Returns ``True`` if the entry existed.
         ``workspace`` -- see :meth:`load_index`."""
 

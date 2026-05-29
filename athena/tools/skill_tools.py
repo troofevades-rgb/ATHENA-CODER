@@ -39,27 +39,80 @@ def _workspace():
 # Stopwords + tool-noun filler that wouldn't be meaningful evidence of
 # topic match. Kept short on purpose — we want WORDS like "OSINT" and
 # "GEPA" to be the signal, not "the" and "a".
-_STOPWORDS: frozenset[str] = frozenset({
-    "the", "and", "for", "with", "that", "this", "from", "into", "have",
-    "has", "are", "was", "were", "but", "not", "use", "uses", "using",
-    "your", "you", "all", "any", "out", "over", "via", "per", "via",
-    "skill", "skills", "tool", "tools", "code", "data", "info",
-    "research", "analysis", "assistant", "guide", "general",
-    "implementation", "implement", "framework", "module", "system",
-    "public", "private", "user", "users", "list", "show", "create",
-    "delete", "view", "manage", "patch", "update", "write", "read",
-    "file", "files", "directory", "path", "name", "type",
-})
+_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the",
+        "and",
+        "for",
+        "with",
+        "that",
+        "this",
+        "from",
+        "into",
+        "have",
+        "has",
+        "are",
+        "was",
+        "were",
+        "but",
+        "not",
+        "use",
+        "uses",
+        "using",
+        "your",
+        "you",
+        "all",
+        "any",
+        "out",
+        "over",
+        "via",
+        "per",
+        "skill",
+        "skills",
+        "tool",
+        "tools",
+        "code",
+        "data",
+        "info",
+        "research",
+        "analysis",
+        "assistant",
+        "guide",
+        "general",
+        "implementation",
+        "implement",
+        "framework",
+        "module",
+        "system",
+        "public",
+        "private",
+        "user",
+        "users",
+        "list",
+        "show",
+        "create",
+        "delete",
+        "view",
+        "manage",
+        "patch",
+        "update",
+        "write",
+        "read",
+        "file",
+        "files",
+        "directory",
+        "path",
+        "name",
+        "type",
+    }
+)
 
 
 def _tokens(s: str) -> set[str]:
     """Lowercase, alnum-only tokens 3+ chars long, minus stopwords."""
     if not s:
         return set()
-    return {
-        w for w in re.findall(r"[a-z0-9]{3,}", s.lower())
-        if w not in _STOPWORDS
-    }
+    return {w for w in re.findall(r"[a-z0-9]{3,}", s.lower()) if w not in _STOPWORDS}
 
 
 def _first_h1(body: str) -> str:
@@ -240,25 +293,25 @@ def skill_view(name: str) -> str:
         "alongside the SKILL.md.\n"
         "\n"
         "EXAMPLE — create a skill (copy + modify):\n"
-        '  skill_manage(\n'
+        "  skill_manage(\n"
         '      action="create",\n'
         '      name="osint-research",\n'
-        '      frontmatter={\n'
+        "      frontmatter={\n"
         '          "description": "OSINT research framework for "\n'
         '                         "gathering public information"\n'
-        '      },\n'
+        "      },\n"
         '      body="# OSINT Research Skill\\n\\nThis skill ..."\n'
         "  )\n"
         "\n"
         "EXAMPLE — patch a skill's body without touching frontmatter:\n"
-        '  skill_manage(\n'
+        "  skill_manage(\n"
         '      action="patch",\n'
         '      name="osint-research",\n'
         '      body="# OSINT Research Skill\\n\\n(rewritten body)"\n'
         "  )\n"
         "\n"
         "EXAMPLE — add a support file alongside SKILL.md:\n"
-        '  skill_manage(\n'
+        "  skill_manage(\n"
         '      action="write_file",\n'
         '      name="osint-research",\n'
         '      file_path="references/checklist.md",\n'
@@ -305,8 +358,7 @@ def skill_view(name: str) -> str:
                         "minLength": 1,
                         "maxLength": 1024,
                         "description": (
-                            "One-line summary of what the skill does. "
-                            "Required for action='create'."
+                            "One-line summary of what the skill does. Required for action='create'."
                         ),
                     },
                     "name": {
@@ -405,8 +457,10 @@ def skill_manage(
     # calls returned the GEPA body and the model would loop trying to
     # "find the right OSINT skill" because the one it loaded didn't
     # match its name.
-    if action == "patch" and body is not None and (
-        not frontmatter or not str((frontmatter or {}).get("description", "")).strip()
+    if (
+        action == "patch"
+        and body is not None
+        and (not frontmatter or not str((frontmatter or {}).get("description", "")).strip())
     ):
         meta = _skill_metadata(name, workspace)
         if meta is not None:
@@ -418,7 +472,8 @@ def skill_manage(
             )
             if not matches:
                 return _err(
-                    "patch", name,
+                    "patch",
+                    name,
                     f"refused: body H1 {h1!r} shares no keywords with "
                     f"skill {skill_name_meta!r} (description: "
                     f"{skill_description!r}). This usually means "

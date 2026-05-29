@@ -40,18 +40,16 @@ def test_agent_description_auto_derived_from_prompt(monkeypatch):
 
         def fork(self, **kwargs):
             captured.update(kwargs)
+
             class _Result:
                 output = "ok"
+
             return _Result()
 
-    monkeypatch.setattr(
-        "athena.agent.core.get_current_agent", lambda: _FakeAgent()
-    )
+    monkeypatch.setattr("athena.agent.core.get_current_agent", lambda: _FakeAgent())
 
     # Call WITHOUT description — must not raise TypeError.
-    result = Agent(
-        prompt="Look at how the goal loop persists state across sessions"
-    )
+    result = Agent(prompt="Look at how the goal loop persists state across sessions")
     # Tool returned a string (didn't crash on missing description).
     assert isinstance(result, str)
 
@@ -66,13 +64,13 @@ def test_agent_description_explicit_value_preserved(monkeypatch):
     class _FakeAgent:
         def fork(self, **kwargs):
             captured.update(kwargs)
+
             class _Result:
                 output = "ok"
+
             return _Result()
 
-    monkeypatch.setattr(
-        "athena.agent.core.get_current_agent", lambda: _FakeAgent()
-    )
+    monkeypatch.setattr("athena.agent.core.get_current_agent", lambda: _FakeAgent())
 
     at.Agent(prompt="long body here", description="audit security")
     # We can't easily peek the description through ``fork`` (it's

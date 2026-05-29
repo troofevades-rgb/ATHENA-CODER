@@ -14,7 +14,6 @@ import pytest
 from athena.computer.backends.noop import NoOpBackend
 from athena.computer.detect import available_backends, select_backend
 
-
 # ---------------------------------------------------------------------------
 # Detector
 # ---------------------------------------------------------------------------
@@ -174,12 +173,9 @@ def test_windows_backend_supports_includes_input_after_t6_04_5():
     backend = WindowsBackend()
     supports = backend.supports()
     assert "screenshot" in supports
-    for input_verb in (
-        "move", "click", "double_click", "right_click", "type", "key", "scroll"
-    ):
+    for input_verb in ("move", "click", "double_click", "right_click", "type", "key", "scroll"):
         assert input_verb in supports, (
-            f"input verb {input_verb!r} missing from supports — "
-            "T6-04.5 should have wired it"
+            f"input verb {input_verb!r} missing from supports — T6-04.5 should have wired it"
         )
     assert "drag" not in supports
 

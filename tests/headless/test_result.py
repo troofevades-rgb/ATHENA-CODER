@@ -13,7 +13,6 @@ import pytest
 
 from athena.headless.result import RunResult, mint_run_id
 
-
 # ---------------------------------------------------------------
 # mint_run_id
 # ---------------------------------------------------------------
@@ -52,13 +51,16 @@ def _r(**overrides):
     return RunResult(**base)
 
 
-@pytest.mark.parametrize("status,code", [
-    ("ok", 0),
-    ("error", 1),
-    ("invalid", 2),
-    ("timeout", 124),
-    ("interrupted", 130),
-])
+@pytest.mark.parametrize(
+    "status,code",
+    [
+        ("ok", 0),
+        ("error", 1),
+        ("invalid", 2),
+        ("timeout", 124),
+        ("interrupted", 130),
+    ],
+)
 def test_exit_code_per_status(status, code):
     r = _r(status=status)
     assert r.exit_code() == code
@@ -73,11 +75,22 @@ def test_to_dict_contains_all_required_keys():
     r = _r()
     d = r.to_dict()
     required = {
-        "run_id", "status", "exit_code",
-        "started_at", "finished_at", "duration_s",
-        "task", "workspace", "model", "profile",
-        "session_id", "tool_calls", "tokens",
-        "cost_est", "assistant_text", "error",
+        "run_id",
+        "status",
+        "exit_code",
+        "started_at",
+        "finished_at",
+        "duration_s",
+        "task",
+        "workspace",
+        "model",
+        "profile",
+        "session_id",
+        "tool_calls",
+        "tokens",
+        "cost_est",
+        "assistant_text",
+        "error",
     }
     assert required <= set(d.keys())
 
@@ -95,8 +108,7 @@ def test_to_json_round_trips():
         status="error",
         error="RuntimeError: model unreachable",
         tool_calls=[{"name": "Bash", "count": 3}],
-        tokens={"prompt": 100, "completion": 50,
-                "cache_read": 80, "cache_creation": 20},
+        tokens={"prompt": 100, "completion": 50, "cache_read": 80, "cache_creation": 20},
         cost_est=0.0042,
     )
     parsed = json.loads(r.to_json())

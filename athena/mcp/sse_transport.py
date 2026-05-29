@@ -414,9 +414,11 @@ class SSETransport:
         # MCPStdioClient.request added; without it, every foreground
         # tool call against a wedged SSE server stalled a full minute
         # while ``_listen`` was already trying to reconnect.
-        coro_future = asyncio.run_coroutine_threadsafe(
-            self._async_request(method, params), self._loop
-        ) if self._loop is not None else None
+        coro_future = (
+            asyncio.run_coroutine_threadsafe(self._async_request(method, params), self._loop)
+            if self._loop is not None
+            else None
+        )
         if coro_future is None:
             raise SSEError(f"[{self.name}] event loop unavailable")
         elapsed = 0.0
@@ -432,9 +434,7 @@ class SSETransport:
             except FutTimeout:
                 if not self.is_alive():
                     coro_future.cancel()
-                    raise SSEError(
-                        f"[{self.name}] transport closed while waiting for {method!r}"
-                    )
+                    raise SSEError(f"[{self.name}] transport closed while waiting for {method!r}")
                 elapsed += step
         if "error" in result_box:
             err = result_box["error"]

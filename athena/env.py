@@ -104,7 +104,8 @@ def load_dotenv() -> dict[str, str]:
             logger.warning(
                 "%s is mode %o; recommend chmod 0o600 — credentials "
                 "in this file are readable by other users",
-                path, mode,
+                path,
+                mode,
             )
     except OSError:
         pass

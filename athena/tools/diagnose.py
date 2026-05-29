@@ -35,10 +35,14 @@ def _active_cfg_or_disk():
     disk fallback through the same module-level binding to preserve
     that seam."""
     from ._active_cfg import active_cfg as _active
+
     try:
         from ..agent.core import get_current_agent
     except ImportError:
-        get_current_agent = lambda: None  # type: ignore[assignment]
+
+        def get_current_agent():
+            return None  # type: ignore[assignment]
+
     agent = get_current_agent()
     if agent is not None and getattr(agent, "cfg", None) is not None:
         return agent.cfg

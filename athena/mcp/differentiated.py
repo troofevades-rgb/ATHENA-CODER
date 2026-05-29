@@ -127,10 +127,7 @@ _ANALYZE_IMAGE_DESCRIPTOR: dict[str, Any] = {
 
 _ANALYZE_VIDEO_DESCRIPTOR: dict[str, Any] = {
     "name": "analyze_video",
-    "description": (
-        "Analyze a video by routing key frames through a "
-        "vision-capable provider."
-    ),
+    "description": ("Analyze a video by routing key frames through a vision-capable provider."),
     "inputSchema": {
         "type": "object",
         "properties": {
@@ -233,10 +230,7 @@ class DifferentiatedTools:
 
         verifier = VerifiedExecution(cfg=self.cfg, workspace=self.workspace)
         outcome = verifier.verify_write(target)
-        header = (
-            f"{'overwrote' if existed else 'created'} {target} "
-            f"({len(content)} bytes)"
-        )
+        header = f"{'overwrote' if existed else 'created'} {target} ({len(content)} bytes)"
         body = outcome.report()
         text = header + "\n" + body
         is_error = outcome.failed

@@ -81,11 +81,7 @@ def _verify_user_json(ctx: VerifyContext) -> bool:
     data = _try_parse_json_in_text(text)
     if not isinstance(data, dict):
         return False
-    return (
-        data.get("name") == "Ada"
-        and data.get("age") == 35
-        and data.get("role") == "engineer"
-    )
+    return data.get("name") == "Ada" and data.get("age") == 35 and data.get("role") == "engineer"
 
 
 _emit_user_json = EvalTask(
@@ -110,7 +106,7 @@ _emit_user_json = EvalTask(
 
 def _setup_for_csv_to_json(ws: Path) -> None:
     (ws / "rows.csv").write_text(
-        "name,score\n" "alice,90\n" "bob,85\n" "carol,77\n",
+        "name,score\nalice,90\nbob,85\ncarol,77\n",
         encoding="utf-8",
     )
 
@@ -160,9 +156,7 @@ def _verify_markdown_table(ctx: VerifyContext) -> bool:
     # Need at least header, separator, 3 data rows = 5 lines minimum.
     if len(lines) < 5:
         return False
-    has_separator = any(
-        re.fullmatch(r"\s*\|[\s\-:|]+\|\s*", l) for l in lines
-    )
+    has_separator = any(re.fullmatch(r"\s*\|[\s\-:|]+\|\s*", l) for l in lines)
     has_data = all(name in text for name in ("apple", "banana", "cherry"))
     has_columns = "|" in lines[0] and ("Fruit" in lines[0] or "fruit" in lines[0])
     return has_separator and has_data and has_columns
@@ -220,9 +214,7 @@ _emit_yaml = EvalTask(
 
 
 def _setup_for_pretty(ws: Path) -> None:
-    (ws / "min.json").write_text(
-        '{"name":"Ada","items":[1,2,3]}', encoding="utf-8"
-    )
+    (ws / "min.json").write_text('{"name":"Ada","items":[1,2,3]}', encoding="utf-8")
 
 
 def _verify_pretty(ctx: VerifyContext) -> bool:
@@ -388,7 +380,7 @@ _emit_toml = EvalTask(
     prompt=(
         "Write a TOML file called settings.toml in the current "
         "workspace. It should contain a [server] section with two "
-        "keys: host = \"localhost\" and port = 8080."
+        'keys: host = "localhost" and port = 8080.'
     ),
     setup_fn=lambda ws: None,
     verify_fn=_verify_toml,
@@ -404,11 +396,7 @@ _emit_toml = EvalTask(
 
 def _setup_for_aggregate(ws: Path) -> None:
     (ws / "sales.csv").write_text(
-        "product,amount\n"
-        "apple,10\n"
-        "banana,5\n"
-        "apple,7\n"
-        "banana,3\n",
+        "product,amount\napple,10\nbanana,5\napple,7\nbanana,3\n",
         encoding="utf-8",
     )
 
@@ -423,6 +411,7 @@ def _verify_aggregate(ctx: VerifyContext) -> bool:
         return False
     if not isinstance(data, dict):
         return False
+
     # Numbers may land as int or str — coerce.
     def _n(k):
         v = data.get(k)
@@ -433,6 +422,7 @@ def _verify_aggregate(ctx: VerifyContext) -> bool:
                 return int(float(v))
             except (TypeError, ValueError):
                 return None
+
     return _n("apple") == 17 and _n("banana") == 8
 
 

@@ -64,9 +64,7 @@ def test_log_appends_jsonl(tmp_path: Path):
         result="ok",
     )
     log.log(
-        action=Action(
-            type="click", target_desc="Delete", app="editor", coords=(100, 200)
-        ),
+        action=Action(type="click", target_desc="Delete", app="editor", coords=(100, 200)),
         tier="destructive",
         confirmed=False,
         executed=False,

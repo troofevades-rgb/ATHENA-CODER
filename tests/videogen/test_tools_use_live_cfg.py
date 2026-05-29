@@ -57,7 +57,8 @@ def test_load_cfg_prefers_live_agent_cfg():
 
     agent = _live_agent(video_backend="xai_video")
     with patch(
-        "athena.agent.core.get_current_agent", return_value=agent,
+        "athena.agent.core.get_current_agent",
+        return_value=agent,
     ):
         cfg = tools_mod._load_cfg()
     assert cfg is agent.cfg
@@ -72,10 +73,15 @@ def test_load_cfg_falls_back_to_disk_load_when_no_agent():
     fake_disk_cfg = SimpleNamespace(
         video_generation=SimpleNamespace(backend=None),
     )
-    with patch(
-        "athena.agent.core.get_current_agent", return_value=None,
-    ), patch(
-        "athena.config.load_config", return_value=fake_disk_cfg,
+    with (
+        patch(
+            "athena.agent.core.get_current_agent",
+            return_value=None,
+        ),
+        patch(
+            "athena.config.load_config",
+            return_value=fake_disk_cfg,
+        ),
     ):
         cfg = tools_mod._load_cfg()
     assert cfg is fake_disk_cfg
@@ -89,11 +95,15 @@ def test_load_cfg_falls_back_when_get_current_agent_raises():
     fake_disk_cfg = SimpleNamespace(
         video_generation=SimpleNamespace(backend=None),
     )
-    with patch(
-        "athena.agent.core.get_current_agent",
-        side_effect=ImportError("simulated"),
-    ), patch(
-        "athena.config.load_config", return_value=fake_disk_cfg,
+    with (
+        patch(
+            "athena.agent.core.get_current_agent",
+            side_effect=ImportError("simulated"),
+        ),
+        patch(
+            "athena.config.load_config",
+            return_value=fake_disk_cfg,
+        ),
     ):
         cfg = tools_mod._load_cfg()
     assert cfg is fake_disk_cfg
@@ -112,12 +122,17 @@ def test_video_generate_routes_through_live_selector():
     fake_backend = MagicMock()
     fake_backend.name = "xai_video"
     fake_backend.estimate.return_value = MagicMock(
-        seconds_est=30.0, cost_est=None,
+        seconds_est=30.0,
+        cost_est=None,
         needs_confirm=lambda cfg: False,
     )
     fake_backend.submit.return_value = MagicMock(
-        backend="xai_video", job_id="job-fake", status="done",
-        progress=1.0, extra={"poll_response": {}}, error=None,
+        backend="xai_video",
+        job_id="job-fake",
+        status="done",
+        progress=1.0,
+        extra={"poll_response": {}},
+        error=None,
     )
     fake_backend.poll.return_value = fake_backend.submit.return_value
 
@@ -129,11 +144,16 @@ def test_video_generate_routes_through_live_selector():
     tmp.write_bytes(b"FAKE-MP4")
     fake_backend.fetch.return_value = tmp
 
-    with patch(
-        "athena.agent.core.get_current_agent", return_value=agent,
-    ), patch(
-        "athena.videogen.tools.resolve_backend", return_value=fake_backend,
-    ) as resolve_mock:
+    with (
+        patch(
+            "athena.agent.core.get_current_agent",
+            return_value=agent,
+        ),
+        patch(
+            "athena.videogen.tools.resolve_backend",
+            return_value=fake_backend,
+        ) as resolve_mock,
+    ):
         tools_mod.video_generate(prompt="a cat", duration_s=3.0)
 
     # The tool called resolve_backend with the agent's live cfg

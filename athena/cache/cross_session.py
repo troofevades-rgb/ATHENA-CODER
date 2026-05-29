@@ -229,9 +229,7 @@ class CrossSessionCache:
         write is durable before the calling session ends.
         """
         if not self._should_cache(prefix_text):
-            logger.debug(
-                "cache record skipped: prefix below cache_min_prefix_tokens"
-            )
+            logger.debug("cache record skipped: prefix below cache_min_prefix_tokens")
             return None
         entry = CacheEntry(
             workspace=workspace,

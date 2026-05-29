@@ -84,12 +84,15 @@ class SkillWatcher:
             return
         self._last = _snapshot(self.workspace)
         self._thread = threading.Thread(
-            target=self._run, name="athena-skill-watcher", daemon=True,
+            target=self._run,
+            name="athena-skill-watcher",
+            daemon=True,
         )
         self._thread.start()
         logger.info(
             "skill watcher started: %d skill(s) tracked, poll=%.1fs",
-            len(self._last), self.poll_interval,
+            len(self._last),
+            self.poll_interval,
         )
 
     def stop(self, *, timeout: float = 2.0) -> None:
@@ -108,10 +111,7 @@ class SkillWatcher:
                 continue
             added = set(current) - set(self._last)
             removed = set(self._last) - set(current)
-            modified = {
-                p for p in current
-                if p in self._last and current[p] != self._last[p]
-            }
+            modified = {p for p in current if p in self._last and current[p] != self._last[p]}
             self._last = current
             self._on_changes(added=added, removed=removed, modified=modified)
 
@@ -123,10 +123,14 @@ class SkillWatcher:
         modified: set[Path],
     ) -> None:
         logger.info(
-            "skill watcher: +%d -%d ~%d", len(added), len(removed), len(modified),
+            "skill watcher: +%d -%d ~%d",
+            len(added),
+            len(removed),
+            len(modified),
         )
         try:
             from . import loader as _loader
+
             _loader._BODY_CACHE.clear()
         except Exception:  # noqa: BLE001
             logger.debug("skill watcher: body cache clear failed", exc_info=True)

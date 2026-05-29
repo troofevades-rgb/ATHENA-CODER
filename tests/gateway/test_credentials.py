@@ -56,11 +56,14 @@ def test_path_returns_file_contents(tmp_path: Path):
 def test_path_strips_trailing_whitespace(tmp_path: Path):
     p = tmp_path / "tok.txt"
     p.write_text("FILE-TOKEN\n\n  \r\n", encoding="utf-8")
-    assert resolve_credential(
-        {"bot_token_path": str(p)},
-        "bot_token",
-        platform="discord",
-    ) == "FILE-TOKEN"
+    assert (
+        resolve_credential(
+            {"bot_token_path": str(p)},
+            "bot_token",
+            platform="discord",
+        )
+        == "FILE-TOKEN"
+    )
 
 
 def test_path_wins_over_cleartext(tmp_path: Path):
@@ -105,8 +108,7 @@ def test_cleartext_fallback_returns_value(caplog):
     assert out == "CLEARTEXT-TOK"
     # Warning fired naming the migration path.
     assert any(
-        "discord.bot_token is configured as cleartext" in r.getMessage()
-        for r in caplog.records
+        "discord.bot_token is configured as cleartext" in r.getMessage() for r in caplog.records
     )
 
 
@@ -119,7 +121,8 @@ def test_cleartext_deprecation_fires_only_once_per_pair(caplog):
             platform="discord",
         )
     nudges = [
-        r for r in caplog.records
+        r
+        for r in caplog.records
         if "discord.bot_token is configured as cleartext" in r.getMessage()
     ]
     assert len(nudges) == 1
@@ -141,11 +144,13 @@ def test_different_keys_warn_independently(caplog):
     caplog.set_level(logging.WARNING, logger="athena.gateway.credentials")
     resolve_credential(
         {"bot_token": "B", "app_token": "A"},
-        "bot_token", platform="slack",
+        "bot_token",
+        platform="slack",
     )
     resolve_credential(
         {"bot_token": "B", "app_token": "A"},
-        "app_token", platform="slack",
+        "app_token",
+        platform="slack",
     )
     msgs = [r.getMessage() for r in caplog.records]
     assert sum("slack.bot_token" in m for m in msgs) == 1
@@ -184,9 +189,7 @@ def test_empty_file_falls_back_to_cleartext(tmp_path: Path, caplog):
     )
     assert out == "FALLBACK"
     # The empty-file warning fires.
-    assert any(
-        "is empty" in r.getMessage() for r in caplog.records
-    )
+    assert any("is empty" in r.getMessage() for r in caplog.records)
 
 
 # ---------------------------------------------------------------
@@ -205,7 +208,10 @@ def test_missing_both_required_raises():
 
 def test_missing_both_optional_returns_none():
     out = resolve_credential(
-        {}, "bot_token", platform="discord", required=False,
+        {},
+        "bot_token",
+        platform="discord",
+        required=False,
     )
     assert out is None
 

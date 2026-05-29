@@ -116,10 +116,7 @@ def load_reference(
         target_resolved = target.resolve()
     except OSError:
         return None
-    if (
-        target_resolved != skill_dir_resolved
-        and skill_dir_resolved not in target_resolved.parents
-    ):
+    if target_resolved != skill_dir_resolved and skill_dir_resolved not in target_resolved.parents:
         return None
     if not target.exists() or not target.is_file():
         return None

@@ -55,8 +55,7 @@ class HookDispatcher:
     def __init__(self, plugins: list[Plugin]):
         self.plugins = list(plugins)
         self._by_hook: dict[str, list[Plugin]] = {
-            hook: [p for p in self.plugins if self._overrides(p, hook)]
-            for hook in self._HOOK_NAMES
+            hook: [p for p in self.plugins if self._overrides(p, hook)] for hook in self._HOOK_NAMES
         }
 
     @staticmethod

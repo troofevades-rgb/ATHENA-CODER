@@ -173,9 +173,7 @@ def test_one_store_for_tasks_and_subgoals(tmp_path: Path):
     is what makes the board / goal-subgoal projections agree."""
     s = _store(tmp_path)
     regular = s.create(title="cleanup", workspace="/ws")
-    subgoal = s.create(
-        title="define schema", workspace="/ws", goal_id="my-goal"
-    )
+    subgoal = s.create(title="define schema", workspace="/ws", goal_id="my-goal")
 
     # Both visible to list().
     all_tasks = s.list(workspace="/ws")
@@ -257,13 +255,8 @@ def test_corrupt_file_starts_empty_and_preserves_original(tmp_path: Path):
     # The unreadable original should be moved to a .corrupt.* sidecar so
     # the user can recover; the live path itself should be either
     # missing or fresh after the first save.
-    sidecars = [
-        p for p in tmp_path.iterdir()
-        if p.name.startswith("tasks.json.corrupt.")
-    ]
-    assert len(sidecars) == 1, (
-        f"expected exactly one .corrupt sidecar, found {sidecars}"
-    )
+    sidecars = [p for p in tmp_path.iterdir() if p.name.startswith("tasks.json.corrupt.")]
+    assert len(sidecars) == 1, f"expected exactly one .corrupt sidecar, found {sidecars}"
     assert sidecars[0].read_text(encoding="utf-8") == corrupt_body
     # Next create still works and writes a clean store.
     s.create(title="fresh", workspace="/ws")

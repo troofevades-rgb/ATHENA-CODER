@@ -54,9 +54,7 @@ class _StubBackend:
     def screenshot(self) -> Screenshot:
         if self._raise is not None:
             raise self._raise
-        return Screenshot(
-            png_bytes=self._payload, width=200, height=100, scale=1.0
-        )
+        return Screenshot(png_bytes=self._payload, width=200, height=100, scale=1.0)
 
     def active_app(self):
         return self._app
@@ -163,9 +161,7 @@ def test_observe_refuses_when_disabled(monkeypatch, tmp_path: Path):
 
 def test_screenshot_when_backend_unavailable(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend(available=False)
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend(available=False))
     out = json.loads(tools_mod.computer_screenshot())
     assert out["available"] is False
     assert "not available" in out["reason"]
@@ -192,9 +188,7 @@ def test_screenshot_backend_error_returns_structured(monkeypatch, tmp_path: Path
 
 def test_screenshot_returns_image_and_logs(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
 
     out = json.loads(tools_mod.computer_screenshot())
     assert out["available"] is True
@@ -247,9 +241,7 @@ def test_screenshot_payload_NEVER_in_audit_log(monkeypatch, tmp_path: Path):
 
 def test_observe_empty_question_rejected(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
     out = json.loads(tools_mod.computer_observe(question=""))
     assert out["available"] is False
     assert "question" in out["reason"]
@@ -261,9 +253,7 @@ def test_observe_no_vision_backend(monkeypatch, tmp_path: Path):
     user can install a vision-capable provider or fall through
     to a base64 screenshot the agent passes elsewhere."""
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
 
     # Empty vision capability set. Two patch sites needed: the
     # source-of-truth registry AND the imported alias inside
@@ -294,9 +284,7 @@ def test_observe_resolves_vision_backend(monkeypatch, tmp_path: Path):
     )  # type: ignore[method-assign]
 
     monkeypatch.setattr(tools_mod, "_load_cfg", lambda: _cfg(tmp_path))
-    monkeypatch.setattr(
-        tools_mod, "select_backend", lambda cfg: _StubBackend()
-    )
+    monkeypatch.setattr(tools_mod, "select_backend", lambda cfg: _StubBackend())
     monkeypatch.setattr("athena.providers._REGISTRY", {"stub_vision": _VisionStub})
     monkeypatch.setattr("athena.media.registry._REGISTRY", {"stub_vision": _VisionStub})
 

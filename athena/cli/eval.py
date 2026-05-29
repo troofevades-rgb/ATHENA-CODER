@@ -66,7 +66,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("cases_file", help="Path to the eval cases JSONL.")
     p.add_argument(
-        "--output-dir", "-o",
+        "--output-dir",
+        "-o",
         help=(
             "Where to write per-run envelopes + scores.jsonl "
             "+ eval-summary.json. Default <profile>/eval/<eval_id>/."
@@ -113,7 +114,8 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress per-case progress lines on stderr.",
     )
@@ -122,14 +124,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Active profile (overrides ATHENA_PROFILE / config).",
     )
     p.add_argument(
-        "--cwd", "-C",
+        "--cwd",
+        "-C",
         help="Default workspace for cases without their own cwd.",
     )
     return p
 
 
 def _resolve_output_dir(
-    args: argparse.Namespace, *, eval_id: str, cfg: Any,
+    args: argparse.Namespace,
+    *,
+    eval_id: str,
+    cfg: Any,
 ) -> Path:
     if args.output_dir:
         return Path(args.output_dir).expanduser()
@@ -144,9 +150,7 @@ def _score_progress_to_stderr(quiet: bool):
         return None
 
     def _print(es, done: int, total: int) -> None:
-        mark = "PASS" if es.passed else (
-            "ERR " if es.run_status not in ("ok", "") else "FAIL"
-        )
+        mark = "PASS" if es.passed else ("ERR " if es.run_status not in ("ok", "") else "FAIL")
         sys.stderr.write(
             f"[{done:>4}/{total}] {mark}  {es.case_id}  "
             f"scorer={es.scorer}  {es.task_excerpt[:60]}\n"
@@ -169,9 +173,7 @@ def _main_text(argv: list[str]) -> int:
     if args.profile:
         cfg.profile = args.profile
 
-    workspace = (
-        Path(args.cwd).expanduser().resolve() if args.cwd else Path.cwd().resolve()
-    )
+    workspace = Path(args.cwd).expanduser().resolve() if args.cwd else Path.cwd().resolve()
     if not workspace.is_dir():
         sys.stderr.write(f"eval: workspace not a directory: {workspace}\n")
         return 2
@@ -179,17 +181,16 @@ def _main_text(argv: list[str]) -> int:
     # Validate the default scorer before doing anything else
     # so a typo'd --scorer NAME fails fast.
     from ..eval.scorers import get_scorer, list_scorers
+
     try:
         get_scorer(args.scorer)
     except KeyError as e:
-        sys.stderr.write(
-            f"eval: {e}\n"
-            f"      available scorers: {', '.join(list_scorers())}\n"
-        )
+        sys.stderr.write(f"eval: {e}\n      available scorers: {', '.join(list_scorers())}\n")
         return 2
 
     try:
         from ..eval.runner import parse_cases_file
+
         cases = parse_cases_file(args.cases_file)
     except FileNotFoundError as e:
         sys.stderr.write(f"eval: {e}\n")
@@ -199,6 +200,7 @@ def _main_text(argv: list[str]) -> int:
         return 2
 
     from ..eval.summary import mint_eval_id
+
     eid = args.eval_id or mint_eval_id()
     output_dir = _resolve_output_dir(args, eval_id=eid, cfg=cfg)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -206,19 +208,28 @@ def _main_text(argv: list[str]) -> int:
     if not cases:
         sys.stderr.write("eval: cases file has no entries\n")
         # Still write an empty summary so CI can read it.
-        from ..eval.summary import EvalSummary
         import datetime
-        now = datetime.datetime.now(datetime.timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%S.%fZ"
-        )
+
+        from ..eval.summary import EvalSummary
+
+        now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         summary = EvalSummary(
-            eval_id=eid, batch_id="", started_at=now, finished_at=now,
-            duration_s=0.0, output_dir=str(output_dir),
-            total=0, passed=0, failed=0, errored=0,
-            pass_rate=0.0, avg_score=0.0,
+            eval_id=eid,
+            batch_id="",
+            started_at=now,
+            finished_at=now,
+            duration_s=0.0,
+            output_dir=str(output_dir),
+            total=0,
+            passed=0,
+            failed=0,
+            errored=0,
+            pass_rate=0.0,
+            avg_score=0.0,
         )
         (output_dir / "eval-summary.json").write_text(
-            summary.to_json(indent=2), encoding="utf-8",
+            summary.to_json(indent=2),
+            encoding="utf-8",
         )
         if args.json:
             sys.stdout.write(summary.to_json(indent=None) + "\n")
@@ -227,6 +238,7 @@ def _main_text(argv: list[str]) -> int:
     score_progress = _score_progress_to_stderr(args.quiet)
 
     from ..eval.runner import run_eval
+
     summary = run_eval(
         cases,
         cfg=cfg,
@@ -257,16 +269,10 @@ def _main_text(argv: list[str]) -> int:
                 f"{len(summary.improvements)} improvement(s)\n"
             )
             if summary.regressions:
-                sys.stderr.write(
-                    f"  regressed: {', '.join(summary.regressions)}\n"
-                )
+                sys.stderr.write(f"  regressed: {', '.join(summary.regressions)}\n")
             if summary.improvements:
-                sys.stderr.write(
-                    f"  improved:  {', '.join(summary.improvements)}\n"
-                )
-        sys.stderr.write(
-            f"summary: {output_dir / 'eval-summary.json'}\n"
-        )
+                sys.stderr.write(f"  improved:  {', '.join(summary.improvements)}\n")
+        sys.stderr.write(f"summary: {output_dir / 'eval-summary.json'}\n")
 
     # Exit code: 0 if every case passed; 1 if any failed or
     # errored; 2 already returned above for validation.
@@ -289,11 +295,13 @@ def _build_run_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--model", required=True,
+        "--model",
+        required=True,
         help="Model tag passed to the Agent (e.g. troofevades-q35:athena).",
     )
     p.add_argument(
-        "--tasks", default="default",
+        "--tasks",
+        default="default",
         help=(
             "Task-set name. Built-ins: default, file_ops, shell, "
             "structured, mcp. User-supplied modules under "
@@ -302,7 +310,8 @@ def _build_run_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--policy", choices=("default", "static", "heuristic"),
+        "--policy",
+        choices=("default", "static", "heuristic"),
         default="default",
         help=(
             "Parseltongue policy. 'default' uses the active config "
@@ -311,15 +320,21 @@ def _build_run_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--output", "-o", required=True,
+        "--output",
+        "-o",
+        required=True,
         help="Path to write the JSON report.",
     )
     p.add_argument(
-        "--limit", type=int, default=0,
+        "--limit",
+        type=int,
+        default=0,
         help="If >0, only run the first N tasks (smoke-testing).",
     )
     p.add_argument(
-        "--quiet", "-q", action="store_true",
+        "--quiet",
+        "-q",
+        action="store_true",
         help="Suppress per-task progress on stderr.",
     )
     return p
@@ -364,7 +379,7 @@ def _main_run(argv: list[str]) -> int:
             "passed": "PASS",
             "failed": "FAIL",
             "timeout": "TOUT",
-            "error":   "ERR ",
+            "error": "ERR ",
         }.get(result.status, "????")
         sys.stderr.write(
             f"  {mark}  {result.task_id}  ({result.duration_s:.1f}s, "
@@ -386,14 +401,11 @@ def _main_run(argv: list[str]) -> int:
 
     if not args.quiet:
         sys.stderr.write(
-            f"\neval run: {report.passed}/{report.total} passed "
-            f"({report.pass_rate * 100:.1f}%)"
+            f"\neval run: {report.passed}/{report.total} passed ({report.pass_rate * 100:.1f}%)"
         )
         if report.failed or report.timed_out or report.errored:
             sys.stderr.write(
-                f"  [{report.failed} failed, "
-                f"{report.timed_out} timeout, "
-                f"{report.errored} error]"
+                f"  [{report.failed} failed, {report.timed_out} timeout, {report.errored} error]"
             )
         sys.stderr.write(f"\nreport: {out_path}\n")
         # Per-bucket breakdown.
@@ -427,7 +439,8 @@ def _build_compare_parser() -> argparse.ArgumentParser:
     p.add_argument("baseline", help="Path to baseline report JSON.")
     p.add_argument("current", help="Path to current report JSON.")
     p.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="Emit the diff as JSON on stdout instead of human text.",
     )
     return p
@@ -478,13 +491,9 @@ def _main_compare(argv: list[str]) -> int:
     if diff.improvements:
         sys.stderr.write("  improved:  " + ", ".join(diff.improvements) + "\n")
     if diff.only_in_baseline:
-        sys.stderr.write(
-            "  only_in_baseline: " + ", ".join(diff.only_in_baseline) + "\n"
-        )
+        sys.stderr.write("  only_in_baseline: " + ", ".join(diff.only_in_baseline) + "\n")
     if diff.only_in_current:
-        sys.stderr.write(
-            "  only_in_current:  " + ", ".join(diff.only_in_current) + "\n"
-        )
+        sys.stderr.write("  only_in_current:  " + ", ".join(diff.only_in_current) + "\n")
 
     return 1 if diff.regressions else 0
 
@@ -507,7 +516,8 @@ def _build_list_tasks_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="Emit as JSON instead of human-readable table.",
     )
     return p
@@ -530,10 +540,7 @@ def _main_list_tasks(argv: list[str]) -> int:
         groups = {k: v for k, v in BUCKETS.items() if k != "default"}
 
     if args.json:
-        out = {
-            name: [t.to_catalog_dict() for t in tasks]
-            for name, tasks in groups.items()
-        }
+        out = {name: [t.to_catalog_dict() for t in tasks] for name, tasks in groups.items()}
         sys.stdout.write(json.dumps(out, indent=2) + "\n")
         return 0
 
@@ -543,9 +550,7 @@ def _main_list_tasks(argv: list[str]) -> int:
         sys.stdout.write(f"[{name}] ({len(tasks)} tasks)\n")
         for t in tasks:
             mcp_tag = " [mcp]" if t.mcp_servers else ""
-            sys.stdout.write(
-                f"  {t.id:35s}{mcp_tag}  {t.short_description()}\n"
-            )
+            sys.stdout.write(f"  {t.id:35s}{mcp_tag}  {t.short_description()}\n")
         sys.stdout.write("\n")
     return 0
 

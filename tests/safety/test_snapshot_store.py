@@ -450,6 +450,7 @@ def test_restore_rejects_tar_slip(
     a tarball being modified on disk by another tool or supply-chain
     compromise — the snapshot dir is local but not write-protected."""
     import tarfile as _tarfile
+
     skill = _write_skill_tree(workspace)
     token = set_current_write_origin(CURATOR)
     try:
@@ -468,6 +469,7 @@ def test_restore_rejects_tar_slip(
             evil = _tarfile.TarInfo(name="../escaped.md")
             payload = b"pwned"
             import io as _io
+
             evil.size = len(payload)
             dst.addfile(evil, _io.BytesIO(payload))
     snap.tarball_path.unlink()

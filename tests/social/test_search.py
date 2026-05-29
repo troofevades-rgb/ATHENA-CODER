@@ -18,7 +18,6 @@ import pytest
 from athena.providers.social import SocialProvider
 from athena.social import search as search_module
 
-
 # ---------------------------------------------------------------------------
 # Capability + routing
 # ---------------------------------------------------------------------------
@@ -219,7 +218,9 @@ def test_visible_switch_surfaced(monkeypatch, capsys):
     captured = capsys.readouterr().out
     # The visible switch — ui.info routes through stdout in
     # athena's UI.
-    assert "searching X via social" in captured or "searching X via social" in capsys.readouterr().out
+    assert (
+        "searching X via social" in captured or "searching X via social" in capsys.readouterr().out
+    )
 
     payload = json.loads(out)
     assert payload["available"] is True
@@ -233,9 +234,7 @@ def test_search_x_no_provider_degrades_cleanly(monkeypatch, capsys):
     """No social provider declared → tool returns
     available=false with a clear reason — never raises into the
     agent loop."""
-    monkeypatch.setattr(
-        search_module, "_resolve_social_provider", lambda: (None, None)
-    )
+    monkeypatch.setattr(search_module, "_resolve_social_provider", lambda: (None, None))
 
     out = search_module.search_x(query="anything")
     payload = json.loads(out)
@@ -249,9 +248,7 @@ def test_search_x_provider_declared_but_not_available(monkeypatch):
     declares the capability but isn't ready (e.g. no OAuth
     token) — the tool surfaces that as the same not-ready
     error."""
-    monkeypatch.setattr(
-        search_module, "_resolve_social_provider", lambda: ("social", None)
-    )
+    monkeypatch.setattr(search_module, "_resolve_social_provider", lambda: ("social", None))
     out = search_module.search_x(query="anything")
     payload = json.loads(out)
     assert payload["available"] is False
@@ -268,9 +265,7 @@ def test_search_x_provider_raises_returns_structured_error(monkeypatch):
         def social_search(self, q, *, max_results):
             raise RuntimeError("vendor exploded")
 
-    monkeypatch.setattr(
-        search_module, "_resolve_social_provider", lambda: ("social", _Boom())
-    )
+    monkeypatch.setattr(search_module, "_resolve_social_provider", lambda: ("social", _Boom()))
     out = search_module.search_x(query="x")
     payload = json.loads(out)
     assert payload["available"] is False

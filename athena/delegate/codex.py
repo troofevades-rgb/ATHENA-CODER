@@ -37,9 +37,9 @@ class CodexDetection(NamedTuple):
     """Result of looking for the codex CLI on this host."""
 
     found: bool
-    path: str | None        # absolute path to the binary, when found
-    version: str | None     # version string from ``codex --version``, when found
-    error: str | None       # explanation when not found / not runnable
+    path: str | None  # absolute path to the binary, when found
+    version: str | None  # version string from ``codex --version``, when found
+    error: str | None  # explanation when not found / not runnable
 
 
 def detect_codex(*, binary_name: str = "codex") -> CodexDetection:
@@ -52,7 +52,9 @@ def detect_codex(*, binary_name: str = "codex") -> CodexDetection:
     location = shutil.which(binary_name)
     if location is None:
         return CodexDetection(
-            found=False, path=None, version=None,
+            found=False,
+            path=None,
+            version=None,
             error=(
                 f"{binary_name!r} not found on PATH. Install with:\n"
                 "  npm install -g @openai/codex   # Node\n"
@@ -71,7 +73,9 @@ def detect_codex(*, binary_name: str = "codex") -> CodexDetection:
     try:
         out = subprocess.run(
             [location, "--version"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if out.returncode == 0 and out.stdout.strip():
             version = out.stdout.strip().splitlines()[0]
@@ -82,7 +86,10 @@ def detect_codex(*, binary_name: str = "codex") -> CodexDetection:
         version = None
 
     return CodexDetection(
-        found=True, path=location, version=version, error=None,
+        found=True,
+        path=location,
+        version=version,
+        error=None,
     )
 
 
@@ -126,8 +133,7 @@ def write_config_snippet(
     review).
     """
     target = (
-        Path(config_path).expanduser() if config_path
-        else Path.home() / ".athena" / "config.toml"
+        Path(config_path).expanduser() if config_path else Path.home() / ".athena" / "config.toml"
     )
     snippet = recommended_config_snippet(sandbox=sandbox)
 
@@ -136,9 +142,7 @@ def write_config_snippet(
         try:
             existing = target.read_text(encoding="utf-8")
         except OSError as e:
-            raise RuntimeError(
-                f"cannot read existing config at {target}: {e}"
-            ) from e
+            raise RuntimeError(f"cannot read existing config at {target}: {e}") from e
         if "cli_delegate_command" in existing and not overwrite:
             raise RuntimeError(
                 f"{target} already configures cli_delegate_command; "

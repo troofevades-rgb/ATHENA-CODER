@@ -64,10 +64,7 @@ def encode_iterm2(image: Any, *, name: str = "image", inline: bool = True) -> st
     data = base64.standard_b64encode(buf.getvalue()).decode("ascii")
     name_b64 = base64.standard_b64encode(name.encode("utf-8")).decode("ascii")
     inline_flag = "1" if inline else "0"
-    return (
-        f"\033]1337;File=name={name_b64};inline={inline_flag};"
-        f"size={len(data)}:{data}\007"
-    )
+    return f"\033]1337;File=name={name_b64};inline={inline_flag};size={len(data)}:{data}\007"
 
 
 def encode_sixel(image: Any, *, max_colors: int = 256) -> str:

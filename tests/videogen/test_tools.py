@@ -28,7 +28,6 @@ from athena.videogen.job import (
     JobHandle,
 )
 
-
 # ---------------------------------------------------------------------------
 # Capability declaration
 # ---------------------------------------------------------------------------
@@ -146,12 +145,8 @@ def test_resolve_backend_missing_protocol_methods(monkeypatch):
     _BadProvider.stream_chat = lambda *a, **k: (_ for _ in ()).throw(NotImplementedError())  # type: ignore[method-assign]
     _BadProvider.parse_tool_calls = lambda self, c, r: (c, [])  # type: ignore[method-assign]
 
-    monkeypatch.setattr(
-        "athena.providers._REGISTRY", {"bad_video": _BadProvider}
-    )
-    monkeypatch.setattr(
-        "athena.media.registry._REGISTRY", {"bad_video": _BadProvider}
-    )
+    monkeypatch.setattr("athena.providers._REGISTRY", {"bad_video": _BadProvider})
+    monkeypatch.setattr("athena.media.registry._REGISTRY", {"bad_video": _BadProvider})
 
     cfg = SimpleNamespace(
         video_backend_prefer="local",
@@ -170,9 +165,7 @@ def test_stub_backend_full_cycle(tmp_path: Path):
     contract — estimate / submit / poll / fetch all do
     sensible things."""
     backend = StubLocalVideoBackend()
-    request = GenerationRequest(
-        mode="text_to_video", prompt="a stub clip", duration_s=4.0
-    )
+    request = GenerationRequest(mode="text_to_video", prompt="a stub clip", duration_s=4.0)
 
     est = backend.estimate(request)
     assert isinstance(est, CostEstimate)

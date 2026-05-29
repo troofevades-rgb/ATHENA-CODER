@@ -53,9 +53,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
 
     n_turns = _backfill_sessions(store, pdir)
     n_mem = _backfill_memory(store, pdir, args)
-    sys.stdout.write(
-        f"backfilled {n_turns} session turn(s) + {n_mem} memory entry(ies)\n"
-    )
+    sys.stdout.write(f"backfilled {n_turns} session turn(s) + {n_mem} memory entry(ies)\n")
     return 0
 
 

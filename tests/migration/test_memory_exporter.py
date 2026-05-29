@@ -74,6 +74,7 @@ def test_exports_sqlite_to_markdown_files(
     # from untrusted SQLite sources; verify by YAML-parsing the front
     # matter rather than literal-string-matching the (quoted) values.
     import yaml as _yaml
+
     _, fm_text, _ = user_md.split("---", 2)
     fm = _yaml.safe_load(fm_text)
     assert fm["name"] == "user role"

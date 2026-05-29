@@ -71,10 +71,17 @@ def test_docx_metadata_extraction(tmp_path: Path):
 def test_docx_normalized_shape(tmp_path: Path):
     """Same JSON-safe shape as the PDF extractor."""
     import json
+
     doc = make_docx_with_structure(tmp_path / "structured.docx")
     nd = extract(doc).normalized()
     json.dumps(nd)
     assert set(nd.keys()) >= {
-        "text", "pages", "outline", "tables", "metadata",
-        "scanned_pages", "ocr_pages", "figures",
+        "text",
+        "pages",
+        "outline",
+        "tables",
+        "metadata",
+        "scanned_pages",
+        "ocr_pages",
+        "figures",
     }

@@ -12,8 +12,8 @@ adjust the underlying knobs.
 from __future__ import annotations
 
 from .. import ui
+from ..computer.audit import ActionAuditLog, default_audit_path
 from ..computer.detect import available_backends, select_backend
-from ..computer.audit import default_audit_path, ActionAuditLog
 from ..config import load_config, profile_dir
 from . import command
 
@@ -36,9 +36,7 @@ def _print_status(*, tail_n: int = 5) -> None:
         f"  allowlist: {allow if allow else '[dim](empty — no app may be controlled)[/]'}"
     )
     ui.console.print(f"  denylist:  {deny}")
-    ui.console.print(
-        f"  kill hotkey: {cu.kill_hotkey} (Ctrl+C always active)"
-    )
+    ui.console.print(f"  kill hotkey: {cu.kill_hotkey} (Ctrl+C always active)")
     ui.console.print(
         f"  caps: max_actions/task={cu.max_actions_per_task}, "
         f"max_actions/sec={cu.max_actions_per_sec}"
@@ -55,9 +53,7 @@ def _print_status(*, tail_n: int = 5) -> None:
     ui.console.print("  known backends:")
     for row in available_backends():
         marker = "✓" if row["available"] else "✗"
-        ui.console.print(
-            f"    {marker} {row['name']}: supports={row['supports']}"
-        )
+        ui.console.print(f"    {marker} {row['name']}: supports={row['supports']}")
 
     # Audit log tail.
     prof = getattr(cfg, "profile", None) or "default"
@@ -71,13 +67,10 @@ def _print_status(*, tail_n: int = 5) -> None:
     ui.console.print(f"  recent actions (last {len(entries)}):")
     for e in entries:
         result_color = (
-            "green" if e.executed and e.result == "ok"
-            else "yellow" if not e.executed
-            else "red"
+            "green" if e.executed and e.result == "ok" else "yellow" if not e.executed else "red"
         )
         ui.console.print(
-            f"    [{e.ts}] {e.type} tier={e.tier} "
-            f"app={e.app!r} → [{result_color}]{e.result}[/]"
+            f"    [{e.ts}] {e.type} tier={e.tier} app={e.app!r} → [{result_color}]{e.result}[/]"
         )
 
 

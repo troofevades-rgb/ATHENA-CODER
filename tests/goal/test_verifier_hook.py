@@ -58,7 +58,10 @@ def test_no_command_returns_none():
 
 def test_zero_exit_passes(monkeypatch):
     completed = subprocess.CompletedProcess(
-        args="true", returncode=0, stdout="ok\n", stderr="",
+        args="true",
+        returncode=0,
+        stdout="ok\n",
+        stderr="",
     )
     monkeypatch.setattr(subprocess, "run", lambda *a, **kw: completed)
     result = run_goal_verifier(_cfg(goal_verifier_command="true"))
@@ -69,8 +72,10 @@ def test_zero_exit_passes(monkeypatch):
 
 def test_nonzero_exit_fails(monkeypatch):
     completed = subprocess.CompletedProcess(
-        args="false", returncode=1,
-        stdout="FAIL: 2 tests broke\n", stderr="AssertionError\n",
+        args="false",
+        returncode=1,
+        stdout="FAIL: 2 tests broke\n",
+        stderr="AssertionError\n",
     )
     monkeypatch.setattr(subprocess, "run", lambda *a, **kw: completed)
     result = run_goal_verifier(_cfg(goal_verifier_command="false"))
@@ -83,6 +88,7 @@ def test_nonzero_exit_fails(monkeypatch):
 def test_timeout_fails_with_reason(monkeypatch):
     def _raise(*a, **kw):
         raise subprocess.TimeoutExpired(cmd="x", timeout=10)
+
     monkeypatch.setattr(subprocess, "run", _raise)
     result = run_goal_verifier(_cfg(goal_verifier_command="sleep 999"))
     assert result is not None
@@ -93,6 +99,7 @@ def test_timeout_fails_with_reason(monkeypatch):
 def test_spawn_failure_fails_with_reason(monkeypatch):
     def _raise(*a, **kw):
         raise OSError("no such file")
+
     monkeypatch.setattr(subprocess, "run", _raise)
     result = run_goal_verifier(_cfg(goal_verifier_command="missing-binary"))
     assert result is not None
@@ -103,7 +110,10 @@ def test_spawn_failure_fails_with_reason(monkeypatch):
 def test_long_output_is_truncated(monkeypatch):
     big = "X" * 10_000
     completed = subprocess.CompletedProcess(
-        args="cmd", returncode=1, stdout=big, stderr="",
+        args="cmd",
+        returncode=1,
+        stdout=big,
+        stderr="",
     )
     monkeypatch.setattr(subprocess, "run", lambda *a, **kw: completed)
     result = run_goal_verifier(_cfg(goal_verifier_command="cmd"))
@@ -152,7 +162,8 @@ def test_achieved_with_failing_verifier_refuses(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         "athena.goal.loop.run_goal_verifier",
         lambda cfg: VerifierResult(
-            passed=False, output="FAILED tests/foo.py::test_bar",
+            passed=False,
+            output="FAILED tests/foo.py::test_bar",
         ),
     )
     state = _active_state()
@@ -221,13 +232,15 @@ def test_failing_verifier_emits_visible_ui_warn(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         "athena.goal.loop.run_goal_verifier",
         lambda cfg: VerifierResult(
-            passed=False, output="FAIL: 3 tests broke",
+            passed=False,
+            output="FAIL: 3 tests broke",
         ),
     )
 
     captured: list[str] = []
     monkeypatch.setattr(
-        "athena.ui.warn", lambda msg, *a, **kw: captured.append(str(msg)),
+        "athena.ui.warn",
+        lambda msg, *a, **kw: captured.append(str(msg)),
     )
 
     state = _active_state()

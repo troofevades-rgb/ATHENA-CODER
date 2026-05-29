@@ -98,10 +98,7 @@ class MediaRegistry:
         ``capability``. The differentiated MCP surface checks
         this before advertising a capability-dependent tool —
         no provider declares it → tool isn't advertised."""
-        return any(
-            cls.static_capabilities().supports(capability)
-            for cls in _REGISTRY.values()
-        )
+        return any(cls.static_capabilities().supports(capability) for cls in _REGISTRY.values())
 
     def available_backend_for(
         self,
@@ -128,9 +125,7 @@ class MediaRegistry:
             available_providers_with_capability,
         )
 
-        names = available_providers_with_capability(
-            capability, cfg=self.cfg, pool=pool
-        )
+        names = available_providers_with_capability(capability, cfg=self.cfg, pool=pool)
         if not names:
             logger.info(
                 "media:%s → no AVAILABLE backend (declared but no creds / all cooled-down)",
@@ -142,9 +137,7 @@ class MediaRegistry:
             for name in names:
                 cls = _REGISTRY.get(name)
                 if cls is not None and cls.static_capabilities().is_local:
-                    logger.info(
-                        "media:%s → %s (local + available)", capability, name
-                    )
+                    logger.info("media:%s → %s (local + available)", capability, name)
                     return cls
 
         chosen = names[0]

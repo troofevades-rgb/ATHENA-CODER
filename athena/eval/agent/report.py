@@ -245,9 +245,7 @@ class CompareResult:
         }
 
 
-def compare_reports(
-    baseline: EvalReport, current: EvalReport
-) -> CompareResult:
+def compare_reports(baseline: EvalReport, current: EvalReport) -> CompareResult:
     """Diff two reports by ``task_id``. Tasks not present in both are
     surfaced separately rather than dropped silently."""
     base_by_id = {r.task_id: r for r in baseline.results}
