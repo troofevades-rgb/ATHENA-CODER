@@ -49,6 +49,17 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.S)
 _MEMORY_TYPES = {"user", "feedback", "project", "reference"}
 
 
+def _deprecated(message: str) -> None:
+    """Emit a one-line DeprecationWarning for legacy workspace-keyed
+    callers (R2 stage 3). The agent's system-prompt build still uses
+    :func:`load_memory_index` for its stage-2 compatibility fallback;
+    that one is exempt -- it'll be removed at R2 stage 5 along with
+    the rest of this module."""
+    import warnings as _warnings
+
+    _warnings.warn(message, DeprecationWarning, stacklevel=3)
+
+
 def _slugify(p: Path) -> str:
     """Stable, filesystem-safe slug for a workspace path.
 
@@ -132,6 +143,11 @@ def parse_memory_file(path: Path) -> MemoryFile | None:
 
 
 def list_memories(workspace: Path) -> list[MemoryFile]:
+    _deprecated(
+        "list_memories(workspace) is deprecated; use "
+        "athena.memory.store.list_entries(profile, workspace=workspace) "
+        "(R2 stage 3)."
+    )
     d = memory_dir(workspace)
     if not d.exists():
         return []
@@ -155,6 +171,11 @@ def write_memory(
     body: str,
 ) -> Path:
     """Write a memory file and update MEMORY.md to reference it."""
+    _deprecated(
+        "write_memory(workspace, ...) is deprecated; use "
+        "athena.memory.store.write_entry(profile, workspace=workspace, ...) "
+        "(R2 stage 3)."
+    )
     if type not in _MEMORY_TYPES:
         raise ValueError(f"invalid memory type {type!r}; must be one of {_MEMORY_TYPES}")
     if not filename.endswith(".md"):
@@ -189,6 +210,11 @@ def write_memory(
 
 
 def delete_memory(workspace: Path, filename: str) -> bool:
+    _deprecated(
+        "delete_memory(workspace, filename) is deprecated; use "
+        "athena.memory.store.delete_entry(profile, name, workspace=workspace) "
+        "(R2 stage 3)."
+    )
     # Same model-callable surface as write_memory — guard against
     # prompt-injected ``filename="../../../etc/passwd"`` deleting
     # arbitrary files. Mirrors the literal + resolved-containment
