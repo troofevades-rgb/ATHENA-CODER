@@ -37,11 +37,11 @@ Subcommands (once enabled)::
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
 from .. import ui
+from ..env import get_credential
 from . import command
 
 # 0.3.0 hardening (Tier 0 #3): ``/godmode`` is REGISTERED unconditionally
@@ -58,15 +58,20 @@ _GATE_VALUE = "1"
 
 
 def _gate_open() -> bool:
-    return os.environ.get(_GATE_ENV_VAR) == _GATE_VALUE
+    # Routed through ``get_credential`` so the gate honors athena's
+    # standard dotenv convention -- ``ATHENA_ALLOW_GODMODE=1`` in
+    # ``~/.athena/.env`` opens the gate the same as a shell-exported
+    # env var. Lookup order is dotenv first, then process env.
+    return get_credential(_GATE_ENV_VAR) == _GATE_VALUE
 
 
 def _refuse_gated() -> None:
     ui.error(
-        f"/godmode is gated. Set {_GATE_ENV_VAR}={_GATE_VALUE} in your "
-        "environment and restart athena to enable. The module ships "
-        "templates that intentionally weaken the model's safety posture; "
-        "opting in is a deliberate operator decision."
+        f"/godmode is gated. Set {_GATE_ENV_VAR}={_GATE_VALUE} either in "
+        f"~/.athena/.env or as a shell environment variable and restart "
+        "athena to enable. The module ships templates that intentionally "
+        "weaken the model's safety posture; opting in is a deliberate "
+        "operator decision."
     )
 
 

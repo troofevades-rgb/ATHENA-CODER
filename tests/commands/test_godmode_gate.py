@@ -23,10 +23,31 @@ Pins:
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolate_dotenv(
+    tmp_path: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Point ``athena.env._path`` at a guaranteed-missing file and
+    reset the cache around every test so the user's real
+    ``~/.athena/.env`` (which could contain ATHENA_ALLOW_GODMODE=1
+    after this routing change) can't pollute the gate-behavior
+    pins. The dotenv-path test below opts back in by writing its
+    own file under tmp_path and re-pointing ``_path``."""
+    import athena.env as env_mod
+
+    fake = Path(str(tmp_path)) / "missing.env"
+    monkeypatch.setattr(env_mod, "_path", lambda: fake)
+    env_mod.reset_cache()
+    yield
+    env_mod.reset_cache()
 
 
 @pytest.fixture
@@ -174,6 +195,107 @@ def test_active_path_lists_strategies(
     combined = " ".join(_captured_ui["print"])
     assert "og_godmode" in combined
     assert "refusal_inversion" in combined
+
+
+# ---------------------------------------------------------------------------
+# Dotenv path: ATHENA_ALLOW_GODMODE=1 in ~/.athena/.env opens the gate
+# the same as a shell env var -- matches athena's standard credential
+# convention so operators don't have to remember a special-case place.
+# ---------------------------------------------------------------------------
+
+
+def test_dotenv_file_opens_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _agent: SimpleNamespace,
+    _captured_ui: dict[str, list[str]],
+) -> None:
+    """ATHENA_ALLOW_GODMODE=1 written into the dotenv file opens
+    the gate without needing the shell-exported env var. This is
+    the whole point of the routing-through-get_credential change."""
+    import athena.env as env_mod
+
+    dotenv = tmp_path / ".env"
+    dotenv.write_text("ATHENA_ALLOW_GODMODE=1\n", encoding="utf-8")
+    monkeypatch.setattr(env_mod, "_path", lambda: dotenv)
+    env_mod.reset_cache()
+    # Ensure the OS env var is NOT set -- the dotenv must carry the
+    # gate by itself, not coincidentally because the env var was also set.
+    monkeypatch.delenv("ATHENA_ALLOW_GODMODE", raising=False)
+
+    from athena.commands.godmode import cmd_godmode
+
+    cmd_godmode(_agent, "list")
+    # Active path: warning fires, strategy listing renders, no refusal.
+    assert _captured_ui["warn"], "expected active-path warning when dotenv opens the gate"
+    assert not any("/godmode is gated" in m for m in _captured_ui["error"])
+    assert any("og_godmode" in p for p in _captured_ui["print"])
+
+
+def test_dotenv_quoted_value_opens_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _agent: SimpleNamespace,
+    _captured_ui: dict[str, list[str]],
+) -> None:
+    """The dotenv parser strips matching quote pairs, so
+    ``ATHENA_ALLOW_GODMODE="1"`` and ``ATHENA_ALLOW_GODMODE='1'``
+    must also open the gate. Operators paste-format their .env
+    inconsistently; the gate honoring whatever the parser yields
+    keeps the contract clean."""
+    import athena.env as env_mod
+
+    dotenv = tmp_path / ".env"
+    dotenv.write_text('ATHENA_ALLOW_GODMODE="1"\n', encoding="utf-8")
+    monkeypatch.setattr(env_mod, "_path", lambda: dotenv)
+    env_mod.reset_cache()
+    monkeypatch.delenv("ATHENA_ALLOW_GODMODE", raising=False)
+
+    from athena.commands.godmode import cmd_godmode
+
+    cmd_godmode(_agent, "list")
+    assert _captured_ui["warn"]
+    assert any("og_godmode" in p for p in _captured_ui["print"])
+
+
+def test_dotenv_wrong_value_does_not_open_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    _agent: SimpleNamespace,
+    _captured_ui: dict[str, list[str]],
+) -> None:
+    """Strict ``"1"`` match still applies to dotenv values --
+    ``ATHENA_ALLOW_GODMODE=true`` in .env is NOT enough. The dotenv
+    routing must not loosen the env-var contract; it just adds a
+    second source for the same exact value."""
+    import athena.env as env_mod
+
+    dotenv = tmp_path / ".env"
+    dotenv.write_text("ATHENA_ALLOW_GODMODE=true\n", encoding="utf-8")
+    monkeypatch.setattr(env_mod, "_path", lambda: dotenv)
+    env_mod.reset_cache()
+    monkeypatch.delenv("ATHENA_ALLOW_GODMODE", raising=False)
+
+    from athena.commands.godmode import cmd_godmode
+
+    cmd_godmode(_agent, "list")
+    assert _captured_ui["error"], "expected refusal -- 'true' is not '1'"
+
+
+def test_refusal_message_mentions_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+    _agent: SimpleNamespace,
+    _captured_ui: dict[str, list[str]],
+) -> None:
+    """The refusal message must point at BOTH the dotenv file and
+    the shell env var so operators know either path works."""
+    monkeypatch.delenv("ATHENA_ALLOW_GODMODE", raising=False)
+    from athena.commands.godmode import cmd_godmode
+
+    cmd_godmode(_agent, "list")
+    combined = " ".join(_captured_ui["error"]).lower()
+    assert ".env" in combined
+    assert "athena_allow_godmode" in combined
 
 
 # ---------------------------------------------------------------------------
