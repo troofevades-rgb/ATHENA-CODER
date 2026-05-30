@@ -358,6 +358,87 @@ async def test_process_dedupes_media_artifacts(tmp_path: Path) -> None:
     assert [p for _, p, _ in adapter.sent_files] == [clip]
 
 
+# ---- tool-result relay ------------------------------------------------
+
+
+async def test_process_relays_tool_results(tmp_path: Path) -> None:
+    """A gateway_relay tool's result (emit_tool_result) must be delivered
+    to the chat, with a header, BEFORE the model's summary — otherwise it
+    only ever renders to the daemon terminal."""
+    from athena.agent.tool_relay import emit_tool_result
+
+    daemon = _FakeDaemon(tmp_path)
+    daemon.approvals.bind_loop(asyncio.get_running_loop())
+    adapter = _TestAdapter(daemon)
+    adapter._active_sessions["sess-1"] = asyncio.Event()
+
+    def run(text: str = "") -> None:
+        emit_tool_result("skills_list", "- alpha (active) — A\n- beta (active) — B")
+
+    daemon.pool.agents["sess-1"] = SimpleNamespace(
+        run_until_done=run,
+        last_assistant_message=lambda: "here are your skills",
+    )
+
+    await adapter._process_message_background(_evt(), "sess-1")
+
+    bodies = [t for _, t in adapter.sent_text]
+    assert any("alpha (active)" in b for b in bodies), bodies
+    assert any("skills_list" in b for b in bodies)
+    # Relayed content comes before the summary.
+    relay_idx = next(i for i, b in enumerate(bodies) if "alpha (active)" in b)
+    summary_idx = next(i for i, b in enumerate(bodies) if "here are your skills" in b)
+    assert relay_idx < summary_idx
+
+
+async def test_process_truncates_long_tool_result(tmp_path: Path) -> None:
+    """A huge relayed result is truncated (not firehosed) into the chat."""
+    from athena.agent.tool_relay import emit_tool_result
+
+    daemon = _FakeDaemon(tmp_path)
+    daemon.approvals.bind_loop(asyncio.get_running_loop())
+    adapter = _TestAdapter(daemon)
+    adapter._active_sessions["sess-1"] = asyncio.Event()
+
+    big = "x" * 5000
+
+    def run(text: str = "") -> None:
+        emit_tool_result("dump", big)
+
+    daemon.pool.agents["sess-1"] = SimpleNamespace(
+        run_until_done=run,
+        last_assistant_message=lambda: "",
+    )
+
+    await adapter._process_message_background(_evt(), "sess-1")
+
+    joined = "\n".join(t for _, t in adapter.sent_text)
+    assert "truncated" in joined
+    assert joined.count("x") < 5000  # not the whole thing
+
+
+async def test_process_skips_empty_tool_result(tmp_path: Path) -> None:
+    """A blank relayed result produces no chat message."""
+    from athena.agent.tool_relay import emit_tool_result
+
+    daemon = _FakeDaemon(tmp_path)
+    daemon.approvals.bind_loop(asyncio.get_running_loop())
+    adapter = _TestAdapter(daemon)
+    adapter._active_sessions["sess-1"] = asyncio.Event()
+
+    def run(text: str = "") -> None:
+        emit_tool_result("noop", "   ")
+
+    daemon.pool.agents["sess-1"] = SimpleNamespace(
+        run_until_done=run,
+        last_assistant_message=lambda: "done",
+    )
+
+    await adapter._process_message_background(_evt(), "sess-1")
+
+    assert [t for _, t in adapter.sent_text] == ["done"]
+
+
 # ---- approval bridge --------------------------------------------------
 
 

@@ -923,6 +923,17 @@ class AgentRuntime:
         with ui_lock:
             ui.tool_result(name, result)
 
+        # Relay the result to a gateway chat if this tool opted in
+        # (gateway_relay=True) -- e.g. skills_list, whose output is itself
+        # what the user asked to see. Emitted on the RAW result, before
+        # the large-output blob-handle swap below, so the chat gets the
+        # real content rather than a storage reference. No-op when no
+        # gateway sink is bound (terminal / forks).
+        if t is not None and getattr(t, "gateway_relay", False):
+            from .tool_relay import emit_tool_result
+
+            emit_tool_result(name, result if isinstance(result, str) else str(result))
+
         # Plugin observation; cannot affect control flow. ShellHookPlugin
         # bridges settings.json PostToolUse hooks here.
         self.plugin_hooks.post_tool_call(name, args, result)
