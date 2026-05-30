@@ -89,6 +89,13 @@ _PROGRESS_MIN_INTERVAL_SECONDS = 8.0
 # anything beyond this is logged and left on the server.
 _MAX_MEDIA_ARTIFACTS_PER_TURN = 8
 
+# Bounds on relaying gateway_relay tool results into the chat: the most
+# results a single turn can post, and the per-result char ceiling before
+# truncation. Keep the char cap below a couple of body-cap chunks so a
+# big result is a short scroll, not a channel flood.
+_MAX_TOOL_RELAYS_PER_TURN = 5
+_TOOL_RELAY_CHAR_CAP = 3500
+
 # Default chat-body cap when an adapter doesn't override.
 # Sized below Telegram's 4096 hard cap with headroom for Markdown
 # formatting (the parse-mode markers, code-fence delimiters, etc.).
@@ -601,6 +608,7 @@ class GatewayAdapter(ABC):
 
         from ..agent.media_artifacts import reset_media_sink, set_media_sink
         from ..agent.progress import reset_progress_sink, set_progress_sink
+        from ..agent.tool_relay import reset_tool_result_sink, set_tool_result_sink
         from ..safety.approval_callback import (
             reset_approval_callback,
             set_approval_callback,
@@ -682,6 +690,17 @@ class GatewayAdapter(ABC):
                 media_artifacts: list[str] = []
                 media_token = set_media_sink(media_artifacts.append)
 
+                # Tool-result relay: a tool that declared gateway_relay
+                # (e.g. skills_list) emits its result here; we collect
+                # them on the worker thread and deliver them to the chat
+                # after the turn — the output IS what the user asked to
+                # see, and it otherwise only renders to the daemon's
+                # terminal.
+                relayed_results: list[tuple[str, str]] = []
+                relay_token = set_tool_result_sink(
+                    lambda tool_name, text: relayed_results.append((tool_name, text))
+                )
+
                 user_text = _build_user_text(event)
 
                 try:
@@ -701,10 +720,14 @@ class GatewayAdapter(ABC):
                     )
                     return
                 finally:
+                    reset_tool_result_sink(relay_token)
                     reset_media_sink(media_token)
                     reset_progress_sink(progress_token)
                     reset_approval_callback(approval_token)
 
+                # Relayed tool output first (the content the user asked
+                # for), then the model's summary, then any media files.
+                await self._send_tool_results(event.chat_id, relayed_results)
                 response = strip_think_blocks(agent.last_assistant_message()).strip()
                 if response:
                     await self._send_chunked(event.chat_id, response)
@@ -766,6 +789,45 @@ class GatewayAdapter(ABC):
                 self.name,
                 chat_id,
             )
+
+    async def _send_tool_results(self, chat_id: str, results: list[tuple[str, str]]) -> None:
+        """Deliver the results of gateway_relay tools into the chat.
+
+        Each result gets a short ``_tool:_`` header and its body, the
+        body truncated to :data:`_TOOL_RELAY_CHAR_CAP` (with a note) and
+        then chunked to the platform's body cap. A per-turn cap bounds
+        how many results a single turn can post so a tool-heavy turn
+        can't flood the channel; the rest are logged and dropped. Empty
+        results are skipped. One result failing never aborts the rest.
+        """
+        if not results:
+            return
+        sent = 0
+        for name, body in results:
+            text = (body or "").strip()
+            if not text:
+                continue
+            if sent >= _MAX_TOOL_RELAYS_PER_TURN:
+                logger.warning(
+                    "[%s] tool-relay cap (%d) reached; %d result(s) not sent",
+                    self.name,
+                    _MAX_TOOL_RELAYS_PER_TURN,
+                    len(results) - sent,
+                )
+                break
+            if len(text) > _TOOL_RELAY_CHAR_CAP:
+                dropped = len(text) - _TOOL_RELAY_CHAR_CAP
+                text = text[:_TOOL_RELAY_CHAR_CAP] + f"\n… (truncated; {dropped} more chars)"
+            try:
+                await self._send_chunked(chat_id, f"_{name}:_\n{text}")
+                sent += 1
+            except Exception:
+                logger.exception(
+                    "[%s] failed to relay result of %s to %s",
+                    self.name,
+                    name,
+                    chat_id,
+                )
 
     async def _send_media_artifacts(self, chat_id: str, paths: list[str]) -> None:
         """Deliver media files a turn produced (video/image) into the

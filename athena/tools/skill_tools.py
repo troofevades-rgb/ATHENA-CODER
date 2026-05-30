@@ -225,6 +225,7 @@ def _err(action: str, name: str, message: str) -> str:
         },
     },
     parallel_safe=True,
+    gateway_relay=True,
 )
 def skills_list(state: str = "active", pinned: bool | None = None) -> str:
     include_archived = state in ("archived", "all")

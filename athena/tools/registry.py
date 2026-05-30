@@ -39,6 +39,14 @@ class Tool:
     # work adds the field + flags the obvious read-only surface; the
     # actual batched dispatch lands in stage 3.
     parallel_safe: bool = False
+    # Opt-in marker for surfacing this tool's RESULT into a gateway chat
+    # (Discord/Telegram/etc.). The gateway normally relays only the
+    # model's final text + media files; a tool whose output is itself
+    # the thing the user asked to see (``skills_list``, a status dump)
+    # sets ``gateway_relay=True`` so its result is delivered to the chat
+    # (truncated/chunked). Default ``False`` — most tool output is
+    # internal scaffolding the model summarizes, not chat-facing.
+    gateway_relay: bool = False
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -72,6 +80,7 @@ def tool(
     check_fn: Callable[[], bool] | None = None,
     aliases: list[str] | None = None,
     parallel_safe: bool = False,
+    gateway_relay: bool = False,
 ) -> Callable[[Callable[..., str]], Callable[..., str]]:
     """Register a function as a tool.
 
@@ -84,6 +93,10 @@ def tool(
     ``parallel_safe`` (Phase 18.2) opts the tool into concurrent dispatch
     with other parallel-safe siblings in the same tool-call round.
     Defaults to ``False`` (serial). See :class:`Tool` for the contract.
+
+    ``gateway_relay`` opts the tool's result into delivery to a gateway
+    chat (the result is what the user wanted to see, e.g. ``skills_list``).
+    Defaults to ``False``. See :class:`Tool` for the contract.
     """
 
     def deco(fn: Callable[..., str]) -> Callable[..., str]:
@@ -97,6 +110,7 @@ def tool(
             check_fn=check_fn,
             aliases=tuple(aliases or ()),
             parallel_safe=parallel_safe,
+            gateway_relay=gateway_relay,
         )
         _REGISTRY[name] = t
         _TOOLSETS.setdefault(toolset, set()).add(name)
