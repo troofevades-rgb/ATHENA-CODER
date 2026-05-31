@@ -355,6 +355,50 @@ def test_openrouter_no_credential_returns_empty(
     assert mod._openrouter_models() == {}
 
 
+def test_same_provider_switch_strips_routing_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Switching between two models on the SAME hosted provider
+    (e.g. ``anthropic/A`` -> ``anthropic/B``) must still strip the
+    routing prefix from ``agent.model``. Without the strip, the next
+    API call sends ``anthropic/B`` as the wire model id and the
+    upstream provider 404s.
+
+    Pin for dogfood bug: ``/model anthropic/claude-sonnet-4-5`` ->
+    ``/model anthropic/claude-opus-4-7`` left ``agent.model`` as
+    ``anthropic/claude-opus-4-7`` and Anthropic returned
+    ``model: anthropic/claude-opus-4-7 not_found_error``."""
+    import athena.commands.model as mod
+
+    monkeypatch.setattr(mod.ui, "info", lambda *a, **kw: None)
+    monkeypatch.setattr(mod.ui, "warn", lambda *a, **kw: None)
+
+    agent = _agent("claude-sonnet-4-5", provider_name="anthropic")
+    agent.cfg.providers = None
+    mod._switch_model(agent, "anthropic/claude-opus-4-7")
+
+    assert agent.model == "claude-opus-4-7"
+
+
+def test_same_provider_switch_strips_openrouter_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same invariant on the openrouter -> openrouter path. Both
+    Phase 2 picker labels are prefixed, and a redirect between two
+    OpenRouter models must NOT leave ``openrouter/`` on the wire."""
+    import athena.commands.model as mod
+
+    monkeypatch.setattr(mod.ui, "info", lambda *a, **kw: None)
+    monkeypatch.setattr(mod.ui, "warn", lambda *a, **kw: None)
+    monkeypatch.setattr(mod, "_OPENROUTER_CACHE", None)
+
+    agent = _agent("openai/gpt-4o", provider_name="openrouter")
+    agent.cfg.providers = None
+    mod._switch_model(agent, "openrouter/anthropic/claude-sonnet-4.6")
+
+    assert agent.model == "anthropic/claude-sonnet-4.6"
+
+
 # ---------------------------------------------------------------------------
 # Tool-capability awareness (added after dogfood found hermes-4-405b
 # 404'd on tool schemas)

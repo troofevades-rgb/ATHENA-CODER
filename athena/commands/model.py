@@ -34,7 +34,7 @@ from typing import Any
 
 from .. import ui
 from ..providers.credential_pool import global_pool as _global_pool
-from ..providers.runtime_resolver import _route, resolve_provider
+from ..providers.runtime_resolver import _bare_model, _route, resolve_provider
 from . import command
 
 logger = logging.getLogger(__name__)
@@ -305,7 +305,12 @@ def _switch_model(agent: Any, new_name: str) -> None:
         )
         _warn_if_openrouter_no_tools(new_provider_name, bare_model)
         return
-    agent.model = new_name
+    # Same-provider switch -- still strip the routing prefix so
+    # ``agent.model`` doesn't carry it onto the wire. Without this,
+    # ``/model anthropic/A`` -> ``/model anthropic/B`` sends
+    # ``anthropic/B`` to the API and Anthropic 404s on the prefix.
+    bare = _bare_model(new_provider_name, new_name)
+    agent.model = bare
     ui.info(f"model set to {agent.model}")
     _warn_if_openrouter_no_tools(new_provider_name, agent.model)
 
