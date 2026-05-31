@@ -119,6 +119,7 @@ _SUBCOMMANDS = {
     "checkpoint": "athena.cli.checkpoint",
     "audit": "athena.cli.audit",
     "verify": "athena.cli.verify",
+    "doctor": "athena.cli.doctor",
     "cache": "athena.cli.cache",
     "recall": "athena.cli.recall",
     "image-demo": "athena.cli.image_demo",
