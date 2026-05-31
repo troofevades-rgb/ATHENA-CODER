@@ -78,14 +78,34 @@ def _initialize_once() -> None:
         try:
             import faulthandler
 
-            # Direct faulthandler at stderr so a real abort still
-            # leaves the operator a traceback. dump_traceback_later
-            # with repeat=True keeps firing every 30s as long as
-            # the process lives — a hang during MCP load will
-            # show every 30s exactly which thread is blocked
-            # and on what call.
-            faulthandler.enable(file=sys.stderr, all_threads=True)
-            faulthandler.dump_traceback_later(30, repeat=True, file=sys.stderr)
+            # CRITICAL: write faulthandler dumps to a FILE, not
+            # stderr. The earlier implementation dumped to
+            # sys.stderr and raced with Rich Live's spinner
+            # rendering (the agent uses ``ui.console.status``
+            # while waiting for the provider). On Windows
+            # ConPTY, the interleaved writes corrupt the
+            # console stream and trigger an "access violation"
+            # that crashes the process -- the exact mode the
+            # operator saw when this fix was written. A file
+            # sink is isolated from terminal rendering and
+            # preserves the diagnostic value (the operator
+            # opens the log after the hang).
+            log_path = Path.home() / ".athena" / "faulthandler.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            # Append mode + line-buffered so previous traces
+            # survive across launches; line-buffer flushes
+            # each stack frame immediately so a hard crash
+            # mid-dump leaves a usable partial.
+            fh = open(log_path, "a", buffering=1, encoding="utf-8")
+            fh.write(
+                f"\n--- faulthandler armed at {time.time()} pid={os.getpid()} ---\n"
+            )
+            faulthandler.enable(file=fh, all_threads=True)
+            # 60s threshold gives Ollama cold-start (model load
+            # + GPU warmup on partial-offload) a chance before
+            # we cry "hang". repeat=True still fires every 60s
+            # for genuine hangs so the file accumulates evidence.
+            faulthandler.dump_traceback_later(60, repeat=True, file=fh)
         except Exception:  # noqa: BLE001
             # faulthandler isn't strictly required for tracing to
             # be useful -- the JSONL still records reached
