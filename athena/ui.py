@@ -892,12 +892,22 @@ class TypewriterStream:
         if self._closed:
             return self._buf
         text = self._buf
-        # Gateway path: emit StreamEnd, nothing else to clean up.
+        # Gateway path: emit StreamEnd carrying the stripped final
+        # view so the TUI can swap its accumulated buffer for the
+        # polished version. Without ``final_text`` the TUI would
+        # keep showing the raw streamed text -- including any
+        # ``<think>...</think>`` blocks that leaked into the
+        # render layer.
         if self._stream_id is not None and self._gateway is not None:
             try:
                 from .tui_gateway.events import StreamEndEvent
 
-                self._gateway.send_event(StreamEndEvent(stream_id=self._stream_id))
+                self._gateway.send_event(
+                    StreamEndEvent(
+                        stream_id=self._stream_id,
+                        final_text=_strip_think_blocks(text),
+                    )
+                )
             except Exception:  # noqa: BLE001
                 pass
             self._stream_id = None
