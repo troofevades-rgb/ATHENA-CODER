@@ -642,19 +642,52 @@ class TuiGateway:
 
         env = os.environ.copy()
         env[env_name] = env_value
+        # Always capture Ink's stderr to a file so a silent post-
+        # handshake death (Ink crash, raw-mode setup failure, missing
+        # Node module, etc.) leaves a forensic trail. Previously stderr
+        # inherited from sys.stderr in production, which mixed Ink
+        # errors with athena's own status output and made it
+        # impossible to tell whether the TUI had crashed or just
+        # rendered nothing. The file is rotated per-session by
+        # mtime + an OS-rotation policy is unnecessary -- the
+        # latest is always at the same path so operators can `tail`
+        # it during a hang.
+        tui_stderr_path = Path.home() / ".athena" / "tui-stderr.log"
+        try:
+            tui_stderr_path.parent.mkdir(parents=True, exist_ok=True)
+            self._tui_stderr_file: Any = open(
+                tui_stderr_path, "a", encoding="utf-8", buffering=1
+            )
+            self._tui_stderr_file.write(
+                f"\n--- TUI launched at {time.time()} pid={os.getpid()} "
+                f"bundle={self._bundle} ---\n"
+            )
+        except OSError:
+            # Logging is observability; never block launch. Fall
+            # back to inheriting stderr the old way.
+            self._tui_stderr_file = None
         if self._tty_passthrough:
-            # Production: inherit real terminal stdio. Ink reads
-            # the keyboard from stdin and renders to stdout.
+            # Production: inherit real terminal stdio for stdin/stdout
+            # so Ink reads keyboard input and renders to the terminal.
+            # stderr goes to the capture file (above) so a silent
+            # Ink crash leaves a tail-able trail rather than
+            # disappearing into the terminal scrollback.
             popen_stdin: Any = sys.stdin
             popen_stdout: Any = sys.stdout
-            popen_stderr: Any = sys.stderr
+            popen_stderr: Any = (
+                self._tui_stderr_file if self._tui_stderr_file is not None
+                else sys.stderr
+            )
         else:
             # Headless: parent has no real TTY (pytest, daemon).
             # DEVNULL stdin so Ink's input handlers see immediate
             # EOF; capture stdout/stderr so test output is clean.
             popen_stdin = subprocess.DEVNULL
             popen_stdout = subprocess.DEVNULL
-            popen_stderr = subprocess.DEVNULL
+            popen_stderr = (
+                self._tui_stderr_file if self._tui_stderr_file is not None
+                else subprocess.DEVNULL
+            )
         self._proc = subprocess.Popen(  # noqa: S603
             [self._node, str(self._bundle)],
             stdin=popen_stdin,
