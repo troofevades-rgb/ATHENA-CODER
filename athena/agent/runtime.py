@@ -371,8 +371,20 @@ class AgentRuntime:
                 self.stats.cache_read_tokens += raw_done.get("cache_read_input_tokens") or 0
                 self.stats.cache_creation_tokens += raw_done.get("cache_creation_input_tokens") or 0
 
-            # Record the assistant message (with tool_calls if any) into history
-            assistant_msg: dict[str, Any] = {"role": "assistant", "content": assistant_text}
+            # Strip <think>...</think> blocks from the persisted /
+            # propagated text. The on-screen render strips them
+            # via the typewriter; the history + tool-result side
+            # was leaking them through to (1) the next turn's prompt
+            # cache (model sees its own thoughts come back),
+            # (2) the Agent-tool return value (parent sees fork's
+            # thinking trace and re-summarizes it, producing visible
+            # duplication), and (3) the JSONL transcript. Strip
+            # once here, at the point where assistant_text becomes
+            # part of the durable session state.
+            from ..text_utils import strip_think_blocks
+
+            clean_text = strip_think_blocks(assistant_text or "")
+            assistant_msg: dict[str, Any] = {"role": "assistant", "content": clean_text}
             if tool_calls:
                 assistant_msg["tool_calls"] = tool_calls
             self.messages.append(assistant_msg)

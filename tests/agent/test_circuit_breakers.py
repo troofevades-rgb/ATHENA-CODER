@@ -427,6 +427,60 @@ def test_compressor_summarizer_failure_does_not_crash_agent(
     assert agent.messages == pre_messages
 
 
+def test_assistant_message_persists_with_think_blocks_stripped(
+    isolated_home: Path,
+    workspace: Path,
+) -> None:
+    """``<think>...</think>`` blocks emitted by the model must NOT
+    survive into self.messages or the JSONL transcript. Pre-fix the
+    raw text (with thought tags) was appended directly, which meant
+    (1) the next turn's prompt-cache hashed the model's own
+    thoughts back into the prompt, (2) the Agent-tool return value
+    contained thinking traces that the parent then re-summarized
+    (visible duplication in the dogfood), and (3) the JSONL
+    transcript carried noise.
+
+    The stripping happens in ``_run_turn_inner`` at the message-
+    record point, so this test exercises that path via a stub
+    provider that emits a complete <think>...</think> block."""
+    cfg = Config(model="thinker")
+
+    class _ThinkerProvider:
+        name = "thinker"
+        requires_api_key = False
+
+        def stream_chat(self, **kwargs: Any) -> Iterator[StreamChunk]:
+            yield StreamChunk(
+                "content",
+                "<think>internal scratch the parent shouldn't see</think>\n"
+                "Here's the answer: 42.",
+            )
+            yield StreamChunk("end", {})
+
+        def parse_tool_calls(self, content: str, raw_response: dict) -> tuple:
+            return content, []
+
+        def list_models(self) -> list[str]:
+            return ["thinker"]
+
+        def show_model(self, model: str) -> dict[str, Any]:
+            return {}
+
+        def close(self) -> None:
+            return None
+
+    agent = Agent(cfg, workspace, provider=_ThinkerProvider())
+    agent.run_turn("ask me anything")
+
+    # Find the assistant message we just persisted.
+    assistant_msgs = [m for m in agent.messages if m.get("role") == "assistant"]
+    assert assistant_msgs, "no assistant message recorded"
+    final = assistant_msgs[-1]["content"]
+    assert "<think>" not in final
+    assert "scratch" not in final
+    assert "Here's the answer: 42." in final
+
+
 def test_compressor_skip_when_should_compress_is_false(
     isolated_home: Path,
     workspace: Path,
