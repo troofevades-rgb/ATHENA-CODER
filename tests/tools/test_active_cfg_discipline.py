@@ -59,11 +59,7 @@ _LOAD_CONFIG_ALLOWLIST: frozenset[str] = frozenset(
 def _python_files_under(directory: Path) -> list[Path]:
     """Recursively list every .py under ``directory`` (excluding the
     __pycache__/ dirs)."""
-    return [
-        p
-        for p in directory.rglob("*.py")
-        if "__pycache__" not in p.parts
-    ]
+    return [p for p in directory.rglob("*.py") if "__pycache__" not in p.parts]
 
 
 def test_no_tool_imports_load_config_outside_allowlist() -> None:
@@ -110,9 +106,7 @@ def test_no_tool_calls_load_config_outside_allowlist() -> None:
     for path in _python_files_under(_TOOLS_DIR):
         if path.name in _LOAD_CONFIG_ALLOWLIST:
             continue
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.split("#", 1)[0]
             if "`" in stripped:
                 continue

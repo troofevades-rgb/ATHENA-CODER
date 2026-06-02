@@ -93,7 +93,16 @@ def test_purge_does_not_crash_on_db_access(tmp_path: Path) -> None:
     store.close()
 
     rc = sessions_cli.main(
-        ["--home", str(tmp_path), "--profile", "default", "purge", "--before", "2999-01-01", "--confirm"]
+        [
+            "--home",
+            str(tmp_path),
+            "--profile",
+            "default",
+            "purge",
+            "--before",
+            "2999-01-01",
+            "--confirm",
+        ]
     )
     assert rc == 0
 

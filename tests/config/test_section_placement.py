@@ -71,11 +71,7 @@ def _patch_config_dir(monkeypatch, tmp_path: Path) -> Path:
 def test_load_config_raises_with_file_and_line(monkeypatch, tmp_path: Path) -> None:
     path = _patch_config_dir(monkeypatch, tmp_path)
     path.write_text(
-        'model = "top"\n'
-        "\n"
-        "[skills]\n"
-        "autoload = true\n"
-        'model = "nested-by-mistake"\n',  # line 5
+        'model = "top"\n\n[skills]\nautoload = true\nmodel = "nested-by-mistake"\n',  # line 5
         encoding="utf-8",
     )
     with pytest.raises(ValueError) as ei:
@@ -88,11 +84,7 @@ def test_load_config_raises_with_file_and_line(monkeypatch, tmp_path: Path) -> N
 def test_load_config_clean_file_loads(monkeypatch, tmp_path: Path) -> None:
     path = _patch_config_dir(monkeypatch, tmp_path)
     path.write_text(
-        'model = "top"\n'
-        "auto_approve_tools = false\n"
-        "\n"
-        "[skills]\n"
-        "autoload = true\n",
+        'model = "top"\nauto_approve_tools = false\n\n[skills]\nautoload = true\n',
         encoding="utf-8",
     )
     cfg = load_config()

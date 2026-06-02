@@ -84,7 +84,7 @@ def test_extra_append_lands_at_the_end(tmp_path: Path) -> None:
     )
     assert needle in out
     # No content should follow the needle except trailing whitespace.
-    tail = out[out.index(needle) + len(needle):]
+    tail = out[out.index(needle) + len(needle) :]
     assert tail.strip() == ""
 
 

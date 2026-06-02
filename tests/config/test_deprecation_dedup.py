@@ -53,7 +53,7 @@ def _tmp_config_with_deprecated_key(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     a test can point a second load at a different file."""
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(
-        'computer_use_enabled = true\n',
+        "computer_use_enabled = true\n",
         encoding="utf-8",
     )
     # The config module reads CONFIG_PATH at function-call time, so
@@ -142,8 +142,7 @@ def test_multiple_deprecated_keys_in_same_config_all_warn(
     not "first deprecation only"."""
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(
-        'computer_use_enabled = true\n'
-        'computer_permission_mode = "observe_only"\n',
+        'computer_use_enabled = true\ncomputer_permission_mode = "observe_only"\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(config_mod, "CONFIG_PATH", cfg_file)
@@ -166,12 +165,8 @@ def test_emit_deprecation_emits_only_first_time(
     Subsequent calls are silent regardless of message body
     differences -- the dedup key is the (path, key) tuple, not the
     message text."""
-    config_mod._emit_deprecation(
-        Path("/etc/a.toml"), "old_key", "first message"
-    )
-    config_mod._emit_deprecation(
-        Path("/etc/a.toml"), "old_key", "different message"
-    )
+    config_mod._emit_deprecation(Path("/etc/a.toml"), "old_key", "first message")
+    config_mod._emit_deprecation(Path("/etc/a.toml"), "old_key", "different message")
     stderr = capsys.readouterr().err
     assert "first message" in stderr
     assert "different message" not in stderr
@@ -183,12 +178,8 @@ def test_emit_deprecation_independent_per_path(
     """Different config paths produce independent dedup state.
     A profile switch shouldn't silence the new config's
     deprecations because the old profile's load already warned."""
-    config_mod._emit_deprecation(
-        Path("/etc/a.toml"), "old_key", "from path A"
-    )
-    config_mod._emit_deprecation(
-        Path("/etc/b.toml"), "old_key", "from path B"
-    )
+    config_mod._emit_deprecation(Path("/etc/a.toml"), "old_key", "from path A")
+    config_mod._emit_deprecation(Path("/etc/b.toml"), "old_key", "from path B")
     stderr = capsys.readouterr().err
     assert "from path A" in stderr
     assert "from path B" in stderr
@@ -208,9 +199,7 @@ def test_doctor_deprecation_check_ok_when_none(
     config_mod.reset_deprecation_dedup()
     # Avoid having load_config() find a real config with
     # deprecated keys (the dogfood machine has one).
-    monkeypatch.setattr(
-        config_mod, "load_config", lambda: None
-    )
+    monkeypatch.setattr(config_mod, "load_config", lambda: None)
     # Re-import in doctor's namespace too.
     with patch(
         "athena.config.reported_deprecations",

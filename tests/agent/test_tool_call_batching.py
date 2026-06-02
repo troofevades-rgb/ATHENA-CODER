@@ -32,7 +32,6 @@ import pytest
 from athena.agent.runtime import AgentRuntime
 from athena.tools.registry import bump_schema_version, tool
 
-
 # ---------------------------------------------------------------------------
 # A throwaway runtime stub -- just enough for _partition_tool_calls
 # ---------------------------------------------------------------------------
@@ -120,10 +119,12 @@ def test_partition_single_serial_call_alone(runtime) -> None:
 
 def test_partition_groups_contiguous_parallel_safe_calls(runtime) -> None:
     """Two parallel-safe calls in a row cluster into one batch."""
-    out = runtime._partition_tool_calls([
-        _call("_batch_safe_a"),
-        _call("_batch_safe_b"),
-    ])
+    out = runtime._partition_tool_calls(
+        [
+            _call("_batch_safe_a"),
+            _call("_batch_safe_b"),
+        ]
+    )
     assert len(out) == 1
     assert [c["function"]["name"] for c in out[0]] == [
         "_batch_safe_a",
@@ -136,12 +137,14 @@ def test_partition_break_on_non_parallel_safe_call(runtime) -> None:
     emit order ``[safe, safe, serial, safe]`` must produce three
     batches (not two), so the serial call's side-effects sit between
     the read-only calls exactly where the model placed them."""
-    out = runtime._partition_tool_calls([
-        _call("_batch_safe_a"),
-        _call("_batch_safe_b"),
-        _call("_batch_serial"),
-        _call("_batch_safe_a"),
-    ])
+    out = runtime._partition_tool_calls(
+        [
+            _call("_batch_safe_a"),
+            _call("_batch_safe_b"),
+            _call("_batch_serial"),
+            _call("_batch_safe_a"),
+        ]
+    )
     names = [[c["function"]["name"] for c in b] for b in out]
     assert names == [
         ["_batch_safe_a", "_batch_safe_b"],
@@ -156,10 +159,12 @@ def test_partition_consecutive_serial_calls_split_into_own_batches(
     """Two serial calls in a row become TWO batches (not one of size
     two) -- their order needs to be preserved across the serial
     handler, which only takes one call at a time."""
-    out = runtime._partition_tool_calls([
-        _call("_batch_serial"),
-        _call("_batch_serial"),
-    ])
+    out = runtime._partition_tool_calls(
+        [
+            _call("_batch_serial"),
+            _call("_batch_serial"),
+        ]
+    )
     names = [[c["function"]["name"] for c in b] for b in out]
     assert names == [["_batch_serial"], ["_batch_serial"]]
 
@@ -168,11 +173,13 @@ def test_partition_unknown_tool_name_treated_as_serial(runtime) -> None:
     """A typoed call (no matching Tool) falls through as
     non-parallel-safe -- never accidentally races a real
     parallel-safe sibling."""
-    out = runtime._partition_tool_calls([
-        _call("_batch_safe_a"),
-        _call("_batch_does_not_exist"),
-        _call("_batch_safe_b"),
-    ])
+    out = runtime._partition_tool_calls(
+        [
+            _call("_batch_safe_a"),
+            _call("_batch_does_not_exist"),
+            _call("_batch_safe_b"),
+        ]
+    )
     names = [[c["function"]["name"] for c in b] for b in out]
     assert names == [
         ["_batch_safe_a"],

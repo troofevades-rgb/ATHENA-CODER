@@ -125,6 +125,5 @@ def test_athena_tui_noninteractive_env_var_bypasses_guard(
     code = athena_main._run_interactive_repl(agent=None, cfg=None, workspace=None)
     assert code == 2  # via the RuntimeError handler below
     assert len(constructed) == 1, (
-        "guard should have let TuiGateway() construct when "
-        "ATHENA_TUI_NONINTERACTIVE=1"
+        "guard should have let TuiGateway() construct when ATHENA_TUI_NONINTERACTIVE=1"
     )

@@ -141,9 +141,7 @@ def render_status(snapshot: dict[str, Any]) -> str:
             key=lambda kv: -float(kv[1].get("p95_ms", 0)),
         ):
             lines.append(
-                f"  {tool:<20} "
-                f"{s['p50_ms']:>6.0f}ms / "
-                f"{s['p95_ms']:>6.0f}ms  (n={s['count']})"
+                f"  {tool:<20} {s['p50_ms']:>6.0f}ms / {s['p95_ms']:>6.0f}ms  (n={s['count']})"
             )
     prov_err = int(snapshot.get("provider_errors") or 0)
     tool_err = int(snapshot.get("tool_errors") or 0)

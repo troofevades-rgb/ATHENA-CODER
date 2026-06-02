@@ -174,9 +174,7 @@ class _StuckLoopProvider:
         return None
 
 
-def test_consecutive_provider_errors_trips_breaker(
-    isolated_home: Path, workspace: Path
-) -> None:
+def test_consecutive_provider_errors_trips_breaker(isolated_home: Path, workspace: Path) -> None:
     """3 simulated upstream failures in a row halts the turn with
     the ``circuit_breaker:provider_errors`` stop reason. Without
     the breaker, ``max_turn_steps`` would let the loop burn through
@@ -217,13 +215,12 @@ def test_consecutive_errors_breaker_disabled_when_zero(
     assert provider.calls == 5
 
 
-def test_intermittent_errors_reset_counter(
-    isolated_home: Path, workspace: Path
-) -> None:
+def test_intermittent_errors_reset_counter(isolated_home: Path, workspace: Path) -> None:
     """The consecutive counter resets on a successful call. A
     pattern like ``[error, error, success, error, error, error]``
     trips only on the THIRD trailing error, not the second
     (intermittent failures shouldn't fire the breaker)."""
+
     class _Flaky:
         name = "flaky"
         requires_api_key = False
@@ -277,9 +274,7 @@ def test_intermittent_errors_reset_counter(
     assert provider.calls == 3
 
 
-def test_identical_tool_calls_trip_breaker(
-    isolated_home: Path, workspace: Path
-) -> None:
+def test_identical_tool_calls_trip_breaker(isolated_home: Path, workspace: Path) -> None:
     """3 identical Read calls on the same missing file in a row
     halts the turn with ``circuit_breaker:identical_tool_calls``."""
     cfg = Config(
@@ -298,9 +293,7 @@ def test_identical_tool_calls_trip_breaker(
     assert provider.calls == 3
 
 
-def test_identical_breaker_disabled_when_zero(
-    isolated_home: Path, workspace: Path
-) -> None:
+def test_identical_breaker_disabled_when_zero(isolated_home: Path, workspace: Path) -> None:
     """Setting ``max_identical_tool_calls=0`` disables that breaker;
     the loop runs to ``max_turn_steps``."""
     cfg = Config(
@@ -318,9 +311,7 @@ def test_identical_breaker_disabled_when_zero(
     assert provider.calls == 5
 
 
-def test_different_args_reset_identical_counter(
-    isolated_home: Path, workspace: Path
-) -> None:
+def test_different_args_reset_identical_counter(isolated_home: Path, workspace: Path) -> None:
     """A legitimate iterative pass (reading three different files)
     does NOT trip the breaker even though every call uses the same
     tool. Only IDENTICAL ``(tool_name, args)`` ordered lists count."""
@@ -507,8 +498,7 @@ def test_assistant_message_persists_with_think_blocks_stripped(
         def stream_chat(self, **kwargs: Any) -> Iterator[StreamChunk]:
             yield StreamChunk(
                 "content",
-                "<think>internal scratch the parent shouldn't see</think>\n"
-                "Here's the answer: 42.",
+                "<think>internal scratch the parent shouldn't see</think>\nHere's the answer: 42.",
             )
             yield StreamChunk("end", {})
 

@@ -87,9 +87,7 @@ class Stats:
     # slower after rebuild X", "tool Y is intermittently hanging")
     # surface without external monitoring. ``deque(maxlen=...)`` caps
     # memory in long-lived gateway sessions.
-    turn_durations_ms: deque[float] = field(
-        default_factory=lambda: deque(maxlen=_LATENCY_WINDOW)
-    )
+    turn_durations_ms: deque[float] = field(default_factory=lambda: deque(maxlen=_LATENCY_WINDOW))
     tool_durations_ms: dict[str, deque[float]] = field(default_factory=dict)
     provider_errors: int = 0
     tool_errors: int = 0
@@ -174,9 +172,7 @@ class Stats:
             # least one sample (so a fresh session's /status
             # doesn't show p50=0.0 noise).
             "turn_latency_ms": (
-                self._latency_summary(self.turn_durations_ms)
-                if self.turn_durations_ms
-                else None
+                self._latency_summary(self.turn_durations_ms) if self.turn_durations_ms else None
             ),
             "tool_latencies_ms": {
                 name: self._latency_summary(window)

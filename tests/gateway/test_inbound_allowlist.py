@@ -38,7 +38,6 @@ import pytest
 from athena.gateway.base import GatewayAdapter
 from athena.gateway.events import MessageEvent
 
-
 # ---------------------------------------------------------------------------
 # Test doubles -- minimal daemon + adapter, just enough for the guard
 # ---------------------------------------------------------------------------
@@ -89,9 +88,7 @@ class _TestAdapter(GatewayAdapter):
         self.sent_text.append((chat_id, text))
         return "msg-id"
 
-    async def send_file(
-        self, chat_id: str, file_path: Path, caption: str | None = None
-    ) -> str:
+    async def send_file(self, chat_id: str, file_path: Path, caption: str | None = None) -> str:
         return "msg-id"
 
 
@@ -123,9 +120,7 @@ async def test_empty_allowlists_authorize_anyone() -> None:
     """Config present but both lists empty -> still open. Operators
     who want to declare a platform without locking it down (e.g. to
     set ``poll_interval_s``) shouldn't be auto-locked."""
-    adapter = _TestAdapter(
-        _daemon(platform_cfg={"allowed_user_ids": [], "allowed_chat_ids": []})
-    )
+    adapter = _TestAdapter(_daemon(platform_cfg={"allowed_user_ids": [], "allowed_chat_ids": []}))
     assert adapter._is_authorized(_evt()) is True
 
 
@@ -144,28 +139,19 @@ async def test_malformed_allowlist_falls_back_to_open() -> None:
 
 
 async def test_user_allowlist_admits_listed_user() -> None:
-    adapter = _TestAdapter(
-        _daemon(platform_cfg={"allowed_user_ids": ["alice", "bob"]})
-    )
+    adapter = _TestAdapter(_daemon(platform_cfg={"allowed_user_ids": ["alice", "bob"]}))
     assert adapter._is_authorized(_evt(user_id="alice")) is True
     assert adapter._is_authorized(_evt(user_id="bob")) is True
 
 
 async def test_user_allowlist_refuses_unlisted_user() -> None:
-    adapter = _TestAdapter(
-        _daemon(platform_cfg={"allowed_user_ids": ["alice"]})
-    )
+    adapter = _TestAdapter(_daemon(platform_cfg={"allowed_user_ids": ["alice"]}))
     assert adapter._is_authorized(_evt(user_id="mallory")) is False
 
 
 async def test_chat_allowlist_refuses_unlisted_chat() -> None:
-    adapter = _TestAdapter(
-        _daemon(platform_cfg={"allowed_chat_ids": ["chat-trusted"]})
-    )
-    assert (
-        adapter._is_authorized(_evt(user_id="alice", chat_id="chat-public"))
-        is False
-    )
+    adapter = _TestAdapter(_daemon(platform_cfg={"allowed_chat_ids": ["chat-trusted"]}))
+    assert adapter._is_authorized(_evt(user_id="alice", chat_id="chat-public")) is False
 
 
 async def test_both_allowlists_require_both_to_match() -> None:
@@ -180,20 +166,9 @@ async def test_both_allowlists_require_both_to_match() -> None:
             }
         )
     )
-    assert (
-        adapter._is_authorized(_evt(user_id="alice", chat_id="chat-trusted"))
-        is True
-    )
-    assert (
-        adapter._is_authorized(_evt(user_id="alice", chat_id="chat-public"))
-        is False
-    )
-    assert (
-        adapter._is_authorized(
-            _evt(user_id="mallory", chat_id="chat-trusted")
-        )
-        is False
-    )
+    assert adapter._is_authorized(_evt(user_id="alice", chat_id="chat-trusted")) is True
+    assert adapter._is_authorized(_evt(user_id="alice", chat_id="chat-public")) is False
+    assert adapter._is_authorized(_evt(user_id="mallory", chat_id="chat-trusted")) is False
 
 
 async def test_numeric_ids_coerce_to_strings() -> None:
@@ -231,9 +206,7 @@ async def test_refused_event_never_reaches_router(caplog) -> None:
     assert not adapter._pending_messages
     spawn.assert_not_called()
     # Refusal logged at INFO so an operator can grep it.
-    rejected_lines = [
-        rec for rec in caplog.records if "rejected inbound message" in rec.message
-    ]
+    rejected_lines = [rec for rec in caplog.records if "rejected inbound message" in rec.message]
     assert rejected_lines, "expected INFO log entry for the refusal"
 
 

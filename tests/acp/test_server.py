@@ -384,10 +384,7 @@ async def test_request_during_shutdown_returns_internal_error() -> None:
 
     # Feed a request after stopping is latched.
     await server._handle_line(
-        (
-            json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"})
-            + "\n"
-        ).encode("utf-8")
+        (json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"}) + "\n").encode("utf-8")
     )
     [msg] = writer.lines
     assert msg["jsonrpc"] == "2.0"

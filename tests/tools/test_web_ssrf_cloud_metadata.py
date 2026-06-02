@@ -84,9 +84,7 @@ def _fixed_dns(monkeypatch: pytest.MonkeyPatch, host: str, ip: str) -> None:
         "http://[fd00:ec2::254]/latest/meta-data/",
     ],
 )
-def test_cloud_metadata_endpoints_blocked_by_ip(
-    url: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cloud_metadata_endpoints_blocked_by_ip(url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """The single-most exploitable SSRF target. If any of these are
     ever reachable, an agent running on cloud spits out IAM creds /
     project metadata / service account tokens with one model

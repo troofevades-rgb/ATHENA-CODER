@@ -122,9 +122,7 @@ def test_missing_file_returns_empty_with_warn(
     workspace: Path,
     tmp_path: Path,
 ) -> None:
-    agent = _make_agent(
-        fake_provider, workspace, prefill_file=str(tmp_path / "missing.json")
-    )
+    agent = _make_agent(fake_provider, workspace, prefill_file=str(tmp_path / "missing.json"))
     assert agent._load_prefill_messages() == []
 
 

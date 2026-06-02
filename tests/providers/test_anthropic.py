@@ -368,6 +368,7 @@ def test_payload_includes_temperature_for_pre_deprecation_models(provider):
     Covers ``claude-3-5-sonnet`` (legacy), ``claude-sonnet-4-5``
     (current 4.5 series, not yet deprecated), and
     ``claude-haiku-4-5`` (4.5 Haiku)."""
+
     def _capture_and_call(model: str) -> dict:
         bucket: dict = {}
 
@@ -397,9 +398,7 @@ def test_payload_includes_temperature_for_pre_deprecation_models(provider):
         "claude-haiku-4-5-20251001",
     ):
         body = _capture_and_call(model)["body"]
-        assert "temperature" in body, (
-            f"{model} should still receive temperature"
-        )
+        assert "temperature" in body, f"{model} should still receive temperature"
 
 
 def test_payload_includes_max_tokens_default(provider):

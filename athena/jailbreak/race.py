@@ -129,10 +129,7 @@ def get_models_for_tier(tier: str) -> list[str]:
     ``getModelsForTier``. Unknown tier raises ``KeyError``.
     """
     if tier not in ULTRAPLINIAN_MODELS:
-        raise KeyError(
-            f"unknown tier: {tier!r}. "
-            f"Valid: {', '.join(ULTRAPLINIAN_MODELS.keys())}"
-        )
+        raise KeyError(f"unknown tier: {tier!r}. Valid: {', '.join(ULTRAPLINIAN_MODELS.keys())}")
     out: list[str] = []
     for t in _TIER_ORDER:
         out.extend(ULTRAPLINIAN_MODELS[t])
@@ -260,9 +257,7 @@ class RaceConfig:
     per_model_timeout_s: float = 30.0
     # Optional callback fired per result as it arrives. The
     # /godmode race UI uses this to render live progress.
-    on_result: Callable[[RaceResult], None] | None = field(
-        default=None, repr=False
-    )
+    on_result: Callable[[RaceResult], None] | None = field(default=None, repr=False)
 
 
 # Type alias for the per-model query function: takes (provider, model,
@@ -389,10 +384,7 @@ def race_models(
             if grace is not None and now >= grace:
                 logger.debug("race grace period elapsed; returning")
                 break
-            wait_until = (
-                grace if grace is not None
-                else started_at + cfg.hard_timeout_s
-            )
+            wait_until = grace if grace is not None else started_at + cfg.hard_timeout_s
             wait_s = max(0.05, wait_until - now)
 
             done: list[Future[RaceResult]] = []
@@ -433,9 +425,7 @@ def race_models(
                 if success_count >= cfg.min_results:
                     with deadline_lock:
                         if grace_deadline[0] is None:
-                            grace_deadline[0] = (
-                                time.perf_counter() + cfg.grace_period_s
-                            )
+                            grace_deadline[0] = time.perf_counter() + cfg.grace_period_s
     finally:
         # Don't wait for slow models -- the whole point of the early-exit
         # is to return without them. ``cancel_futures=True`` would also

@@ -25,7 +25,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 # Map legacy flat-field name -> (nested_dataclass_field, attribute_on_nested).
 # Add new entries here as subsystems migrate. ``Config.__getattr__`` /
 # ``__setattr__`` shims walk this table to translate legacy access at

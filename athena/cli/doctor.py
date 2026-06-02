@@ -375,9 +375,7 @@ def _check_athena_home_writable() -> CheckResult:
             detail=f"{home} does not exist yet (will be created on first run)",
         )
     try:
-        with tempfile.NamedTemporaryFile(
-            dir=str(home), prefix=".doctor_probe_", delete=True
-        ):
+        with tempfile.NamedTemporaryFile(dir=str(home), prefix=".doctor_probe_", delete=True):
             pass
     except OSError as e:
         return CheckResult(
@@ -505,10 +503,7 @@ def _check_recent_crashes() -> CheckResult:
         name="crashes.recent",
         label="Recent crashes (7d)",
         severity="warn",
-        detail=(
-            f"{len(recent)} record(s); newest: {newest.name}. "
-            f"Inspect: {crash_dir}"
-        ),
+        detail=(f"{len(recent)} record(s); newest: {newest.name}. Inspect: {crash_dir}"),
         extra={"count": len(recent), "newest": str(newest)},
     )
 

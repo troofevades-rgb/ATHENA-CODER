@@ -135,9 +135,7 @@ def test_refuses_when_env_var_unset_or_wrong(
     cmd_godmode(_agent, "list")
     assert _captured_ui["error"], "expected an ui.error refusal"
     assert any("ATHENA_ALLOW_GODMODE" in m for m in _captured_ui["error"])
-    assert not _captured_ui["warn"], (
-        "warn is the active-path reminder; should not fire on refusal"
-    )
+    assert not _captured_ui["warn"], "warn is the active-path reminder; should not fire on refusal"
     # The "list strategies" print never happens on the refusal path.
     assert not any("og_godmode" in p for p in _captured_ui["print"])
 

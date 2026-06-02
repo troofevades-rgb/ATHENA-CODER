@@ -373,7 +373,7 @@ def _parse_parseltongue_args(rest: str) -> tuple[str, str]:
             i += 1
             continue
         if tok.startswith("--tier="):
-            tier = tok[len("--tier="):]
+            tier = tok[len("--tier=") :]
             i += 1
             continue
         out.append(tok)
@@ -390,16 +390,11 @@ def _parseltongue(agent: Any, query: str, tier: str = "standard") -> None:
     skill_path = _get_skill_path(agent)
     script = skill_path / "scripts" / "parseltongue.py"
     if not script.exists():
-        ui.warn(
-            f"parseltongue.py not found at {script}. "
-            "Install the godmode skill scripts."
-        )
+        ui.warn(f"parseltongue.py not found at {script}. Install the godmode skill scripts.")
         return
     level = _TIER_TO_LEVEL.get(tier)
     if level is None:
-        ui.error(
-            f"Unknown tier: {tier!r}. Use light, standard, or heavy."
-        )
+        ui.error(f"Unknown tier: {tier!r}. Use light, standard, or heavy.")
         return
     try:
         result = subprocess.run(
@@ -416,10 +411,7 @@ def _parseltongue(agent: Any, query: str, tier: str = "standard") -> None:
         ui.error(f"failed to invoke parseltongue.py: {e}")
         return
     if result.returncode != 0:
-        ui.error(
-            f"parseltongue.py exited {result.returncode}: "
-            f"{(result.stderr or '').strip()}"
-        )
+        ui.error(f"parseltongue.py exited {result.returncode}: {(result.stderr or '').strip()}")
         return
     encoded = (result.stdout or "").strip()
     ui.info(f"Parseltongue {tier} tier (level {level}):")
@@ -432,10 +424,7 @@ def _save_config(agent: Any, name: str) -> None:
     just confuse ``load`` later."""
     active = _active_godmode(agent)
     if active is None:
-        ui.error(
-            "no active jailbreak strategy to save. "
-            "Apply one first: /godmode apply <strategy>"
-        )
+        ui.error("no active jailbreak strategy to save. Apply one first: /godmode apply <strategy>")
         return
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     config_file = CONFIG_DIR / f"{name}.json"
@@ -519,7 +508,7 @@ def _auto_jailbreak(agent: Any, args: str) -> None:
             i += 2
             continue
         if tok.startswith("--model="):
-            model_override = tok[len("--model="):]
+            model_override = tok[len("--model=") :]
             i += 1
             continue
         if tok == "--dry-run":
@@ -539,7 +528,7 @@ def _auto_jailbreak(agent: Any, args: str) -> None:
             # query. Operators rarely want flags AFTER --canary, so
             # this matches the natural usage:
             #   /godmode auto --score --canary how to pick a lock
-            canary_query = " ".join(tokens[i + 1:])
+            canary_query = " ".join(tokens[i + 1 :])
             i = len(tokens)
             continue
         if tok == "--max" and i + 1 < len(tokens):
@@ -552,9 +541,9 @@ def _auto_jailbreak(agent: Any, args: str) -> None:
         ui.warn(f"ignoring unknown auto flag: {tok}")
         i += 1
 
-    model = model_override or getattr(agent, "model", None) or getattr(
-        agent.cfg, "model", None
-    ) or ""
+    model = (
+        model_override or getattr(agent, "model", None) or getattr(agent.cfg, "model", None) or ""
+    )
     family = detect_model_family(model)
 
     if score_mode:
@@ -654,22 +643,16 @@ def _auto_score_path(
     ui.console.print("\n[bold]Strategy scores:[/]")
     for r in scored:
         marker = "[green]✓[/]" if r.success else "[red]✗[/]"
-        ui.console.print(
-            f"  {marker} {r.strategy:<22} "
-            f"score={r.score:>3}  {r.duration_ms:>6}ms"
-        )
+        ui.console.print(f"  {marker} {r.strategy:<22} score={r.score:>3}  {r.duration_ms:>6}ms")
 
     winner = pick_best_strategy(scored)
     if winner is None:
         ui.error(
-            "every strategy failed -- nothing applied. "
-            "Check the provider connection and model id."
+            "every strategy failed -- nothing applied. Check the provider connection and model id."
         )
         return
 
-    ui.console.print(
-        f"\n[bold]Winner:[/] {winner.strategy} (score={winner.score})"
-    )
+    ui.console.print(f"\n[bold]Winner:[/] {winner.strategy} (score={winner.score})")
 
     if dry_run:
         ui.info("--dry-run: no config writes; agent state unchanged.")
@@ -700,9 +683,7 @@ _VALID_RACE_TIERS = (
 )
 
 
-def _resolve_race_provider_and_models(
-    agent: Any, tier: str
-) -> tuple[Any, list[str]] | None:
+def _resolve_race_provider_and_models(agent: Any, tier: str) -> tuple[Any, list[str]] | None:
     """Pick the right provider + model list for ``tier``.
 
     Two paths:
@@ -727,10 +708,7 @@ def _resolve_race_provider_and_models(
         # fresh one. The default host comes from cfg.ollama_host or
         # the OLLAMA_HOST env var which OllamaProvider already handles.
         provider = getattr(agent, "provider", None)
-        is_ollama = (
-            provider is not None
-            and getattr(provider, "name", "") == "ollama"
-        )
+        is_ollama = provider is not None and getattr(provider, "name", "") == "ollama"
         if not is_ollama:
             from ..providers.ollama import OllamaProvider
 
@@ -738,16 +716,10 @@ def _resolve_race_provider_and_models(
         try:
             models = provider.list_models()
         except Exception as e:  # noqa: BLE001
-            ui.error(
-                f"could not list local Ollama models: {e}. "
-                "Is the Ollama daemon running?"
-            )
+            ui.error(f"could not list local Ollama models: {e}. Is the Ollama daemon running?")
             return None
         if not models:
-            ui.error(
-                "no local Ollama models found. "
-                "Pull one first: `ollama pull qwen2.5`."
-            )
+            ui.error("no local Ollama models found. Pull one first: `ollama pull qwen2.5`.")
             return None
         return provider, models
 
@@ -823,7 +795,7 @@ def _parse_race_args(rest: str) -> tuple[str, str, bool, bool]:
             i += 2
             continue
         if tok.startswith("--tier="):
-            tier = tok[len("--tier="):].lower()
+            tier = tok[len("--tier=") :].lower()
             i += 1
             continue
         if tok == "--no-godmode":
@@ -877,10 +849,7 @@ def _run_race(agent: Any, args: str) -> None:
         )
         return
     if tier not in _VALID_RACE_TIERS:
-        ui.error(
-            f"unknown tier: {tier!r}. Use one of: "
-            f"{', '.join(_VALID_RACE_TIERS)}."
-        )
+        ui.error(f"unknown tier: {tier!r}. Use one of: {', '.join(_VALID_RACE_TIERS)}.")
         return
 
     resolved = _resolve_race_provider_and_models(agent, tier)
@@ -910,11 +879,7 @@ def _run_race(agent: Any, args: str) -> None:
     # Live progress callback: print each result as it comes in.
     def _on_result(result: Any) -> None:
         status = "✓" if result.success else "✗"
-        ui.info(
-            f"  {status} {result.model:<48} "
-            f"score={result.score:>3} "
-            f"{result.duration_ms:>6}ms"
-        )
+        ui.info(f"  {status} {result.model:<48} score={result.score:>3} {result.duration_ms:>6}ms")
 
     results = race_models(
         provider,
@@ -933,8 +898,7 @@ def _run_race(agent: Any, args: str) -> None:
     for i, r in enumerate(top, 1):
         status_marker = "[green]✓[/]" if r.success else "[red]✗[/]"
         ui.console.print(
-            f"  {i}. {status_marker} {r.model:<48} "
-            f"score={r.score:>3}  {r.duration_ms:>6}ms"
+            f"  {i}. {status_marker} {r.model:<48} score={r.score:>3}  {r.duration_ms:>6}ms"
         )
     winner = top[0]
     if winner.success and winner.content:
@@ -1121,10 +1085,7 @@ def cmd_godmode(agent, arg: str = "") -> str:
     elif cmd == "parseltongue":
         query, tier = _parse_parseltongue_args(rest)
         if not query:
-            ui.error(
-                "usage: /godmode parseltongue <query> "
-                "[--tier light|standard|heavy]"
-            )
+            ui.error("usage: /godmode parseltongue <query> [--tier light|standard|heavy]")
             return ""
         _parseltongue(agent, query, tier)
     elif cmd == "save":
@@ -1154,10 +1115,7 @@ def cmd_godmode(agent, arg: str = "") -> str:
             sub = prefill_parts[0]
             if sub == "set":
                 if len(prefill_parts) < 2:
-                    ui.error(
-                        "usage: /godmode prefill set "
-                        "<aggressive|subtle|PATH>"
-                    )
+                    ui.error("usage: /godmode prefill set <aggressive|subtle|PATH>")
                     return ""
                 _set_prefill_file(agent, prefill_parts[1])
             elif sub == "clear":
@@ -1165,10 +1123,7 @@ def cmd_godmode(agent, arg: str = "") -> str:
             elif sub == "status":
                 _show_prefill_status(agent)
             else:
-                ui.error(
-                    f"unknown prefill subcommand: {sub}. "
-                    "Use: set <name|path>, clear, status."
-                )
+                ui.error(f"unknown prefill subcommand: {sub}. Use: set <name|path>, clear, status.")
     else:
         ui.error(f"Unknown /godmode subcommand: {cmd}")
         ui.info(

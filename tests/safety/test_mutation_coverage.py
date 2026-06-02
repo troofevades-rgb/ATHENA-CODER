@@ -123,11 +123,7 @@ def test_mutation_writes_are_snapshotted() -> None:
 def test_guard_detects_an_unguarded_write() -> None:
     """The walker actually flags a bare write (so the guard can't silently
     pass by being a no-op)."""
-    src = (
-        "from pathlib import Path\n"
-        "def mutate(p):\n"
-        "    Path(p).write_text('x')\n"
-    )
+    src = "from pathlib import Path\ndef mutate(p):\n    Path(p).write_text('x')\n"
     bad = _unguarded_writes(src, set())
     assert bad == [("mutate", 3, "write_text")]
 
