@@ -69,19 +69,14 @@ def run_agent_job(job, *, store: JobStore | None = None) -> dict:
     # just to construct a CronJob.
     from ..agent import Agent
     from ..config import load_config
-    from ..provenance import CRON, reset_current_write_origin, set_current_write_origin
-    from ..safety.approval_callback import (
-        AUTO_DENY,
-        reset_approval_callback,
-        set_approval_callback,
-    )
+    from ..provenance import CRON
+    from ..safety.thread_entry import non_foreground_thread
 
-    # AUTO_DENY: confirmation-required tools (Bash outside the
-    # allowlist, etc.) would otherwise call ui.confirm from a daemon
-    # with no stdin -- the APScheduler thread would block indefinitely.
-    approval_token = set_approval_callback(AUTO_DENY)
-    token = set_current_write_origin(CRON)
-    try:
+    # non_foreground_thread: write-origin=CRON + AUTO_DENY + fresh
+    # approval scope. Without AUTO_DENY a confirmation-required tool
+    # (Bash outside the allowlist, etc.) would call ui.confirm from an
+    # APScheduler daemon with no stdin and block indefinitely.
+    with non_foreground_thread(origin=CRON):
         try:
             cfg = load_config()
             agent = Agent(cfg, Path.cwd())
@@ -110,9 +105,6 @@ def run_agent_job(job, *, store: JobStore | None = None) -> dict:
                 "started_at": start.isoformat(),
             }
             status = "error"
-    finally:
-        reset_current_write_origin(token)
-        reset_approval_callback(approval_token)
 
     if store:
         store.record_run(job.id, status=status)
