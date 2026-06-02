@@ -167,9 +167,7 @@ def test_refusal_patterns_match_reference_phrases() -> None:
         "It's important to note that",
     ]
     for phrase in canonical:
-        assert any(p.search(phrase) for p in REFUSAL_PATTERNS), (
-            f"no pattern caught: {phrase!r}"
-        )
+        assert any(p.search(phrase) for p in REFUSAL_PATTERNS), f"no pattern caught: {phrase!r}"
 
 
 def test_preamble_patterns_match_canonical_starts() -> None:
@@ -199,16 +197,14 @@ def _stub_query(canned: dict[str, str], delay_ms: int = 0):
     models. ``delay_ms`` adds an artificial per-call sleep for
     early-exit / ordering tests."""
 
-    def _q(
-        provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float
-    ) -> str:
+    def _q(provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float) -> str:
         if delay_ms:
             time.sleep(delay_ms / 1000.0)
         if model not in canned:
             raise RuntimeError(f"unexpected model: {model}")
         text = canned[model]
         if text.startswith("RAISE:"):
-            raise RuntimeError(text[len("RAISE:"):])
+            raise RuntimeError(text[len("RAISE:") :])
         return text
 
     return _q
@@ -234,12 +230,10 @@ def test_race_returns_one_result_per_model_sorted_desc() -> None:
             "# Detailed answer\n\n"
             "Here is comprehensive detail with substance and examples "
             "and step-by-step breakdown.\n\n"
-            "- Point one\n- Point two\n- Point three\n"
-            + "concrete details everywhere " * 30
+            "- Point one\n- Point two\n- Point three\n" + "concrete details everywhere " * 30
         ),
         "fast/mid-bot": (
-            "Sure! Here is a moderate response with some detail "
-            "about the topic of interest." * 4
+            "Sure! Here is a moderate response with some detail about the topic of interest." * 4
         ),
     }
     results = race_models(
@@ -356,9 +350,7 @@ def test_race_ties_break_on_faster_duration() -> None:
     duration_ms wins the tie."""
     canned = {"a/slow": "same", "a/fast": "same"}
 
-    def _q(
-        provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float
-    ) -> str:
+    def _q(provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float) -> str:
         if "slow" in model:
             time.sleep(0.03)
         else:
@@ -387,9 +379,7 @@ def test_race_hard_timeout_drops_pending_models() -> None:
         "a/wedge": "wedged response (we never see this)",
     }
 
-    def _q(
-        provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float
-    ) -> str:
+    def _q(provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float) -> str:
         if "wedge" in model:
             time.sleep(5.0)  # well past hard timeout
         return canned[model]
@@ -400,9 +390,7 @@ def test_race_hard_timeout_drops_pending_models() -> None:
         messages=[{"role": "user", "content": "x"}],
         user_query="x",
         query_fn=_q,
-        config=RaceConfig(
-            min_results=1, grace_period_s=0.01, hard_timeout_s=0.5
-        ),
+        config=RaceConfig(min_results=1, grace_period_s=0.01, hard_timeout_s=0.5),
     )
     # Only the quick model finished within the budget.
     finished = {r.model for r in results}
@@ -424,9 +412,7 @@ def test_race_early_exits_after_min_results_and_grace() -> None:
         "a/slow": "slow response we should not see",
     }
 
-    def _q(
-        provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float
-    ) -> str:
+    def _q(provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float) -> str:
         if "slow" in model:
             time.sleep(2.0)
         else:
@@ -440,9 +426,7 @@ def test_race_early_exits_after_min_results_and_grace() -> None:
         messages=[{"role": "user", "content": "x"}],
         user_query="x",
         query_fn=_q,
-        config=RaceConfig(
-            min_results=2, grace_period_s=0.1, hard_timeout_s=5.0
-        ),
+        config=RaceConfig(min_results=2, grace_period_s=0.1, hard_timeout_s=5.0),
     )
     elapsed = time.perf_counter() - start
     # Should finish in well under 1 second (the slow model is 2s).

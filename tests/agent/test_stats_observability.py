@@ -180,7 +180,10 @@ def test_snapshot_emits_per_tool_latencies() -> None:
     stats.record_tool_duration("Read", 0.020)  # 20ms
     stats.record_tool_duration("WebFetch", 0.800)  # 800ms
     snap = stats.to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     tl = snap["tool_latencies_ms"]
     assert set(tl.keys()) == {"Read", "WebFetch"}
@@ -195,7 +198,10 @@ def test_snapshot_carries_error_counters() -> None:
     stats.record_provider_error()
     stats.record_tool_error()
     snap = stats.to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     assert snap["provider_errors"] == 2
     assert snap["tool_errors"] == 1
@@ -212,7 +218,10 @@ def test_render_status_skips_latency_block_on_empty_session() -> None:
     from athena.cli.status import render_status
 
     snap = Stats().to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     out = render_status(snap)
     assert "turn latency" not in out
@@ -225,7 +234,10 @@ def test_render_status_includes_turn_latency_when_present() -> None:
     stats = Stats()
     stats.record_turn_duration(1.250)  # 1250ms
     snap = stats.to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     out = render_status(snap)
     assert "turn latency" in out
@@ -243,7 +255,10 @@ def test_render_status_sorts_tools_by_p95_desc() -> None:
     stats.record_tool_duration("SlowTool", 5.000)
     stats.record_tool_duration("MediumTool", 0.500)
     snap = stats.to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     out = render_status(snap)
     # SlowTool's line precedes MediumTool's line precedes FastTool's.
@@ -261,7 +276,10 @@ def test_render_status_includes_error_counters_when_nonzero() -> None:
     stats.record_tool_error()
     stats.record_tool_error()
     snap = stats.to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     out = render_status(snap)
     assert "errors" in out
@@ -275,7 +293,10 @@ def test_render_status_skips_error_line_when_all_zero() -> None:
     from athena.cli.status import render_status
 
     snap = Stats().to_snapshot(
-        session_id="s", model="m", provider="p", profile="prof",
+        session_id="s",
+        model="m",
+        provider="p",
+        profile="prof",
     )
     out = render_status(snap)
     assert "errors:" not in out

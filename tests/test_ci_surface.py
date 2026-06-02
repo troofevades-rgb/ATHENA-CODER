@@ -67,9 +67,7 @@ def test_every_documented_workflow_file_exists() -> None:
     ("workflow_name", "expected_jobs"),
     list(_EXPECTED_WORKFLOWS.items()),
 )
-def test_workflow_jobs_match_documented_list(
-    workflow_name: str, expected_jobs: set[str]
-) -> None:
+def test_workflow_jobs_match_documented_list(workflow_name: str, expected_jobs: set[str]) -> None:
     """Each workflow's top-level ``jobs:`` keys match the
     CONTRIBUTING.md table. Catches both renames (job moves to a
     different name) and silent additions / removals."""

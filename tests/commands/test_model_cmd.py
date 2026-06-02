@@ -70,9 +70,7 @@ def test_no_arg_renders_picker(monkeypatch) -> None:
     monkeypatch.setattr(mod, "_openrouter_models", lambda: {})
 
     printed: list[str] = []
-    monkeypatch.setattr(
-        mod.ui.console, "print", lambda msg="", *a, **kw: printed.append(str(msg))
-    )
+    monkeypatch.setattr(mod.ui.console, "print", lambda msg="", *a, **kw: printed.append(str(msg)))
 
     agent = _fake_agent(model="qwen2.5-coder:14b")
     mod.cmd_model(agent, "")

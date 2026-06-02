@@ -92,9 +92,7 @@ def test_index_write_goes_through_tmp_then_replace(
     tmp_writes = [p for p in written if p.name.endswith("MEMORY.md.tmp")]
     final_writes = [p for p in written if p.name == "MEMORY.md"]
     assert tmp_writes, f"expected a tmp write, got {written}"
-    assert not final_writes, (
-        f"writes went direct to MEMORY.md (torn-write risk): {written}"
-    )
+    assert not final_writes, f"writes went direct to MEMORY.md (torn-write risk): {written}"
     assert replaced, "os.replace was never called"
     src, dst = replaced[-1]
     assert src.endswith("MEMORY.md.tmp")

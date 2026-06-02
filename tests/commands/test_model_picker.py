@@ -124,6 +124,7 @@ def test_picker_marks_active_model(
         # Picker rows start with "  *" or "   " and an index;
         # the header starts with "[bold]models[/]" / "models".
         return "models" not in p[:20].lower() and "/model" not in p
+
     qwen_line = next(p for p in _captured_ui["print"] if "qwen2.5" in p and _is_row(p))
     llama_line = next(p for p in _captured_ui["print"] if "llama3.1" in p and _is_row(p))
     assert "*" in qwen_line
@@ -149,6 +150,7 @@ def test_picker_recognizes_active_openrouter_model_without_prefix(
     # in its "(current: ...)" suffix.
     def _is_row(p: str) -> bool:
         return "models" not in p[:20].lower() and "/model" not in p
+
     line = next(p for p in _captured_ui["print"] if "openai/gpt-4o" in p and _is_row(p))
     assert "*" in line
 
@@ -296,9 +298,7 @@ def test_name_arg_calls_switch_directly(
     import athena.commands.model as mod
 
     captured: dict[str, str] = {}
-    monkeypatch.setattr(
-        mod, "_switch_model", lambda _a, name: captured.setdefault("name", name)
-    )
+    monkeypatch.setattr(mod, "_switch_model", lambda _a, name: captured.setdefault("name", name))
 
     mod.cmd_model(_agent(), "qwen2.5")
 
@@ -433,13 +433,12 @@ def test_picker_marks_non_tool_openrouter_models(
             and "/model" not in p
             and "no-tools" not in p[:25]  # filter the footer legend
         )
+
     claude_line = next(
-        p for p in _captured_ui["print"]
-        if "anthropic/claude-sonnet-4.6" in p and _is_row(p)
+        p for p in _captured_ui["print"] if "anthropic/claude-sonnet-4.6" in p and _is_row(p)
     )
     hermes_line = next(
-        p for p in _captured_ui["print"]
-        if "nousresearch/hermes-4-405b" in p and _is_row(p)
+        p for p in _captured_ui["print"] if "nousresearch/hermes-4-405b" in p and _is_row(p)
     )
     assert "no-tools" not in claude_line
     assert "no-tools" in hermes_line
@@ -487,7 +486,7 @@ def test_switch_to_non_tool_openrouter_model_warns(
         captured["name"] = name
         provider = SimpleNamespace(name="openrouter", close=lambda: None)
         # Resolver strips the openrouter/ prefix.
-        return provider, name[len("openrouter/"):]
+        return provider, name[len("openrouter/") :]
 
     monkeypatch.setattr(mod, "resolve_provider", _stub_resolve)
     monkeypatch.setattr(mod, "_route", lambda *_a, **_kw: "openrouter")
@@ -495,9 +494,7 @@ def test_switch_to_non_tool_openrouter_model_warns(
     agent = _agent("qwen2.5", provider_name="ollama")
     mod._switch_model(agent, "openrouter/nousresearch/hermes-4-405b")
 
-    warns = " ".join(
-        m for m in _captured_ui.get("warn", [])
-    ) if "warn" in _captured_ui else ""
+    warns = " ".join(m for m in _captured_ui.get("warn", [])) if "warn" in _captured_ui else ""
     # The capture fixture wires info/error/print but not warn. Pull
     # warn from a direct patch.
     # The body below uses the fact that ui.warn calls aren't in
@@ -524,7 +521,7 @@ def test_switch_to_non_tool_model_emits_clear_warning(
 
     def _stub_resolve(name, cfg, pool):
         provider = SimpleNamespace(name="openrouter", close=lambda: None)
-        return provider, name[len("openrouter/"):]
+        return provider, name[len("openrouter/") :]
 
     monkeypatch.setattr(mod, "resolve_provider", _stub_resolve)
     monkeypatch.setattr(mod, "_route", lambda *_a, **_kw: "openrouter")
@@ -560,7 +557,7 @@ def test_switch_to_tool_capable_model_does_not_warn(
 
     def _stub_resolve(name, cfg, pool):
         provider = SimpleNamespace(name="openrouter", close=lambda: None)
-        return provider, name[len("openrouter/"):]
+        return provider, name[len("openrouter/") :]
 
     monkeypatch.setattr(mod, "resolve_provider", _stub_resolve)
     monkeypatch.setattr(mod, "_route", lambda *_a, **_kw: "openrouter")
@@ -588,7 +585,7 @@ def test_switch_with_no_catalog_fetched_does_not_warn(
 
     def _stub_resolve(name, cfg, pool):
         provider = SimpleNamespace(name="openrouter", close=lambda: None)
-        return provider, name[len("openrouter/"):]
+        return provider, name[len("openrouter/") :]
 
     monkeypatch.setattr(mod, "resolve_provider", _stub_resolve)
     monkeypatch.setattr(mod, "_route", lambda *_a, **_kw: "openrouter")

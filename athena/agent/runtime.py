@@ -224,13 +224,12 @@ class AgentRuntime:
                     # perf_counter avoids wall-clock skew if the
                     # system clock jumps mid-turn.
                     import time as _time
+
                     _turn_start = _time.perf_counter()
                     try:
                         self._run_turn_inner(current_input)
                     finally:
-                        self.stats.record_turn_duration(
-                            _time.perf_counter() - _turn_start
-                        )
+                        self.stats.record_turn_duration(_time.perf_counter() - _turn_start)
                     next_input = self._consult_goal_continuation(
                         tokens_at_loop_start=tokens_at_loop_start,
                     )
@@ -293,9 +292,7 @@ class AgentRuntime:
         )
         last_tool_signature: tuple[tuple[str, str], ...] | None = None
         identical_tool_count = 0
-        max_identical = max(
-            0, int(getattr(self.cfg, "max_identical_tool_calls", 0) or 0)
-        )
+        max_identical = max(0, int(getattr(self.cfg, "max_identical_tool_calls", 0) or 0))
         # Count tool calls across the whole turn so the narrate-without-act
         # guard (below) can tell "described a next step but never acted"
         # from a normal closing summary after real work.
@@ -339,10 +336,7 @@ class AgentRuntime:
             # breaker fires after N consecutive failures.
             if self.stats.provider_errors > errors_before:
                 consecutive_provider_errors += 1
-                if (
-                    max_consecutive_errors
-                    and consecutive_provider_errors >= max_consecutive_errors
-                ):
+                if max_consecutive_errors and consecutive_provider_errors >= max_consecutive_errors:
                     ui.error(
                         f"circuit breaker tripped: "
                         f"{consecutive_provider_errors} provider errors in a "
@@ -441,9 +435,7 @@ class AgentRuntime:
                 # (2) the headless RunResult.assistant_text field
                 # carries this into machine-readable envelopes that
                 # downstream parsers shouldn't have to filter.
-                self._last_assistant_text = strip_think_blocks(
-                    assistant_text or ""
-                )
+                self._last_assistant_text = strip_think_blocks(assistant_text or "")
                 return
 
             # Identical-tool-call circuit breaker: if the same set of
@@ -852,9 +844,7 @@ class AgentRuntime:
             return recovered, residual
         return None
 
-    def _partition_tool_calls(
-        self, tool_calls: list[dict[str, Any]]
-    ) -> list[list[dict[str, Any]]]:
+    def _partition_tool_calls(self, tool_calls: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
         """Group contiguous parallel-safe calls into batches.
 
         Each returned batch is a list of one or more tool calls that
@@ -883,7 +873,7 @@ class AgentRuntime:
         current_is_safe = False
 
         for call in tool_calls:
-            name = ((call.get("function") or {}).get("name") or "")
+            name = (call.get("function") or {}).get("name") or ""
             t = tools.get_tool(name)
             is_safe = bool(t and t.parallel_safe)
             if current and is_safe and current_is_safe:
@@ -943,6 +933,7 @@ class AgentRuntime:
         def _make_sink(idx: int):
             def _sink(call: dict[str, Any], name: str, result: str) -> None:
                 slots[idx] = (call, name, result)
+
             return _sink
 
         # Capture the foreground thread's context snapshot once per
@@ -1016,9 +1007,7 @@ class AgentRuntime:
         # already preserved order for the happy path; stage 5
         # extends the same ordering guarantee to the interrupted
         # path so the provider's pairing keeps working.
-        denied_msg = (
-            "DENIED: tool execution interrupted by user (Ctrl+C)"
-        )
+        denied_msg = "DENIED: tool execution interrupted by user (Ctrl+C)"
         for idx, entry in enumerate(slots):
             if entry is not None:
                 self._record_tool_result(*entry)
@@ -1094,6 +1083,7 @@ class AgentRuntime:
         # dispatch; ``_stats_lock`` keeps the Stats counter +
         # breakdown-dict mutations atomic. Both serial-path-uncontended.
         import contextlib
+
         ui_lock = getattr(self, "_ui_lock", None) or contextlib.nullcontext()
         stats_lock = getattr(self, "_stats_lock", None) or contextlib.nullcontext()
         with ui_lock:
@@ -1157,6 +1147,7 @@ class AgentRuntime:
         # 5s p95 after rebuild Y" -- the kind of regression that
         # eval suites miss.
         import time as _time
+
         _tool_start = _time.perf_counter()
         try:
             result = tools.dispatch(name, args)
@@ -1174,9 +1165,7 @@ class AgentRuntime:
             )
             raise
         finally:
-            self.stats.record_tool_duration(
-                name, _time.perf_counter() - _tool_start
-            )
+            self.stats.record_tool_duration(name, _time.perf_counter() - _tool_start)
         with ui_lock:
             ui.tool_result(name, result)
 
@@ -1252,11 +1241,7 @@ class AgentRuntime:
         # back-compat for everything that constructs an AgentRuntime via
         # ``__new__``. Production Agents always get the nonce.
         nonce = getattr(self, "_tool_result_nonce", None)
-        wrapped = (
-            f"[TOOL_RESULT.{nonce}]\n{result}\n[/TOOL_RESULT.{nonce}]"
-            if nonce
-            else result
-        )
+        wrapped = f"[TOOL_RESULT.{nonce}]\n{result}\n[/TOOL_RESULT.{nonce}]" if nonce else result
         msg: dict[str, Any] = {"role": "tool", "name": name, "content": wrapped}
         # Some Ollama models send a tool_call_id; preserve when present
         if "id" in call:

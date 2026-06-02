@@ -108,9 +108,7 @@ def test_close_failure_does_not_clobber_success(
 
     result = runner_mod.run_agent_job(job, store=store)
 
-    assert result["status"] == "success", (
-        f"close() failure clobbered the successful run: {result}"
-    )
+    assert result["status"] == "success", f"close() failure clobbered the successful run: {result}"
     assert result["response"] == "successful response"
     # And the started_at field is still the success-path one (the
     # error path would have overwritten it too, but only as a
@@ -136,10 +134,7 @@ def test_close_failure_is_logged(
     with caplog.at_level(logging.ERROR, logger="athena.cron.runner"):
         runner_mod.run_agent_job(job, store=store)
 
-    matches = [
-        r for r in caplog.records
-        if "agent.close()" in r.getMessage()
-    ]
+    matches = [r for r in caplog.records if "agent.close()" in r.getMessage()]
     assert len(matches) >= 1, (
         f"expected agent.close() failure log; got {[r.getMessage() for r in caplog.records]}"
     )

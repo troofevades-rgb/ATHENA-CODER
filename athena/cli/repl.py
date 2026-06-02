@@ -298,10 +298,7 @@ def run_interactive_repl(agent: Agent, cfg: Any, workspace: Path) -> int:
 def _report_tui_crash(gateway: Any) -> None:
     """Print a clear message + the tail of the Ink stderr capture
     after the TUI subprocess died unexpectedly."""
-    sys.stderr.write(
-        "\nathena: the TUI exited unexpectedly (the Ink subprocess "
-        "crashed).\n"
-    )
+    sys.stderr.write("\nathena: the TUI exited unexpectedly (the Ink subprocess crashed).\n")
     path = getattr(gateway, "_tui_stderr_path", None)
     if not path or not Path(path).exists():
         sys.stderr.write("  No stderr capture was available.\n")

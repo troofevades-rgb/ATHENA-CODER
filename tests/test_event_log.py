@@ -162,9 +162,7 @@ def test_get_event_log_returns_same_instance_for_same_id(
     assert a is b
 
 
-def test_close_event_log_releases_slot(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_close_event_log_releases_slot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """After close, the next ``get_event_log`` returns a fresh
     instance (not the closed one). Otherwise long-lived daemons
     would accumulate closed writers in the dict."""
@@ -228,9 +226,7 @@ def test_scrubs_inside_nested_data(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_rotation_drops_oldest_beyond_keep(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_rotation_drops_oldest_beyond_keep(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Files older than the cap get unlinked by mtime. Newest
     survive."""
     import os
@@ -250,9 +246,7 @@ def test_rotation_drops_oldest_beyond_keep(
     assert remaining == ["session-2023.jsonl", "session-2024.jsonl"]
 
 
-def test_rotation_no_op_below_cap(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_rotation_no_op_below_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for i in range(3):
         (tmp_path / f"session-{i}.jsonl").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(event_log, "_log_dir", lambda: tmp_path)
@@ -316,8 +310,7 @@ def test_count_errors_within_days_filters_by_mtime(
     # Old session: 5 errors, 10 days ago.
     old = tmp_path / "session-old.jsonl"
     old.write_text(
-        '{"ts": "x", "session_id": "o", "level": "error", "kind": "tool_error", "data": {}}\n'
-        * 5,
+        '{"ts": "x", "session_id": "o", "level": "error", "kind": "tool_error", "data": {}}\n' * 5,
         encoding="utf-8",
     )
     old_ts = time.time() - 10 * 86400

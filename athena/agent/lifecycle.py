@@ -579,8 +579,7 @@ class AgentLifecycle:
             return self._prefill_cache
         if not isinstance(data, list):
             ui.error(
-                f"prefill file must contain a JSON list of messages, "
-                f"got {type(data).__name__}: {p}"
+                f"prefill file must contain a JSON list of messages, got {type(data).__name__}: {p}"
             )
             self._prefill_cache = []
             return self._prefill_cache
@@ -598,10 +597,7 @@ class AgentLifecycle:
                 )
                 continue
             if not isinstance(content, str):
-                ui.warn(
-                    f"prefill[{i}] has non-string content "
-                    f"({type(content).__name__}); skipping"
-                )
+                ui.warn(f"prefill[{i}] has non-string content ({type(content).__name__}); skipping")
                 continue
             valid.append({"role": role, "content": content})
         if valid:
@@ -1013,9 +1009,7 @@ class AgentLifecycle:
                     session_id=self.session_id,
                     turn_count=getattr(self.stats, "turns", None),
                     tool_call_count=getattr(self.stats, "tool_calls", None),
-                    last_message_roles=[
-                        str(m.get("role", "")) for m in msgs[-10:]
-                    ],
+                    last_message_roles=[str(m.get("role", "")) for m in msgs[-10:]],
                 )
 
             register_context_supplier(_crash_context)

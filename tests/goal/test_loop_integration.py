@@ -345,8 +345,7 @@ def test_announcement_turn_count_includes_bootstrap(
     combined = (capsys.readouterr().out).lower()
     # turns_taken=0 + 1 = "1 turn(s)"
     assert "1 turn(s)" in combined or "in 1 turn" in combined, (
-        f"expected '1 turn(s)' display when achieved on bootstrap; "
-        f"got: {combined!r}"
+        f"expected '1 turn(s)' display when achieved on bootstrap; got: {combined!r}"
     )
 
     # After 1 continuation that achieved -- internal turns_taken=1,
@@ -361,8 +360,7 @@ def test_announcement_turn_count_includes_bootstrap(
     a2._consult_goal_continuation(tokens_at_loop_start=0)
     combined2 = (capsys.readouterr().out).lower()
     assert "2 turn(s)" in combined2 or "in 2 turn" in combined2, (
-        f"expected '2 turn(s)' display for one-continuation case; "
-        f"got: {combined2!r}"
+        f"expected '2 turn(s)' display for one-continuation case; got: {combined2!r}"
     )
 
 

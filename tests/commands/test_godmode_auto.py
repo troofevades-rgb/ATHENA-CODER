@@ -122,10 +122,7 @@ def test_auto_on_gpt_applies_og_godmode(
     agent = _agent(model="gpt-4o")
     cmd_godmode(agent, "auto")
 
-    assert (
-        STRATEGIES["og_godmode"]["template"]
-        in (agent.cfg.agent_system_prompt_append or "")
-    )
+    assert STRATEGIES["og_godmode"]["template"] in (agent.cfg.agent_system_prompt_append or "")
 
 
 def test_auto_on_hermes_applies_zero_refusal(
@@ -138,10 +135,7 @@ def test_auto_on_hermes_applies_zero_refusal(
     agent = _agent(model="nousresearch/hermes-4-405b")
     cmd_godmode(agent, "auto")
 
-    assert (
-        STRATEGIES["zero_refusal"]["template"]
-        in (agent.cfg.agent_system_prompt_append or "")
-    )
+    assert STRATEGIES["zero_refusal"]["template"] in (agent.cfg.agent_system_prompt_append or "")
 
 
 def test_auto_unknown_model_falls_back_to_default(
@@ -157,10 +151,7 @@ def test_auto_unknown_model_falls_back_to_default(
     agent = _agent(model="some-custom-finetune")
     cmd_godmode(agent, "auto")
 
-    assert (
-        GODMODE_SYSTEM_PROMPT
-        in (agent.cfg.agent_system_prompt_append or "")
-    )
+    assert GODMODE_SYSTEM_PROMPT in (agent.cfg.agent_system_prompt_append or "")
 
 
 # ---------------------------------------------------------------------------
@@ -183,9 +174,8 @@ def test_auto_model_flag_overrides_detection(
     cmd_godmode(agent, "auto --model claude-sonnet-4-6")
 
     # The applied strategy is Claude's primary, not GPT's.
-    assert (
-        STRATEGIES["boundary_inversion"]["template"]
-        in (agent.cfg.agent_system_prompt_append or "")
+    assert STRATEGIES["boundary_inversion"]["template"] in (
+        agent.cfg.agent_system_prompt_append or ""
     )
 
 
@@ -200,9 +190,8 @@ def test_auto_model_flag_with_equals_form(
     agent = _agent(model="gpt-4o")
     cmd_godmode(agent, "auto --model=grok-3")
 
-    assert (
-        STRATEGIES["unfiltered_liberated"]["template"]
-        in (agent.cfg.agent_system_prompt_append or "")
+    assert STRATEGIES["unfiltered_liberated"]["template"] in (
+        agent.cfg.agent_system_prompt_append or ""
     )
 
 
@@ -299,9 +288,7 @@ def test_race_without_api_key_errors_clearly(
         def get(self, name: str):
             return None
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _EmptyPool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _EmptyPool())
 
     agent = _agent()
     cmd_godmode(agent, "race what is the meaning of life")

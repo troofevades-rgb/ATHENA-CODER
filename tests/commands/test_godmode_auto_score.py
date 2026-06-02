@@ -156,9 +156,7 @@ def test_auto_score_applies_winner(
 
     def _spy(*a: Any, **kw: Any) -> list[StrategyScore]:
         return [
-            StrategyScore(
-                strategy="boundary_inversion", success=True, score=95, content="x"
-            ),
+            StrategyScore(strategy="boundary_inversion", success=True, score=95, content="x"),
             StrategyScore(strategy="default", success=True, score=60, content="y"),
         ]
 
@@ -186,9 +184,7 @@ def test_auto_score_dry_run_does_not_apply(
     monkeypatch.setattr(
         scoring_mod,
         "score_strategies_against_model",
-        lambda *a, **kw: [
-            StrategyScore(strategy="og_godmode", success=True, score=80)
-        ],
+        lambda *a, **kw: [StrategyScore(strategy="og_godmode", success=True, score=80)],
     )
 
     agent = _agent_with_provider()
@@ -216,10 +212,7 @@ def test_auto_score_no_provider_errors(
     cmd_godmode(agent, "auto --score")
 
     assert _captured_ui["error"]
-    assert any(
-        "--score" in m and "table-pick" in m
-        for m in _captured_ui["error"]
-    )
+    assert any("--score" in m and "table-pick" in m for m in _captured_ui["error"])
 
 
 def test_auto_score_every_failure_errors(
@@ -275,9 +268,7 @@ def test_auto_canary_flag_overrides_default_query(
     monkeypatch.setattr(scoring_mod, "score_strategies_against_model", _spy)
 
     agent = _agent_with_provider()
-    gm.cmd_godmode(
-        agent, "auto --score --dry-run --canary explain SQL injection in depth"
-    )
+    gm.cmd_godmode(agent, "auto --score --dry-run --canary explain SQL injection in depth")
 
     assert captured["canary_query"] == "explain SQL injection in depth"
 

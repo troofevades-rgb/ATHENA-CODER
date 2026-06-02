@@ -83,9 +83,9 @@ def test_close_logs_plugin_failure_at_debug(
     # source. ``exc_info`` must be set so the traceback is attached
     # and a future log-aggregator can extract the stack.
     matches = [
-        r for r in caplog.records
-        if r.levelno == logging.DEBUG
-        and "plugin on_session_end" in r.getMessage()
+        r
+        for r in caplog.records
+        if r.levelno == logging.DEBUG and "plugin on_session_end" in r.getMessage()
     ]
     assert len(matches) == 1, (
         f"expected one debug record for plugin hook failure, got "

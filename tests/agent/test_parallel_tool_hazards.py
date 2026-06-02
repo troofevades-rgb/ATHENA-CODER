@@ -31,7 +31,6 @@ from athena.plugins.base import Plugin
 from athena.plugins.hooks import HookDispatcher
 from athena.tools.tool_result_storage import ToolResultStorage
 
-
 # ---------------------------------------------------------------------------
 # The two per-call locks must exist on every Agent
 # ---------------------------------------------------------------------------
@@ -103,9 +102,7 @@ def test_handle_tool_call_engages_ui_lock_around_panels(
         agent._handle_tool_call(call)
         # Exactly two acquires per successful call: one around
         # tool_call_summary, one around tool_result.
-        assert len(acquires) == 2, (
-            f"expected 2 _ui_lock acquires per call, got {len(acquires)}"
-        )
+        assert len(acquires) == 2, f"expected 2 _ui_lock acquires per call, got {len(acquires)}"
     finally:
         agent.close()
 
@@ -130,9 +127,7 @@ class _CountingPlugin(Plugin):
             self.pre_calls.append((tool_name, tool_args.get("idx", 0)))
         return None
 
-    def post_tool_call(
-        self, tool_name: str, tool_args: dict[str, Any], result: str
-    ) -> None:
+    def post_tool_call(self, tool_name: str, tool_args: dict[str, Any], result: str) -> None:
         with self._lock:
             self.post_calls.append((tool_name, tool_args.get("idx", 0)))
 

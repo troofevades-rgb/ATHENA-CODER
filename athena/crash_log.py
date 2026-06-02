@@ -169,9 +169,7 @@ def _build_record(
     context: CrashContext | None,
 ) -> dict[str, Any]:
     """Assemble the JSON-serializable record."""
-    tb_string = "".join(
-        traceback.format_exception(exc_type, exc_value, exc_tb)
-    )
+    tb_string = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
     return {
         "ts": datetime.now(timezone.utc).isoformat(),
         "athena_version": _athena_version(),
@@ -240,9 +238,7 @@ def write_crash_record(
         # Atomic-ish: write to tmp then rename. Avoids a half-written
         # JSON file if the process dies mid-write.
         tmp = target_dir / (path.name + ".tmp")
-        tmp.write_text(
-            json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        tmp.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
         os.replace(tmp, path)
         _rotate(target_dir, keep)
         return path
@@ -330,9 +326,7 @@ def _athena_excepthook(
             if _orig_excepthook is not None:
                 _orig_excepthook(exc_type, exc_value, exc_tb)
             return
-        path = write_crash_record(
-            exc_type, exc_value, exc_tb, _supplied_context()
-        )
+        path = write_crash_record(exc_type, exc_value, exc_tb, _supplied_context())
         if path is not None:
             try:
                 sys.stderr.write(
@@ -391,9 +385,7 @@ def capture_crash(
         # Merge the call-site note with any supplied context note.
         existing = ctx.note or ""
         ctx.note = f"{note}" if not existing else f"{existing}; {note}"
-    return write_crash_record(
-        type(exc), exc, exc.__traceback__, ctx
-    )
+    return write_crash_record(type(exc), exc, exc.__traceback__, ctx)
 
 
 # Re-exports for the explicit ``__all__`` consumers might rely on.

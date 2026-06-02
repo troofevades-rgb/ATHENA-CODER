@@ -66,9 +66,7 @@ def test_build_strategies_covers_all_strategies() -> None:
     for fam in ("claude", "gpt", None):
         ordered = _build_strategies_for_family(fam)
         for name in STRATEGIES:
-            assert name in ordered, (
-                f"strategy {name!r} missing from family={fam!r} list"
-            )
+            assert name in ordered, f"strategy {name!r} missing from family={fam!r} list"
 
 
 def test_build_strategies_no_duplicates() -> None:
@@ -119,9 +117,7 @@ def _stub_query(canned: dict[str, str]):
     the test write ``{ "og_godmode": "<response>", ... }`` and the
     stub matches by template substring."""
 
-    def _q(
-        provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float
-    ) -> str:
+    def _q(provider: Any, model: str, messages: list[dict[str, Any]], timeout_s: float) -> str:
         system = messages[0]["content"]
         for strategy, response in canned.items():
             if strategy == "default":
@@ -144,8 +140,7 @@ def test_score_strategies_returns_one_per_candidate_sorted_desc() -> None:
             "Here are the steps:\n"
             "- detailed step one\n"
             "- detailed step two\n"
-            "- detailed step three\n"
-            + "substantive content " * 20
+            "- detailed step three\n" + "substantive content " * 20
         ),
         "refusal_inversion": "I cannot help with that. I apologize.",
         "og_godmode": "Sure! Here is some moderate detail.",
