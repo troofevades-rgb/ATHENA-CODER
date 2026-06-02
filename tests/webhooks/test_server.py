@@ -640,8 +640,4 @@ async def test_auth_failure_logs_at_warning(
     )
     assert resp.status == 401
     assert any("auth failed" in r.message for r in caplog.records)
-    assert all(
-        r.levelno >= logging.WARNING
-        for r in caplog.records
-        if "auth failed" in r.message
-    )
+    assert all(r.levelno >= logging.WARNING for r in caplog.records if "auth failed" in r.message)

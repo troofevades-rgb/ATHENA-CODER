@@ -97,9 +97,7 @@ def _initialize_once() -> None:
             # each stack frame immediately so a hard crash
             # mid-dump leaves a usable partial.
             fh = open(log_path, "a", buffering=1, encoding="utf-8")
-            fh.write(
-                f"\n--- faulthandler armed at {time.time()} pid={os.getpid()} ---\n"
-            )
+            fh.write(f"\n--- faulthandler armed at {time.time()} pid={os.getpid()} ---\n")
             faulthandler.enable(file=fh, all_threads=True)
             # 60s threshold gives Ollama cold-start (model load
             # + GPU warmup on partial-offload) a chance before

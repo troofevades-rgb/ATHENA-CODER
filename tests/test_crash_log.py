@@ -132,9 +132,7 @@ def test_scrubs_sk_prefixed_keys_in_message(tmp_path: Path) -> None:
     """sk-or-... / sk-ant-... patterns must NOT survive into the
     on-disk record."""
     try:
-        raise RuntimeError(
-            "auth failed for sk-or-v1-abcdef1234567890 -- check key"
-        )
+        raise RuntimeError("auth failed for sk-or-v1-abcdef1234567890 -- check key")
     except RuntimeError as e:
         path = write_crash_record(type(e), e, e.__traceback__, crash_dir=tmp_path)
     assert path is not None
@@ -352,9 +350,7 @@ def test_excepthook_writes_record_and_chains(
 # ---------------------------------------------------------------------------
 
 
-def test_supplier_lands_in_record(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_supplier_lands_in_record(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A registered supplier's ``CrashContext`` lands in the record
     when the excepthook fires."""
     monkeypatch.setattr(crash_log, "_crash_dir", lambda: tmp_path)
@@ -407,9 +403,7 @@ def test_capture_crash_writes_with_note(tmp_path: Path) -> None:
     try:
         raise ValueError("bad")
     except ValueError as e:
-        path = capture_crash(
-            e, note="TUI gateway disconnected; restarting", context=CrashContext()
-        )
+        path = capture_crash(e, note="TUI gateway disconnected; restarting", context=CrashContext())
         # Override the target dir indirection by monkey-patching:
         # easier to just call write_crash_record directly with the
         # ctx + note. The capture_crash signature delegates to the

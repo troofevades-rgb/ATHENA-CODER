@@ -61,7 +61,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..text_utils import strip_think_blocks
 from .events import MessageEvent, MessageType
@@ -347,8 +347,7 @@ class GatewayAdapter(ABC):
         # ``athena gateway logs`` without enabling debug.
         if not self._is_authorized(event):
             logger.info(
-                "[%s] rejected inbound message: user_id=%s chat_id=%s "
-                "not in allowlist",
+                "[%s] rejected inbound message: user_id=%s chat_id=%s not in allowlist",
                 self.name,
                 event.user_id,
                 event.chat_id,

@@ -115,9 +115,7 @@ def test_openrouter_vendor_model_user_case(filled_pool: CredentialPool):
     sent as ``openrouter/nousresearch/hermes-4-405b`` (the picker's
     routing form) must reach the API as ``nousresearch/hermes-4-405b``."""
     cfg = Config()
-    p, bare = resolve_provider(
-        "openrouter/nousresearch/hermes-4-405b", cfg, filled_pool
-    )
+    p, bare = resolve_provider("openrouter/nousresearch/hermes-4-405b", cfg, filled_pool)
     assert isinstance(p, OpenRouterProvider)
     assert bare == "nousresearch/hermes-4-405b"
     p.close()

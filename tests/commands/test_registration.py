@@ -155,21 +155,15 @@ def test_repl_dispatcher_has_only_documented_inline_exception():
     for node in ast.walk(tree):
         if not isinstance(node, ast.Compare):
             continue
-        if not (
-            isinstance(node.left, ast.Name) and node.left.id == "cmd"
-        ):
+        if not (isinstance(node.left, ast.Name) and node.left.id == "cmd"):
             continue
         for op, comparator in zip(node.ops, node.comparators):
             if isinstance(op, (ast.Eq, ast.In)):
-                if isinstance(comparator, ast.Constant) and isinstance(
-                    comparator.value, str
-                ):
+                if isinstance(comparator, ast.Constant) and isinstance(comparator.value, str):
                     inline_commands.add(comparator.value)
                 elif isinstance(comparator, ast.Tuple):
                     for elt in comparator.elts:
-                        if isinstance(elt, ast.Constant) and isinstance(
-                            elt.value, str
-                        ):
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                             inline_commands.add(elt.value)
 
     assert inline_commands == set(_ACTUAL_INLINE_REPL_COMMANDS), (

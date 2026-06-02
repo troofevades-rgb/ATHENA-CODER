@@ -669,12 +669,9 @@ class TuiGateway:
         self._tui_stderr_path = tui_stderr_path
         try:
             tui_stderr_path.parent.mkdir(parents=True, exist_ok=True)
-            self._tui_stderr_file: Any = open(
-                tui_stderr_path, "a", encoding="utf-8", buffering=1
-            )
+            self._tui_stderr_file: Any = open(tui_stderr_path, "a", encoding="utf-8", buffering=1)
             self._tui_stderr_file.write(
-                f"\n--- TUI launched at {time.time()} pid={os.getpid()} "
-                f"bundle={self._bundle} ---\n"
+                f"\n--- TUI launched at {time.time()} pid={os.getpid()} bundle={self._bundle} ---\n"
             )
         except OSError:
             # Logging is observability; never block launch. Fall
@@ -727,16 +724,14 @@ class TuiGateway:
                     # the child-death detection below turns that into
                     # a clean error instead of a hang.
                     logger.warning(
-                        "could not open CONIN$ for TUI stdin; "
-                        "raw mode may be unavailable",
+                        "could not open CONIN$ for TUI stdin; raw mode may be unavailable",
                         exc_info=True,
                     )
                     self._conin = None
                     popen_stdin = None
             popen_stdout: Any = sys.stdout
             popen_stderr: Any = (
-                self._tui_stderr_file if self._tui_stderr_file is not None
-                else sys.stderr
+                self._tui_stderr_file if self._tui_stderr_file is not None else sys.stderr
             )
         else:
             # Headless: parent has no real TTY (pytest, daemon).
@@ -745,8 +740,7 @@ class TuiGateway:
             popen_stdin = subprocess.DEVNULL
             popen_stdout = subprocess.DEVNULL
             popen_stderr = (
-                self._tui_stderr_file if self._tui_stderr_file is not None
-                else subprocess.DEVNULL
+                self._tui_stderr_file if self._tui_stderr_file is not None else subprocess.DEVNULL
             )
         self._proc = subprocess.Popen(  # noqa: S603
             [self._node, str(self._bundle)],
@@ -1075,8 +1069,7 @@ class TuiGateway:
             proc = self._proc
             if proc is not None and proc.poll() is not None:
                 logger.error(
-                    "TUI subprocess exited (code %s); no reconnect "
-                    "possible. See %s",
+                    "TUI subprocess exited (code %s); no reconnect possible. See %s",
                     proc.returncode,
                     self._tui_stderr_path,
                 )

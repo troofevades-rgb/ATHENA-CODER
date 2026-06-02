@@ -144,15 +144,9 @@ def test_json_output_has_checks_and_summary() -> None:
 def test_text_report_groups_by_section() -> None:
     """Section headers appear once each, in result order."""
     results = [
-        doctor.CheckResult(
-            section="config", name="x", label="cfg-row", severity="ok"
-        ),
-        doctor.CheckResult(
-            section="config", name="y", label="cfg-row-2", severity="ok"
-        ),
-        doctor.CheckResult(
-            section="ollama", name="z", label="ollama-row", severity="ok"
-        ),
+        doctor.CheckResult(section="config", name="x", label="cfg-row", severity="ok"),
+        doctor.CheckResult(section="config", name="y", label="cfg-row-2", severity="ok"),
+        doctor.CheckResult(section="ollama", name="z", label="ollama-row", severity="ok"),
     ]
     text = doctor.render_text_report(results)
     # Both section headers present, in order, exactly once.
@@ -183,9 +177,7 @@ def test_no_network_skips_openrouter_probe(
         def get(self, name: str) -> Any:
             return _CredStub() if name == "openrouter" else None
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _Pool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _Pool())
     # If the skip branch ran, the function should never reach httpx.
     # We don't need to block httpx -- just assert the result severity
     # and detail.
@@ -204,9 +196,7 @@ def test_openrouter_probe_returns_skip_when_no_credential(
         def get(self, name: str) -> Any:
             return None
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _Pool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _Pool())
     result = doctor._check_openrouter_auth(skip_network=False)
     assert result.severity == "skip"
     assert "no credential" in result.detail.lower()
@@ -225,16 +215,12 @@ def test_openrouter_probe_reports_auth_failure(
         def get(self, name: str) -> Any:
             return _CredStub()
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _Pool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _Pool())
 
     class _Resp:
         status_code = 401
 
-    monkeypatch.setattr(
-        "httpx.get", lambda *a, **kw: _Resp()
-    )
+    monkeypatch.setattr("httpx.get", lambda *a, **kw: _Resp())
 
     result = doctor._check_openrouter_auth(skip_network=False)
     assert result.severity == "fail"
@@ -298,9 +284,7 @@ def test_tui_bundle_check_passes_when_file_exists(
     test is independent of repo state."""
     bundle = tmp_path / "main.js"
     bundle.write_text("// bundle bytes", encoding="utf-8")
-    monkeypatch.setattr(
-        "athena.tui_gateway.server._locate_bundle", lambda: bundle
-    )
+    monkeypatch.setattr("athena.tui_gateway.server._locate_bundle", lambda: bundle)
 
     result = doctor._check_tui_bundle()
     assert result.severity == "ok"
@@ -316,13 +300,10 @@ def test_tui_bundle_check_fails_when_missing(
 
     def _raise() -> None:
         raise FileNotFoundError(
-            "Ink TUI bundle not found. ... Build it with: "
-            "cd ui-tui && bun run build"
+            "Ink TUI bundle not found. ... Build it with: cd ui-tui && bun run build"
         )
 
-    monkeypatch.setattr(
-        "athena.tui_gateway.server._locate_bundle", _raise
-    )
+    monkeypatch.setattr("athena.tui_gateway.server._locate_bundle", _raise)
 
     result = doctor._check_tui_bundle()
     assert result.severity == "fail"
@@ -373,9 +354,7 @@ def test_credentials_pool_warns_when_empty(
         def providers(self) -> list[str]:
             return []
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _EmptyPool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _EmptyPool())
 
     result = doctor._check_credentials_pool()
     assert result.severity == "warn"
@@ -392,9 +371,7 @@ def test_credentials_pool_reports_provider_names(
         def providers(self) -> list[str]:
             return ["anthropic", "openai", "openrouter"]
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _Pool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _Pool())
 
     result = doctor._check_credentials_pool()
     assert result.severity == "ok"
@@ -415,9 +392,7 @@ def test_recent_crashes_ok_when_none(
 ) -> None:
     """Empty crash dir -> OK with a pointer at the directory so
     operators know where to look if a crash happens."""
-    monkeypatch.setattr(
-        "athena.crash_log.recent_crashes", lambda within_days=None: []
-    )
+    monkeypatch.setattr("athena.crash_log.recent_crashes", lambda within_days=None: [])
     result = doctor._check_recent_crashes()
     assert result.severity == "ok"
     assert "none recorded" in result.detail.lower()

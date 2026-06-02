@@ -127,9 +127,7 @@ def test_plan_hermes_picks_zero_refusal() -> None:
         ("mistral", "aggressive"),
     ],
 )
-def test_plan_for_families_that_benefit_from_prefill(
-    family: str, expected_prefill: str
-) -> None:
+def test_plan_for_families_that_benefit_from_prefill(family: str, expected_prefill: str) -> None:
     """The hermes table calls out families where prefill amplifies
     the system-prompt mutation. The recommended primary template
     is aggressive for all of these."""

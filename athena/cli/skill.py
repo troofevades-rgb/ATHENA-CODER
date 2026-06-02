@@ -190,9 +190,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
         else:
             sys.stdout.write(f"ok    {name}\n")
     if problems:
-        sys.stderr.write(
-            f"\n{problems} problem(s) across {len(targets)} skill(s)\n"
-        )
+        sys.stderr.write(f"\n{problems} problem(s) across {len(targets)} skill(s)\n")
         return 1
     sys.stdout.write(f"\nall {len(targets)} skill(s) valid\n")
     return 0
@@ -248,8 +246,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_lint = sub.add_parser(
         "lint",
-        help="Validate an installed skill's SKILL.md (catches manual edits "
-        "without a re-import).",
+        help="Validate an installed skill's SKILL.md (catches manual edits without a re-import).",
     )
     p_lint.add_argument("name", nargs="?", help="Skill name to lint (omit with --all).")
     p_lint.add_argument("--all", action="store_true", help="Lint every discovered skill.")

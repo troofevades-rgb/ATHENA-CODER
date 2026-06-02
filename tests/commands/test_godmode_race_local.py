@@ -218,6 +218,4 @@ def test_ollama_local_does_not_require_openrouter_key(
     agent = _agent_with_ollama(models=["qwen2.5:latest"])
     gm.cmd_godmode(agent, "race anything --tier ollama-local")
 
-    assert not any(
-        "OPENROUTER_API_KEY" in m for m in _captured_ui["error"]
-    )
+    assert not any("OPENROUTER_API_KEY" in m for m in _captured_ui["error"])

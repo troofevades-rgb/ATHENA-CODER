@@ -257,9 +257,7 @@ def _rotate(log_dir: Path, keep: int) -> None:
         files = [
             p
             for p in log_dir.iterdir()
-            if p.is_file()
-            and p.name.startswith("session-")
-            and p.suffix == ".jsonl"
+            if p.is_file() and p.name.startswith("session-") and p.suffix == ".jsonl"
         ]
     except OSError:
         return

@@ -125,9 +125,7 @@ def test_parse_race_args_tier_with_equals() -> None:
 def test_parse_race_args_no_godmode_flag() -> None:
     from athena.commands.godmode import _parse_race_args
 
-    query, _, godmode_on, depth_on = _parse_race_args(
-        "hello --no-godmode --tier=power"
-    )
+    query, _, godmode_on, depth_on = _parse_race_args("hello --no-godmode --tier=power")
     assert query == "hello"
     assert godmode_on is False
     assert depth_on is True  # --no-godmode doesn't imply --no-depth
@@ -224,9 +222,7 @@ def test_race_missing_api_key_errors_no_provider(
         def get(self, name: str):
             return None
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _EmptyPool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _EmptyPool())
 
     agent_no_provider = SimpleNamespace(
         workspace=None,
@@ -264,9 +260,7 @@ def test_race_resolves_key_from_credential_pool(
         def get(self, name: str):
             return _Cred() if name == "openrouter" else None
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _PoolWithKey()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _PoolWithKey())
 
     # Capture the provider constructor arg so we can pin that the
     # pool's key flowed through.
@@ -276,9 +270,7 @@ def test_race_resolves_key_from_credential_pool(
         def __init__(self, *, api_key: str, **kw) -> None:
             captured_key["key"] = api_key
 
-    monkeypatch.setattr(
-        "athena.providers.openrouter.OpenRouterProvider", _FakeProvider
-    )
+    monkeypatch.setattr("athena.providers.openrouter.OpenRouterProvider", _FakeProvider)
     monkeypatch.setattr(jb, "race_models", lambda *a, **kw: [])
 
     agent_no_provider = SimpleNamespace(
@@ -290,9 +282,7 @@ def test_race_resolves_key_from_credential_pool(
 
     assert captured_key.get("key") == "sk-or-pool-test-key"
     # No error -- key found in pool.
-    assert not any(
-        "add-key" in m for m in _captured_ui["error"]
-    )
+    assert not any("add-key" in m for m in _captured_ui["error"])
 
 
 def test_race_pool_failure_falls_back_to_env(
@@ -312,9 +302,7 @@ def test_race_pool_failure_falls_back_to_env(
         def get(self, name: str):
             raise RuntimeError("credentials.json corrupted")
 
-    monkeypatch.setattr(
-        "athena.providers.credential_pool.global_pool", lambda: _BrokenPool()
-    )
+    monkeypatch.setattr("athena.providers.credential_pool.global_pool", lambda: _BrokenPool())
 
     captured_key: dict[str, str] = {}
 
@@ -322,9 +310,7 @@ def test_race_pool_failure_falls_back_to_env(
         def __init__(self, *, api_key: str, **kw) -> None:
             captured_key["key"] = api_key
 
-    monkeypatch.setattr(
-        "athena.providers.openrouter.OpenRouterProvider", _FakeProvider
-    )
+    monkeypatch.setattr("athena.providers.openrouter.OpenRouterProvider", _FakeProvider)
     monkeypatch.setattr(jb, "race_models", lambda *a, **kw: [])
 
     agent_no_provider = SimpleNamespace(

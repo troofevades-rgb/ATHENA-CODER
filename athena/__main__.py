@@ -73,7 +73,6 @@ def _rewrite_singledash_longs(argv: list[str], parser: argparse.ArgumentParser) 
 # should import from athena.cli.repl directly.
 from .cli.repl import _handle_slash, _run_interactive_repl  # noqa: E402, F401
 
-
 _SUBCOMMANDS = {
     "import-from-hermes": "athena.cli.import_hermes",
     "reindex": "athena.cli.reindex",
@@ -443,6 +442,7 @@ def main() -> int:
     _rc = _run_interactive_repl(agent, cfg, workspace)
     _cp("post_repl", rc=_rc)
     return _rc
+
 
 if __name__ == "__main__":
     sys.exit(main())

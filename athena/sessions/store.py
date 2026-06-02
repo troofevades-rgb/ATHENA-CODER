@@ -285,9 +285,7 @@ class SessionStore:
         """
         conn = self._conn()
         jsonl_ids = {p.stem for p in self.sessions_dir.glob("*.jsonl")}
-        table_ids = {
-            r[0] for r in conn.execute("SELECT session_id FROM sessions").fetchall()
-        }
+        table_ids = {r[0] for r in conn.execute("SELECT session_id FROM sessions").fetchall()}
         turn_counts: dict[str, int] = {
             r[0]: int(r[1])
             for r in conn.execute(

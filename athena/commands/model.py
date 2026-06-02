@@ -242,17 +242,10 @@ def _render_picker(agent: Any) -> None:
         # tools) so the operator's eye catches it. The agent ships
         # tool schemas every turn; picking a no-tools model is a
         # dead-end in practice.
-        tools_marker = (
-            " [dim red][no-tools][/]" if not entry.supports_tools else ""
-        )
-        ui.console.print(
-            f"  {marker} [dim]{i:>3}[/]  {display}{tools_marker}"
-        )
+        tools_marker = " [dim red][no-tools][/]" if not entry.supports_tools else ""
+        ui.console.print(f"  {marker} [dim]{i:>3}[/]  {display}{tools_marker}")
 
-    ui.console.print(
-        "\nswitch with: [bold]/model N[/] (pick a number) or "
-        "[bold]/model NAME[/]"
-    )
+    ui.console.print("\nswitch with: [bold]/model N[/] (pick a number) or [bold]/model NAME[/]")
     ui.console.print(
         "[dim red][no-tools][/] [dim]entries can't run agent "
         "turns -- they 404 on every tool-schema request[/]"
@@ -354,9 +347,7 @@ def _switch_model(agent: Any, new_name: str) -> None:
     new_provider_name = _route(new_name, agent.cfg)
     if new_provider_name != current_provider_name:
         try:
-            new_provider, bare_model = resolve_provider(
-                new_name, agent.cfg, _global_pool()
-            )
+            new_provider, bare_model = resolve_provider(new_name, agent.cfg, _global_pool())
         except Exception as e:  # noqa: BLE001
             ui.error(f"could not switch to {new_name}: {e}")
             return
@@ -370,8 +361,7 @@ def _switch_model(agent: Any, new_name: str) -> None:
         agent._owns_client = True
         agent.model = bare_model
         ui.info(
-            f"model set to {new_name} "
-            f"(provider: {current_provider_name} -> {new_provider_name})"
+            f"model set to {new_name} (provider: {current_provider_name} -> {new_provider_name})"
         )
         _warn_if_openrouter_no_tools(new_provider_name, bare_model)
         return
@@ -420,14 +410,9 @@ def cmd_model(agent, arg: str = "") -> str:
         resolved = _resolve_picker_index(arg)
         if resolved is None:
             if not _LAST_PICKER:
-                ui.error(
-                    f"no picker rendered yet -- run /model first, "
-                    f"then /model {arg}"
-                )
+                ui.error(f"no picker rendered yet -- run /model first, then /model {arg}")
                 return ""
-            ui.error(
-                f"picker index {arg} out of range (1..{len(_LAST_PICKER)})"
-            )
+            ui.error(f"picker index {arg} out of range (1..{len(_LAST_PICKER)})")
             return ""
         _switch_model(agent, resolved)
         return ""
