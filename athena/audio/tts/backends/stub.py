@@ -63,13 +63,13 @@ class StubTTSBackend(Provider):
 
     # ---- chat ABC plumbing — not a chat backend ----
 
-    def stream_chat(self, **kwargs: Any):  # noqa: D401
+    def stream_chat(self, **kwargs: Any) -> Any:  # noqa: D401
         raise NotImplementedError(
             "tts_stub is a speech-synthesis backend, not a chat provider; "
             "route via athena.audio.tts.resolve.resolve_tts_backend"
         )
 
-    def parse_tool_calls(self, content: str, raw_response: dict[str, Any]):
+    def parse_tool_calls(self, content: str, raw_response: dict[str, Any]) -> tuple[str, list[Any]]:
         return content, []
 
     # ---- SpeechSynthBackend protocol ----
