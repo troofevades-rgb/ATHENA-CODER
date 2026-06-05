@@ -213,3 +213,10 @@ files = ["athena"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+# Optional, untyped third-party engines loaded lazily behind the
+# ``[tts]`` / ``[gateway-voice]`` extras. No type stubs ship with them;
+# the in-tree code guards every use with is_available()/try-except.
+[[tool.mypy.overrides]]
+module = ["webrtcvad", "piper", "piper.*"]
+ignore_missing_imports = true
