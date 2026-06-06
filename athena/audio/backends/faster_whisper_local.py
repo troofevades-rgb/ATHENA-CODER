@@ -186,12 +186,22 @@ class FasterWhisperLocalBackend(Provider):
         )
 
         # faster-whisper's transcribe returns (segments_iter, info).
+        # Anti-hallucination guards (whisper otherwise emits phantom phrases
+        # like "Thank you for watching" on silence/non-speech): a single
+        # greedy pass (temperature=0, no fallback), don't carry context across
+        # clips, and keep the no-speech / low-logprob / repetition thresholds
+        # explicit so quiet or empty audio is rejected rather than confabulated.
         try:
             segments_iter, info = model.transcribe(
                 str(path),
                 language=language,
                 beam_size=5,
                 vad_filter=True,
+                temperature=0.0,
+                condition_on_previous_text=False,
+                no_speech_threshold=0.6,
+                log_prob_threshold=-1.0,
+                compression_ratio_threshold=2.4,
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("faster-whisper transcribe failed for %s: %s", path, e)

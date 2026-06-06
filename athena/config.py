@@ -69,6 +69,11 @@ def mcp_config_paths(workspace: Path) -> list[Path]:
 class Config:
     model: str = "troofevades-q35:athena"
     ollama_host: str = "http://127.0.0.1:11434"
+    # Ollama keep_alive: how long the model stays resident after a request.
+    # None lets Ollama use its default (5 min). The voice path overrides this
+    # to a longer window so the voice model isn't reloaded between spoken
+    # turns. Forwarded as a top-level field by OllamaProvider.stream_chat.
+    ollama_keep_alive: str | None = None
     # Per-request timeout (seconds) for the Ollama HTTP client. This is
     # the stall detector: httpx applies it as the max wait for the next
     # chunk, so a healthy token stream never trips it — only a wedged
