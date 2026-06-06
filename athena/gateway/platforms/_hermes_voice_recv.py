@@ -32,9 +32,14 @@ import struct
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 import discord
 import discord.opus
+
+if TYPE_CHECKING:
+    from discord.voice_client import VoiceClient
 
 log = logging.getLogger("athena.gateway.voice.hermes_recv")
 
@@ -51,7 +56,7 @@ def _pcm_rms(pcm: bytes) -> float:
     s.frombytes(pcm[: len(pcm) - (len(pcm) % 2)])
     if not s:
         return 0.0
-    return (sum(x * x for x in s) / len(s)) ** 0.5
+    return float((sum(x * x for x in s) / len(s)) ** 0.5)
 
 
 def ensure_opus_loaded() -> bool:
@@ -94,12 +99,12 @@ class HermesVoiceReceiver:
 
     def __init__(
         self,
-        voice_client,
+        voice_client: VoiceClient,
         *,
         silence_threshold_s: float = 0.7,
         min_speech_duration_s: float = 0.5,
-        on_voice_activity=None,
-    ):
+        on_voice_activity: Callable[[int], None] | None = None,
+    ) -> None:
         self._vc = voice_client
         self._silence_threshold = silence_threshold_s
         self._min_speech_duration = min_speech_duration_s
@@ -109,7 +114,7 @@ class HermesVoiceReceiver:
         self._paused = False
         # Decryption state (filled in start()).
         self._secret_key: bytes | None = None
-        self._dave_session = None
+        self._dave_session: Any = None
         self._bot_ssrc = 0
         # Per-SSRC state.
         self._lock = threading.Lock()
@@ -159,14 +164,14 @@ class HermesVoiceReceiver:
         with self._lock:
             self._ssrc_to_user[ssrc] = user_id
 
-    def _install_speaking_hook(self, conn) -> None:
+    def _install_speaking_hook(self, conn: Any) -> None:
         """Capture SPEAKING (op 5) to map ssrc→user_id. Wrap the connection
         hook AND the live websocket hook so it takes effect immediately and
         survives reconnects."""
         original = conn.hook
         recv = self
 
-        async def wrapped(ws, msg):
+        async def wrapped(ws: Any, msg: Any) -> None:
             try:
                 if isinstance(msg, dict) and msg.get("op") == 5:
                     d = msg.get("d") or {}
@@ -187,7 +192,7 @@ class HermesVoiceReceiver:
         except Exception:  # noqa: BLE001
             pass
 
-    def _try_map_ssrc(self, ssrc: int, ciphertext: bytes):
+    def _try_map_ssrc(self, ssrc: int, ciphertext: bytes) -> tuple[int, bytes | None]:
         """When op-5 hasn't mapped this SSRC yet, brute-force DAVE decrypt
         against each channel member — the user whose per-user MLS key
         decrypts IS the speaker (AEAD authenticates the sender, so a false
@@ -293,13 +298,14 @@ class HermesVoiceReceiver:
                 uid, plaintext = self._try_map_ssrc(ssrc, dec)
                 if not uid:
                     return
-                dec = plaintext
+                # _try_map_ssrc returns a non-None plaintext whenever uid is truthy.
+                dec = cast(bytes, plaintext)
 
         # Opus decode → 48 kHz stereo PCM.
         try:
             if ssrc not in self._decoders:
-                self._decoders[ssrc] = discord.opus.Decoder()
-            pcm = self._decoders[ssrc].decode(dec)
+                self._decoders[ssrc] = discord.opus.Decoder()  # type: ignore[no-untyped-call]  # FIXME: discord.opus.Decoder.__init__ is unannotated upstream
+            pcm = self._decoders[ssrc].decode(dec, fec=False)
             with self._lock:
                 self._buffers[ssrc].extend(pcm)
                 self._last_packet_time[ssrc] = time.monotonic()
@@ -323,7 +329,7 @@ class HermesVoiceReceiver:
 
     # ---- utterance polling ----
 
-    def check_silence(self):
+    def check_silence(self) -> list[tuple[int, bytes]]:
         """Return ``[(user_id, pcm_48k_stereo), ...]`` for speakers who've gone
         quiet for ``silence_threshold_s`` with at least ``min_speech_duration_s``
         of buffered audio. Call periodically from the event loop."""
