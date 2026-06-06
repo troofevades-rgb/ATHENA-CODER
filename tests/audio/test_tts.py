@@ -22,7 +22,17 @@ from athena.audio.tts.backends.stub import StubTTSBackend
 
 
 def _cfg(**kw):
-    base = {"tts_backend": "", "tts_voice": ""}
+    # Neutralize every real local backend so resolver-LOGIC tests stay
+    # hermetic: empty tts_voice → piper unavailable; bogus kokoro paths →
+    # kokoro unavailable even on a dev box that has the model files at the
+    # default ~/.athena/voices/ location. Tests that want a backend pin it.
+    base = {
+        "tts_backend": "",
+        "tts_voice": "",
+        "kokoro_voice": "af_heart",
+        "kokoro_model_path": "/nonexistent/kokoro-v1.0.onnx",
+        "kokoro_voices_path": "/nonexistent/voices-v1.0.bin",
+    }
     base.update(kw)
     return SimpleNamespace(**base)
 
