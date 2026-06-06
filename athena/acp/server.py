@@ -32,7 +32,7 @@ import json
 import logging
 import sys
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from typing import IO, Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class ACPServer:
         self,
         *,
         stdin: asyncio.StreamReader | None = None,
-        stdout=None,
+        stdout: IO[str] | None = None,
     ) -> None:
         self._methods: dict[str, MethodHandler] = {}
         self._notifications: dict[str, NotificationHandler] = {}

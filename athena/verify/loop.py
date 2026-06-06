@@ -36,9 +36,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from .outcome import VerificationOutcome
+from .outcome import Outcome, VerificationOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -272,12 +272,18 @@ class VerifiedExecution:
             # verifier) so the user-facing rollback hint can describe
             # the actual cause. Lazy import keeps the verify loop
             # decoupled from the sandbox subsystem on module load.
+            policy_exc: type[BaseException] | tuple[()]
             try:
                 from ..sandbox.runner import BlockedByPolicyError
+
+                policy_exc = BlockedByPolicyError
             except ImportError:
-                BlockedByPolicyError = ()  # type: ignore[assignment]
-            blocked = isinstance(e, BlockedByPolicyError) if BlockedByPolicyError else False
-            outcome = "blocked_by_policy" if blocked else "failed_run"
+                policy_exc = ()
+            blocked = isinstance(e, policy_exc) if policy_exc else False
+            # NOTE: "blocked_by_policy" is not in the ``Outcome`` Literal
+            # (defined in verify/outcome.py); the cast preserves the
+            # runtime value the report path expects. See bugs_found.
+            outcome = cast(Outcome, "blocked_by_policy" if blocked else "failed_run")
             stderr_msg = (
                 f"verify command blocked by policy: {e}"
                 if blocked

@@ -197,7 +197,7 @@ def _try_run_tui(state: dict[str, Any]) -> bool:
 
 
 @command("board")
-def cmd_board(agent, arg: str = "") -> str:
+def cmd_board(agent: Any, arg: str = "") -> str:
     """``/board`` subcommands:
 
     /board                  show the board (default)

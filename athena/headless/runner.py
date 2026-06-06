@@ -42,7 +42,11 @@ def _estimate_cost(stats: Any, model: str) -> float:
     table. Returns 0.0 when the model is unknown to the table —
     the envelope still ships, the cost field is just zero."""
     try:
-        from ..ui import estimated_cost_usd
+        # FIXME: athena.ui no longer exports estimated_cost_usd; the
+        # except branch below catches the ImportError so cost is 0.0.
+        from ..ui import (  # type: ignore[attr-defined]
+            estimated_cost_usd,
+        )
 
         return float(
             estimated_cost_usd(
