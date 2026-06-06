@@ -24,3 +24,8 @@ try:
     from . import piper_local as _piper  # noqa: F401
 except Exception as e:  # noqa: BLE001
     logger.warning("tts: piper_local backend not loaded: %s", e)
+
+try:
+    from . import kokoro_local as _kokoro  # noqa: F401
+except Exception as e:  # noqa: BLE001
+    logger.warning("tts: kokoro_local backend not loaded: %s", e)

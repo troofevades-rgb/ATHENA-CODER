@@ -687,6 +687,15 @@ class Config:
     # and the synthesis path degrades gracefully.
     tts_backend: str = ""
     tts_voice: str = ""
+    # Kokoro (tts_kokoro_local) — a far more natural neural voice, still
+    # on-device. Unlike Piper, the "voice" is a NAME, not a file path:
+    # af_heart, af_bella, am_michael, bf_emma, ... (af_/am_ = American
+    # female/male, bf_/bm_ = British). Model + voice-pack files default to
+    # ~/.athena/voices/{kokoro-v1.0.onnx,voices-v1.0.bin}; override only to
+    # relocate them. Backend stays "unavailable" until both files exist.
+    kokoro_voice: str = "af_heart"
+    kokoro_model_path: str | None = None
+    kokoro_voices_path: str | None = None
     # Discord-voice: optional per-voice chat model override. Empty → voice
     # turns use the main ``model``. Set to a fast *non-thinking* Ollama
     # model (e.g. "troofevades:latest", "glm4:9b") to keep spoken replies
