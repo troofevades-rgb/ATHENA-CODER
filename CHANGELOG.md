@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-07
+
+### Added
+- **Discord voice chat** — Athena can join a Discord voice channel, transcribe what's said (local `faster-whisper` STT), run a normal agent turn, and speak the reply (local TTS). Fully on-device: no hosted speech APIs. The receiver reads the raw voice UDP socket and does DAVE (Discord's default E2EE) decryption + Opus decode itself, with single-speaker turn-taking and barge-in (#44, #46).
+- **Kokoro neural TTS backend** (`tts_kokoro_local`) — a much more natural on-device voice than Piper; selected via `tts_backend` / `kokoro_voice` (#46).
+- Voice turns get a real tool surface: on-demand skill list/invoke (progressive disclosure — only the one-line catalog is in the prompt, bodies load on use), plus memory, web, and the full file/shell/code task surface so a spoken request can actually run work (#46).
+- Opt-in **per-command Windows elevation** — with `shell_allow_elevation`, the agent may run a single admin command via `sudo` (Windows 11 inline sudo), gated by a UAC prompt approved at the machine; off by default (#46).
+- `ollama_keep_alive` config to keep a model resident between requests (so the voice model isn't reloaded each turn) (#46).
+
+### Security
+- Discord tool-approval (Approve/Deny) buttons are **locked to the operator** — only authorized users (configured `approval_user_ids` / `allowed_user_ids`, or the auto-resolved bot owner) can act on a confirmation prompt; others get an ephemeral refusal (#46).
+
+### Fixed
+- `faster-whisper` STT no longer hallucinates phantom transcripts (e.g. "Thank you for watching") on near-silent audio — anti-hallucination thresholds are applied (#46).
+- Gateway `/status` reports real session metadata (model / provider / profile) instead of always "(no session metadata)" — `SessionRouter` was missing the lookup it called (#47).
+- The differentiated-MCP `recall` tool works again — it imported a removed module and always returned "recall unavailable"; now backed by the live FTS5 session search (#47).
+- `computer_observe`'s vision-describe path runs — it passed a wrong constructor argument and silently failed every call (#47).
+- `workspace_info` reports the real memory directory instead of "(unavailable)" (a retired import) (#47).
+- A verify run blocked by shell policy is now a proper failure (`blocked_by_policy`) instead of being mis-reported and exiting 0 (#47).
+
 ## [0.3.0] - 2026-06-05
 
 ### Fixed
