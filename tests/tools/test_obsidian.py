@@ -171,7 +171,9 @@ def test_path_traversal_rejected(vault: Path, tmp_path: Path) -> None:
     assert not (tmp_path / "escape.md").exists()
 
 
-def test_absolute_path_outside_vault_rejected(vault: Path, tmp_path: Path) -> None:
-    outside = (tmp_path / "outside").as_posix()
-    out = obsidian.obsidian_write(outside, "evil", mode="overwrite")
-    assert out.startswith("ERROR")
+def test_absolute_path_does_not_escape_vault(vault: Path, tmp_path: Path) -> None:
+    # An absolute path is rewritten to a vault-relative one (anchor stripped),
+    # so it is contained INSIDE the vault rather than written to disk outside.
+    outside = tmp_path / "outside.md"
+    obsidian.obsidian_write((tmp_path / "outside").as_posix(), "evil", mode="overwrite")
+    assert not outside.exists()

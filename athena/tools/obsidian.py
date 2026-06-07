@@ -30,6 +30,7 @@ Configure with, in ``~/.athena/config.toml``::
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -71,8 +72,15 @@ def _normalize_note(note: str) -> str:
 
     Accepts a bare title (``My Note``), a relative path (``Folder/My Note``),
     or one already ending in ``.md``. Forward and back slashes both work.
+
+    Any anchor (a Windows drive like ``C:`` or a leading ``/``) is stripped so
+    the reference is always interpreted *relative to the vault* — an absolute
+    path can't point the write outside the vault. ``..`` traversal is still
+    possible at this layer and is caught by :func:`_resolve_in_vault`.
     """
-    n = note.strip().replace("\\", "/").lstrip("/")
+    n = note.strip().replace("\\", "/")
+    n = re.sub(r"^[A-Za-z]:", "", n)  # drop a Windows drive letter
+    n = n.lstrip("/")
     if not n.lower().endswith(".md"):
         n += ".md"
     return n
