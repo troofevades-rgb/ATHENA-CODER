@@ -21,10 +21,11 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Assembled from fragments at runtime so this guard file does not match
-# itself when it scans the tree. Add more usernames here if other
+# Built with `+` (not adjacent-literal concatenation, which ruff format
+# would fold) so this guard file never contains the literal it scans for
+# — otherwise it would flag itself. Add more usernames here if other
 # contributors' paths ever leak.
-_FORBIDDEN: tuple[str, ...] = ("mtt" "_j",)
+_FORBIDDEN: tuple[str, ...] = ("mtt" + "_j",)
 
 
 def _tracked_files() -> list[Path]:
