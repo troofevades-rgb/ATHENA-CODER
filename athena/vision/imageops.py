@@ -57,8 +57,8 @@ try:
     from PIL import Image, ImageChops
 except ImportError:  # optional [vision] extra (Pillow + imagehash) not installed
     imagehash = None  # type: ignore[assignment]
-    Image = None  # type: ignore[assignment, misc]
-    ImageChops = None  # type: ignore[assignment, misc]
+    Image = None  # type: ignore[assignment]
+    ImageChops = None  # type: ignore[assignment]
 
 # True only when the optional [vision] deps imported. The vision_analyze
 # tool checks this and returns a clean "install the extra" message rather
