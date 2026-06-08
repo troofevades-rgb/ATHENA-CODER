@@ -99,3 +99,5 @@ docs/user-driven-test-plan.md
 # (Claude Code reads CLAUDE.md locally) but not shipped in the public repo.
 /CLAUDE.md
 /RELEASE_v*.md
+# Internal release checklist — local-only working doc.
+docs/internal/release-process.md
