@@ -62,23 +62,51 @@ athena doctor                                          # health check (config, c
 <summary><b>Install from source (development)</b></summary>
 
 ```bash
-git clone https://github.com/troofevades-rgb/ATHENA-AGENT.git
+git clone https://github.com/troofevades-rgb/ATHENA-AGENT.git C:\projects\ATHENA-AGENT   # NOT inside System32
 cd ATHENA-AGENT
-pip install -e ".[dev]"
-ollama pull qwen2.5-coder:14b
 ```
 
-The installed CLI is `athena`. Verify with `athena --version`.
+**Automated setup (recommended)** — installs the package, wires PATH, checks
+Ollama, pulls a GPU-sized model, and runs the health check:
+
+```powershell
+.\scripts\setup.ps1                       # Windows  (-Venv for an isolated install)
+```
+```bash
+scripts/setup.sh                          # Linux / macOS
+```
+
+**Manual:**
+
+```bash
+pip install -e ".[dev]"                    # or just `pip install -e .` for base
+ollama pull qwen2.5-coder:7b               # tool-capable; size it to your GPU (see Requirements)
+```
+
+The installed CLI is `athena` (verify: `athena --version`). If `athena` isn't
+found, the Python scripts dir isn't on your PATH — either open a new terminal
+after install, or just run **`python -m athena`**, which always works.
 
 </details>
 
 ## Requirements
 
-- **Python 3.10+**
-- **[Ollama](https://ollama.com)** running locally (default `http://127.0.0.1:11434`) with a tool-capable model:
-  - `qwen2.5-coder:14b` — best balance of speed and capability (default)
-  - `qwen2.5-coder:32b` — stronger reasoning (spills to RAM, slower)
-  - `llama3.1:8b` — fast fallback
+- **Python 3.10+** — **3.11 or 3.12 recommended.** 3.13/3.14 work for the base
+  install, but optional extras (`vision`, `browser`, `tts`) may lack prebuilt
+  wheels on the newest Python and fail to build.
+- **[Ollama](https://ollama.com)** installed *and running* (it serves
+  `http://127.0.0.1:11434`). athena needs a **tool-capable** model — size it to
+  your GPU's VRAM:
+
+  | VRAM | Model | Pull |
+  |------|-------|------|
+  | ~8 GB (e.g. RTX 3060 Ti) | `qwen2.5-coder:7b` | `ollama pull qwen2.5-coder:7b` |
+  | 12–16 GB | `qwen2.5-coder:14b` | `ollama pull qwen2.5-coder:14b` |
+  | 24 GB+ | `qwen3:32b` / `qwen3-coder:30b` | `ollama pull qwen3:32b` |
+
+  A 30B+ model on an 8 GB card will spill to CPU and crawl — match the table.
+  Custom local models you built with `ollama create` aren't on the public
+  registry; `ollama push`/`pull` them between machines or copy `~/.ollama/models`.
 - Optional: **`ripgrep`** (`rg`) on `PATH` for faster search; falls back to Python.
 
 ## Configuration
@@ -97,6 +125,24 @@ routing_enabled = false           # opt-in: escalate to a stronger model when th
 routing_escalation_model = ""     # e.g. "anthropic/claude-sonnet-4-5"; required when routing_enabled
 recall_auto = false               # opt-in: inject relevant past turns / memory into context each turn
 ```
+
+## Troubleshooting setup
+
+Run `athena doctor` (or `python -m athena doctor`) first — it checks config,
+credentials, Ollama, and the TUI, and each `[FAIL]` line names the fix. Common ones:
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `'athena' is not recognized` / not found | Python's scripts dir isn't on PATH | Use `python -m athena`, or open a new terminal after install, or re-run with `scripts/setup.ps1` / a venv |
+| `ModuleNotFoundError: No module named 'imagehash'` (or similar) on launch | Old checkout, or an optional extra's dep missing | `git pull` (base install is import-safe on current master); install the extra only if you want that feature |
+| `could not fetch model … connection … refused` (WinError 10061) | Ollama isn't installed or isn't running | Install from [ollama.com](https://ollama.com/download); ensure the daemon/app is running on `:11434` |
+| Model loads but is painfully slow | Model too big for your VRAM (spilling to CPU) | Pick a model that fits — see the VRAM table in Requirements |
+| `pip` not found | Minimal or fresh Python without pip | `python -m ensurepip --upgrade`, or just create a venv (it includes pip) |
+| Optional extra won't `pip install` (build errors) | Python 3.13/3.14 lacks wheels for that dep | Use Python 3.11 or 3.12 |
+| Weird permission / path errors | Repo cloned inside `C:\Windows\System32` (elevated-shell default cwd) | Move it to a normal path, e.g. `C:\projects\ATHENA-AGENT` |
+
+`scripts/setup.ps1` (Windows) and `scripts/setup.sh` (Linux/macOS) automate the
+install and guard all of the above.
 
 ## Project memory
 
