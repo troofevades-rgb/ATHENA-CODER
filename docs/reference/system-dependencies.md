@@ -35,6 +35,19 @@ missing piece reports itself unavailable instead of crashing.
 The daemon must be **running** (`ollama serve`, or just launch the Ollama app).
 `ATHENA_NODE_BIN` overrides the JS runtime path if `node`/`bun` aren't on `PATH`.
 
+**Terminal (recommended for full TUI rendering).** athena's owl banner and the
+`⏺`/`⎿` box-drawing are Unicode. A modern, UTF-8 terminal renders them correctly;
+a legacy console on a non-UTF-8 code page shows them as `?`.
+
+- **Windows:** use **Windows Terminal** with a Cascadia Mono / Nerd Font. The old
+  `conhost`/PowerShell window defaults to a legacy code page (e.g. cp437/1252) —
+  run `chcp 65001` before launching as a quick fix. `setup.ps1` checks this and
+  warns if your console isn't UTF-8.
+- **macOS/Linux:** the default terminal is UTF-8; just use a monospace font with
+  good box-drawing/braille glyph coverage.
+
+This affects rendering only — headless mode and the agent loop work regardless.
+
 ---
 
 ## 2. Per-OS package managers (quick reference)

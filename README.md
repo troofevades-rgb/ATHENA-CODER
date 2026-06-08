@@ -142,6 +142,11 @@ The setup scripts handle several of these automatically (Chromium download, ffmp
 check, CUDA-gated training). For the complete map — per-OS install commands and
 what breaks without each — see **[docs/reference/system-dependencies.md](docs/reference/system-dependencies.md)**.
 
+> **Terminal:** run athena in a modern UTF-8 terminal for full TUI rendering — on
+> Windows, **Windows Terminal** (with a Cascadia Mono / Nerd Font) is recommended.
+> The legacy `conhost`/PowerShell console uses a non-UTF-8 code page, so the owl
+> banner and box-drawing show up as `?`; `chcp 65001` before launch is a quick fix.
+
 ## Configuration
 
 `~/.athena/config.toml`:
@@ -173,6 +178,7 @@ credentials, Ollama, and the TUI, and each `[FAIL]` line names the fix. Common o
 | `pip` not found | Minimal or fresh Python without pip | `python -m ensurepip --upgrade`, or just create a venv (it includes pip) |
 | Optional extra won't `pip install` (build errors) | Python 3.13/3.14 lacks wheels for that dep | Use Python 3.11 or 3.12 |
 | Weird permission / path errors | Repo cloned inside `C:\Windows\System32` (elevated-shell default cwd) | Move it to a normal path, e.g. `C:\projects\ATHENA-AGENT` |
+| Owl banner / box-drawing shows as `?` | Legacy console code page (not UTF-8) | Use **Windows Terminal** (Cascadia Mono), or run `chcp 65001` before launching |
 
 `scripts/setup.ps1` (Windows) and `scripts/setup.sh` (Linux/macOS) automate the
 install and guard all of the above.
