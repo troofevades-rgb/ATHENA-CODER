@@ -69,6 +69,12 @@ def mcp_config_paths(workspace: Path) -> list[Path]:
 class Config:
     model: str = "troofevades-q35:athena"
     ollama_host: str = "http://127.0.0.1:11434"
+    # aiohttp DNS resolver mode for the gateway / proxy / webhooks. "auto"
+    # (default) probes aiodns on Windows and falls back to the OS resolver
+    # (ThreadedResolver) when c-ares can't read the system DNS; "threaded"
+    # forces the OS resolver; "async" forces aiodns. See
+    # athena/net.py::ensure_working_dns_resolver.
+    dns_resolver: str = "auto"
     # Ollama keep_alive: how long the model stays resident after a request.
     # None lets Ollama use its default (5 min). The voice path overrides this
     # to a longer window so the voice model isn't reloaded between spoken
