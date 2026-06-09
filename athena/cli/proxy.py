@@ -126,6 +126,10 @@ def main(argv: list[str]) -> int:
         return 2
 
     from .. import providers as _providers  # noqa: F401 — registers built-ins
+    from ..net import ensure_working_dns_resolver
+
+    ensure_working_dns_resolver(cfg.dns_resolver)
+
     from ..proxy.server import make_app
 
     pool = global_pool()
