@@ -46,27 +46,36 @@ export function ToolLaneRow({
   const showStillWorking = elapsedMs > stillWorkingThresholdMs;
 
   return (
+    // The whole row is pinned to a single physical line via
+    // wrap="truncate". A wrapping tool row — long args plus a
+    // once-per-second-growing elapsed counter — makes the dynamic
+    // frame's height oscillate between ticks; Ink then miscounts lines
+    // when erasing the previous frame and the composer visibly cascades
+    // and drifts (badly so over SSH, where a full-width line also trips
+    // the terminal's autowrap). One stable line per in-flight tool keeps
+    // the frame height fixed.
     <Box>
       <Spinner color={accent} />
-      <Text color={accent}>
-        {" "}
-        {tool}
+      <Text wrap="truncate">
+        <Text color={accent}>
+          {" "}
+          {tool}
+        </Text>
+        <Text color={dim}>({args})</Text>
+        {/* Elapsed counter only appears after the first second so a fast
+           tool call doesn't flicker "0s" before completing. */}
+        {elapsedSec >= 1 && (
+          <Text color={faint}>
+            {"  · "}
+            {_formatElapsed(elapsedSec)}
+          </Text>
+        )}
+        {showStillWorking && (
+          <Text color={dim}>
+            {"  [still working]"}
+          </Text>
+        )}
       </Text>
-      <Text color={dim}>({args})</Text>
-      {/* Elapsed counter only appears after the first second so a fast
-         tool call doesn't flicker "0s" before completing. */}
-      {elapsedSec >= 1 && (
-        <Text color={faint}>
-          {"  · "}
-          {_formatElapsed(elapsedSec)}
-        </Text>
-      )}
-      {showStillWorking && (
-        <Text color={dim}>
-          {"  "}
-          [still working]
-        </Text>
-      )}
     </Box>
   );
 }

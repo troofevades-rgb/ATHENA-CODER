@@ -264,7 +264,8 @@ def _split_head_middle_tail(
     Tail: most recent messages whose summed tokens are within
         ``tail_budget_tokens``. Walked back-to-front; the first
         message that pushes the running total past the budget
-        becomes the boundary (excluded from tail).
+        becomes the boundary (excluded from tail). The tail always
+        retains at least the most recent message (see below).
     Middle: everything between.
 
     Caller computes ``tail_budget_tokens`` — usually a function of
@@ -274,19 +275,37 @@ def _split_head_middle_tail(
     head = messages[:head_indices]
     rest = messages[head_indices:]
 
-    if tail_budget_tokens <= 0:
-        # No room for tail. Everything except head is middle.
-        return head, rest, []
+    if not rest:
+        return head, [], []
 
     tail_tokens = 0
     tail_start_idx = len(rest)  # default: empty tail
 
-    for i in range(len(rest) - 1, -1, -1):
-        tail_tokens += _message_tokens(rest[i])
-        if tail_tokens > tail_budget_tokens:
-            tail_start_idx = i + 1
-            break
-        tail_start_idx = i
+    if tail_budget_tokens > 0:
+        for i in range(len(rest) - 1, -1, -1):
+            tail_tokens += _message_tokens(rest[i])
+            if tail_tokens > tail_budget_tokens:
+                tail_start_idx = i + 1
+                break
+            tail_start_idx = i
+
+    # Guarantee the tail keeps at least the most recent message, even
+    # when it alone blows the budget (or the budget is zero). An empty
+    # tail collapses the result to [system head, system summary] with no
+    # conversational turn; providers that hoist every system message out
+    # of the array (Anthropic — see providers/anthropic.py:_split_system)
+    # then reject the payload with "messages: at least one message is
+    # required" and the session bricks behind the circuit breaker. A
+    # slightly-over-budget tail is far cheaper than that.
+    if tail_start_idx >= len(rest):
+        tail_start_idx = len(rest) - 1
+
+    # Never start the tail on an orphaned tool result: a tool_result
+    # whose owning tool_use turn was folded into the summary is itself
+    # invalid for Anthropic. Walk back to the assistant turn that issued
+    # the call(s).
+    while tail_start_idx > 0 and rest[tail_start_idx].get("role") == "tool":
+        tail_start_idx -= 1
 
     middle = rest[:tail_start_idx]
     tail = rest[tail_start_idx:]

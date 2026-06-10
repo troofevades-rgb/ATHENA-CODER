@@ -96,6 +96,7 @@ export function Composer({
           <Text
             dimColor
             italic
+            wrap="truncate"
             color={
               flash.level === "warn"
                 ? "yellow"

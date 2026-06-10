@@ -15413,32 +15413,34 @@ function ToolLaneRow({
         color: accent
       }),
       /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
-        color: accent,
+        wrap: "truncate",
         children: [
-          " ",
-          tool
-        ]
-      }),
-      /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
-        color: dim,
-        children: [
-          "(",
-          args,
-          ")"
-        ]
-      }),
-      elapsedSec >= 1 && /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
-        color: faint,
-        children: [
-          "  · ",
-          _formatElapsed(elapsedSec)
-        ]
-      }),
-      showStillWorking && /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
-        color: dim,
-        children: [
-          "  ",
-          "[still working]"
+          /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
+            color: accent,
+            children: [
+              " ",
+              tool
+            ]
+          }),
+          /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
+            color: dim,
+            children: [
+              "(",
+              args,
+              ")"
+            ]
+          }),
+          elapsedSec >= 1 && /* @__PURE__ */ jsx_runtime7.jsxs(Text, {
+            color: faint,
+            children: [
+              "  · ",
+              _formatElapsed(elapsedSec)
+            ]
+          }),
+          showStillWorking && /* @__PURE__ */ jsx_runtime7.jsx(Text, {
+            color: dim,
+            children: "  [still working]"
+          })
         ]
       })
     ]
@@ -15495,6 +15497,7 @@ function Composer({
         children: /* @__PURE__ */ jsx_runtime8.jsxs(Text, {
           dimColor: true,
           italic: true,
+          wrap: "truncate",
           color: flash.level === "warn" ? "yellow" : palette?.primary_dim ?? "gray",
           children: [
             flash.level === "warn" ? "! " : "· ",
@@ -16691,7 +16694,7 @@ function Welcome({
               }),
               /* @__PURE__ */ jsx_runtime15.jsx(Text, {
                 color: palette.primary_faint,
-                children: "Mouse wheel / terminal scrollback to scroll · Esc interrupt · Ctrl+C exit"
+                children: "Mouse wheel / terminal scrollback to scroll · Ctrl+O reasoning · Esc interrupt · Ctrl+C exit"
               })
             ]
           })
@@ -16720,53 +16723,67 @@ function renderLine(line, palette, promptColor) {
       })
     }, line.key);
   }
+  if (line.role === "thinking") {
+    return /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
+      color: palette?.primary_faint ?? "gray",
+      italic: true,
+      children: [
+        "   ",
+        line.content
+      ]
+    }, line.key);
+  }
   if (line.role === "tool") {
+    const nested = !!line.nested;
+    const indent = nested ? "   │ " : "   ";
     if (line.content.startsWith("⏺ ")) {
       const rest2 = line.content.slice(2);
       return /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
         children: [
-          "   ",
+          indent,
           /* @__PURE__ */ jsx_runtime15.jsx(Text, {
-            color: palette?.primary ?? "green",
+            color: nested ? palette?.primary_faint ?? "gray" : palette?.primary ?? "green",
             children: "⏺"
           }),
           " ",
           /* @__PURE__ */ jsx_runtime15.jsx(Text, {
-            color: palette?.accent_dim ?? "yellow",
+            color: nested ? palette?.primary_faint ?? "gray" : palette?.accent_dim ?? "yellow",
             children: rest2
           })
         ]
       }, line.key);
     }
-    const fileLine = line.content.match(FILE_LINE_RE);
-    if (fileLine && /[/\\.]/.test(fileLine[2])) {
-      const [, lead, path, lineNo, rest2] = fileLine;
-      return /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
-        children: [
-          "   ",
-          lead,
-          /* @__PURE__ */ jsx_runtime15.jsx(Text, {
-            color: palette?.primary_faint ?? "gray",
-            children: path
-          }),
-          /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
-            color: palette?.accent_dim ?? "yellow",
-            children: [
-              ":",
-              lineNo
-            ]
-          }),
-          /* @__PURE__ */ jsx_runtime15.jsx(Text, {
-            color: palette?.primary_dim ?? "gray",
-            children: rest2
-          })
-        ]
-      }, line.key);
+    if (!nested) {
+      const fileLine = line.content.match(FILE_LINE_RE);
+      if (fileLine && /[/\\.]/.test(fileLine[2])) {
+        const [, lead, path, lineNo, rest2] = fileLine;
+        return /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
+          children: [
+            indent,
+            lead,
+            /* @__PURE__ */ jsx_runtime15.jsx(Text, {
+              color: palette?.primary_faint ?? "gray",
+              children: path
+            }),
+            /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
+              color: palette?.accent_dim ?? "yellow",
+              children: [
+                ":",
+                lineNo
+              ]
+            }),
+            /* @__PURE__ */ jsx_runtime15.jsx(Text, {
+              color: palette?.primary_dim ?? "gray",
+              children: rest2
+            })
+          ]
+        }, line.key);
+      }
     }
     return /* @__PURE__ */ jsx_runtime15.jsxs(Text, {
-      color: palette?.primary_dim ?? "gray",
+      color: (nested ? palette?.primary_faint : palette?.primary_dim) ?? "gray",
       children: [
-        "   ",
+        indent,
         line.content
       ]
     }, line.key);
@@ -17347,6 +17364,7 @@ var initialTuiState = {
   flash: null,
   confirmReq: null,
   askReq: null,
+  showReasoning: false,
   _nextKey: 1,
   _lastProgressMs: 0,
   _pendingUserInputSince: null
@@ -17445,6 +17463,16 @@ function reducer(state, action) {
       return { ...state, confirmReq: null };
     case "DISMISS_ASK":
       return { ...state, askReq: null };
+    case "TOGGLE_REASONING": {
+      const next = !state.showReasoning;
+      const flash = {
+        type: "status.flash",
+        level: "info",
+        text: next ? "reasoning shown" : "reasoning hidden",
+        ttl_seconds: 2
+      };
+      return { ...state, showReasoning: next, flash };
+    }
     case "USER_INPUT_SENT":
       return {
         ...state,
@@ -17522,19 +17550,27 @@ function reduceEvent(state, event) {
       const fallbackText = rawText.replace(/·\s*\(thought\)\s*/g, "").trim();
       const finalText = (e.final_text ?? fallbackText).trim();
       const hasContent = finalText.length > 0;
-      let newLines = state.lines;
+      const rows = [];
       let nk = state._nextKey;
-      if (hasContent) {
-        newLines = appendLine(state.lines, {
-          key: state._nextKey,
-          role: "assistant",
-          content: finalText
+      const thinking = (e.thinking ?? "").trim();
+      if (state.showReasoning && thinking.length > 0) {
+        const tlines = thinking.split(`
+`);
+        rows.push({
+          key: nk++,
+          role: "thinking",
+          content: `▾ thinking (${tlines.length} line${tlines.length === 1 ? "" : "s"})`
         });
-        nk = state._nextKey + 1;
+        for (const tl of tlines) {
+          rows.push({ key: nk++, role: "thinking", content: `  ${tl}` });
+        }
+      }
+      if (hasContent) {
+        rows.push({ key: nk++, role: "assistant", content: finalText });
       }
       return withProgress({
         ...state,
-        lines: newLines,
+        lines: appendLines(state.lines, rows),
         _nextKey: nk,
         streaming: "",
         _streamFilter: initialThinkFilterState,
@@ -17566,7 +17602,7 @@ function reduceEvent(state, event) {
       const overflow = bodyLines.length - MAX_BODY;
       const rows = [];
       let key = state._nextKey;
-      const laneEntry = state.toolLane.find((t) => t.id === e.call_id || t.tool === e.tool);
+      const laneEntry = state.toolLane.find((t) => t.id === e.call_id);
       const argsRaw = laneEntry?.args ?? "";
       const args = argsRaw.length > 40 ? argsRaw.slice(0, 39) + "…" : argsRaw;
       const durSuffix = formatToolDuration(e.duration_ms);
@@ -17589,10 +17625,11 @@ function reduceEvent(state, event) {
       if (overflow > 0) {
         rows.push({ key: key++, role: "tool", content: `  ... (${overflow} more lines)` });
       }
+      const finalRows = e.nested ? rows.map((r) => ({ ...r, nested: true })) : rows;
       return withProgress({
         ...state,
-        toolLane: state.toolLane.filter((t) => t.id !== e.call_id && t.tool !== e.tool),
-        lines: appendLines(state.lines, rows),
+        toolLane: state.toolLane.filter((t) => t.id !== e.call_id),
+        lines: appendLines(state.lines, finalRows),
         _nextKey: key
       });
     }
@@ -18146,6 +18183,10 @@ function App2() {
     if (key.ctrl && typedChar === "d" && editor.text === "") {
       client.sendCommand({ type: "interrupt" });
       exit();
+      return;
+    }
+    if (key.ctrl && typedChar === "o") {
+      dispatch({ type: "TOGGLE_REASONING" });
       return;
     }
     if (key.leftArrow)

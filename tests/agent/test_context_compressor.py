@@ -109,6 +109,40 @@ def test_split_protects_tail_by_token_budget() -> None:
     assert 2000 < total_tokens(tail) < 3500
 
 
+def test_split_keeps_last_message_when_budget_zero() -> None:
+    """Even with a zero tail budget the tail must retain the most
+    recent message. An empty tail collapses compression to a
+    system-only payload (head + synthetic summary, both role=system)
+    that Anthropic rejects with "messages: at least one message is
+    required" once it hoists the system messages out of the array."""
+    msgs = [_msg("system", "head")] + [
+        _msg("user" if i % 2 == 0 else "assistant", "x" * 1000) for i in range(10)
+    ]
+    head, middle, tail = _split_head_middle_tail(
+        msgs, head_indices=1, tail_budget_tokens=0
+    )
+    assert len(tail) >= 1
+    assert tail[-1] == msgs[-1]
+    assert head + middle + tail == msgs
+
+
+def test_split_tail_does_not_start_on_orphan_tool_result() -> None:
+    """When the minimum-tail rescue lands on a tool result, it must
+    extend back to the assistant turn that issued the tool_use so the
+    pair stays intact — Anthropic rejects an orphan tool_result."""
+    msgs = [
+        _msg("system", "head"),
+        _msg("user", "x" * 4000),
+        _msg("assistant", "calling tool"),
+        {"role": "tool", "content": "result", "tool_call_id": "1"},
+    ]
+    _head, _middle, tail = _split_head_middle_tail(
+        msgs, head_indices=1, tail_budget_tokens=0
+    )
+    assert tail[0]["role"] != "tool"
+    assert tail[0]["content"] == "calling tool"
+
+
 def test_split_with_long_session_fixture() -> None:
     """The 120-turn fixture splits into a small head, a large middle,
     and a non-empty tail at the default ratios."""
@@ -326,6 +360,32 @@ def test_compress_empty_middle_returns_unchanged() -> None:
     assert result.new_messages == msgs
     assert result.middle_message_count == 0
     assert result.summary_tokens == 0
+
+
+def test_compress_never_yields_system_only_payload() -> None:
+    """Regression for the VPS circuit-breaker incident: a large head
+    plus a tiny tail budget used to drive the tail to empty, leaving
+    ``[system head, system summary]``. Anthropic's ``_split_system``
+    then hoists both into the ``system`` field and sends an empty
+    ``messages`` array → 400 → three retries → circuit breaker.
+    Compression must always leave at least one non-system message."""
+    msgs = [_msg("system", "x" * 8000)] + [
+        _msg("user" if i % 2 == 0 else "assistant", "x" * 1000) for i in range(40)
+    ]
+    cfg = CompressionConfig(
+        model_context_window=10_000,
+        watermark=0.5,
+        tail_protection_ratio=0.01,
+        head_message_indices=1,
+    )
+
+    def stub(_p: list, _t: int) -> str:
+        return "summary"
+
+    result = compress(msgs, summarizer=stub, cfg=cfg)
+    assert result.middle_message_count > 0  # compression actually ran
+    non_system = [m for m in result.new_messages if m.get("role") != "system"]
+    assert non_system, "compression left no conversational message (Anthropic 400)"
 
 
 def test_summarizer_preamble_includes_anti_hallucination_rules() -> None:
