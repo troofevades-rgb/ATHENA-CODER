@@ -462,6 +462,81 @@ def test_auth_headers_no_authorization_when_no_token() -> None:
     assert "Authorization" not in headers
 
 
+# ---- _ensure_token never opens a browser (background-safe) ----------
+
+
+def _oauth_transport() -> SSETransport:
+    t = SSETransport.__new__(SSETransport)
+    t.name = "linear"
+    t.oauth_cfg = oauth.OAuthConfig(
+        server_id="linear",
+        authorization_endpoint="https://x/auth",
+        token_endpoint="https://x/token",
+        client_id="cid",
+    )
+    t._token = None
+    return t
+
+
+async def test_ensure_token_no_cached_token_raises_not_browser(monkeypatch) -> None:
+    """Regression: a 401 mid-tool-call (or connect from a background
+    thread) used to run the interactive authorization flow — popping a
+    browser and blocking up to the flow timeout. With no cached token it
+    must now raise an actionable error and NEVER call the interactive
+    flow."""
+    called = {"flow": False}
+
+    def _flow_should_not_run(*_a, **_k):
+        called["flow"] = True
+        raise AssertionError("interactive authorization flow must not run here")
+
+    monkeypatch.setattr(oauth, "load_token", lambda _sid: None)
+    monkeypatch.setattr(oauth, "run_authorization_flow_async", _flow_should_not_run)
+
+    t = _oauth_transport()
+    with pytest.raises(oauth.OAuthError, match="athena mcp auth linear"):
+        await t._ensure_token()
+    assert called["flow"] is False
+
+
+async def test_ensure_token_refresh_failure_raises_not_browser(monkeypatch) -> None:
+    """A failed refresh must surface a 're-authorize' error, not fall
+    back to an interactive browser flow."""
+    expired = oauth.StoredToken(
+        access_token="old",
+        refresh_token="rt",
+        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),  # needs_refresh
+    )
+
+    async def _refresh_fails(*_a, **_k):
+        raise oauth.OAuthError("refresh rejected")
+
+    def _flow_should_not_run(*_a, **_k):
+        raise AssertionError("interactive authorization flow must not run here")
+
+    monkeypatch.setattr(oauth, "load_token", lambda _sid: expired)
+    monkeypatch.setattr(oauth, "refresh_async", _refresh_fails)
+    monkeypatch.setattr(oauth, "run_authorization_flow_async", _flow_should_not_run)
+
+    t = _oauth_transport()
+    with pytest.raises(oauth.OAuthError, match="re-authorize"):
+        await t._ensure_token()
+
+
+async def test_ensure_token_valid_token_used_directly(monkeypatch) -> None:
+    """A valid (non-expiring) cached token is used without any network
+    call or flow."""
+    good = oauth.StoredToken(
+        access_token="AT",
+        refresh_token="rt",
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
+    )
+    monkeypatch.setattr(oauth, "load_token", lambda _sid: good)
+    t = _oauth_transport()
+    await t._ensure_token()
+    assert t._token is good
+
+
 # ---- request id allocation ----------------------------------------
 
 

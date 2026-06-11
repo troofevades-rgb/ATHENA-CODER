@@ -207,27 +207,38 @@ class SSETransport:
             await asyncio.sleep(0.05)
 
     async def _ensure_token(self) -> None:
+        """Load (and silently refresh) the cached OAuth token.
+
+        Deliberately NON-INTERACTIVE: this runs at connect time, on a
+        401 mid-tool-call, and on reconnect — often from a background
+        thread with no user at a browser (and the connect path's
+        startup_timeout is too short to complete an interactive flow
+        anyway). So it never opens a browser; if there's no usable
+        token it raises a clear, actionable error. The interactive
+        authorization flow lives only in the foreground, user-initiated
+        ``athena mcp auth <server>`` command.
+        """
         if self.oauth_cfg is None:
             return
-        token = oauth_mod.load_token(self.oauth_cfg.server_id)
+        server_id = self.oauth_cfg.server_id
+        token = oauth_mod.load_token(server_id)
         if token is None:
-            token = await oauth_mod.run_authorization_flow_async(
-                self.oauth_cfg,
+            raise oauth_mod.OAuthError(
+                f"no OAuth token for MCP server {server_id!r}; "
+                f"run `athena mcp auth {server_id}` to authorize"
             )
-            oauth_mod.save_token(self.oauth_cfg.server_id, token)
-        elif token.needs_refresh:
+        if token.needs_refresh:
             try:
                 token = await oauth_mod.refresh_async(self.oauth_cfg, token)
-                oauth_mod.save_token(self.oauth_cfg.server_id, token)
-            except oauth_mod.OAuthError:
-                logger.warning(
-                    "[%s] refresh failed; re-running authorization flow",
-                    self.name,
-                )
-                token = await oauth_mod.run_authorization_flow_async(
-                    self.oauth_cfg,
-                )
-                oauth_mod.save_token(self.oauth_cfg.server_id, token)
+                oauth_mod.save_token(server_id, token)
+            except oauth_mod.OAuthError as e:
+                # Won't pop a browser here — surface an actionable error
+                # instead of blocking a tool call on an interactive flow
+                # that can't complete in this context.
+                raise oauth_mod.OAuthError(
+                    f"OAuth token refresh failed for MCP server {server_id!r}; "
+                    f"run `athena mcp auth {server_id}` to re-authorize"
+                ) from e
         self._token = token
 
     def _auth_headers(self) -> dict[str, str]:
