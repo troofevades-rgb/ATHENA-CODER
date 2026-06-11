@@ -1,5 +1,6 @@
-"""The /compact command kicks off user-model ingestion in a
-background thread — but ONLY when configured to do so."""
+"""User-model ingestion fires on a background thread — but ONLY when
+configured. Exercises the consolidated trigger in
+``athena.user_model.ingest`` used by both /compact and session close."""
 
 from __future__ import annotations
 
@@ -8,8 +9,8 @@ import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from athena.commands.compact import _maybe_fire_user_model_ingest
 from athena.config import Config, UserModelConfig
+from athena.user_model.ingest import maybe_fire_ingest
 
 
 def _wait_for_threads_named(prefix: str, timeout: float = 2.0) -> bool:
@@ -33,28 +34,61 @@ def _make_agent(cfg: Config) -> SimpleNamespace:
 
 
 def test_no_fire_when_backend_none():
-    """Backend = 'none' is the explicit opt-out — hook must not
-    even spawn a thread, never mind call the LLM."""
+    """Backend = 'none' is the explicit opt-out — must not even spawn a
+    thread, never mind call the LLM."""
     cfg = Config(user_model=UserModelConfig(backend="none", ingest_on_compact=True))
     agent = _make_agent(cfg)
-    before = threading.active_count()
-    _maybe_fire_user_model_ingest(agent, [{"role": "user", "content": "hi"}])
-    _wait_for_threads_named("athena-user-model-ingest")
-    # No worker thread should have been started.
-    assert threading.active_count() <= before + 0  # tolerate scheduling slack
+    assert maybe_fire_ingest(agent, [{"role": "user", "content": "hi"}], trigger="compact") is False
 
 
-def test_no_fire_when_flag_off():
-    """``ingest_on_compact = False`` must skip the hook even on
+def test_no_fire_when_compact_flag_off():
+    """``ingest_on_compact = False`` skips the compact trigger even on
     the default markdown backend."""
     cfg = Config(user_model=UserModelConfig(backend="markdown", ingest_on_compact=False))
     agent = _make_agent(cfg)
-    _maybe_fire_user_model_ingest(agent, [{"role": "user", "content": "hi"}])
+    assert maybe_fire_ingest(agent, [{"role": "user", "content": "hi"}], trigger="compact") is False
+
+
+def test_no_fire_when_session_end_flag_off():
+    """``ingest_on_session_end = False`` skips the session-end trigger."""
+    cfg = Config(
+        user_model=UserModelConfig(backend="markdown", ingest_on_session_end=False),
+    )
+    agent = _make_agent(cfg)
+    assert (
+        maybe_fire_ingest(agent, [{"role": "user", "content": "hi"}], trigger="session_end")
+        is False
+    )
+
+
+def test_fires_on_session_end_when_enabled():
+    """The previously-dead ingest_on_session_end (default True) now
+    actually starts a worker for the markdown backend."""
+    cfg = Config(
+        user_model=UserModelConfig(backend="markdown", ingest_on_session_end=True),
+    )
+    agent = _make_agent(cfg)
+    assert (
+        maybe_fire_ingest(agent, [{"role": "user", "content": "hi"}], trigger="session_end")
+        is True
+    )
+    # The daemon worker eventually finishes (extraction is best-effort).
     assert _wait_for_threads_named("athena-user-model-ingest")
 
 
+def test_no_fire_on_empty_transcript():
+    cfg = Config(user_model=UserModelConfig(backend="markdown", ingest_on_session_end=True))
+    agent = _make_agent(cfg)
+    assert maybe_fire_ingest(agent, [], trigger="session_end") is False
+
+
+def test_unknown_trigger_does_not_fire():
+    cfg = Config(user_model=UserModelConfig(backend="markdown"))
+    agent = _make_agent(cfg)
+    assert maybe_fire_ingest(agent, [{"role": "user", "content": "x"}], trigger="bogus") is False
+
+
 def test_no_fire_when_agent_has_no_cfg():
-    """Defensive — a malformed agent stub must not crash the
-    REPL even if cfg is missing."""
+    """Defensive — a malformed agent stub must not crash."""
     agent = SimpleNamespace()
-    _maybe_fire_user_model_ingest(agent, [])  # should not raise
+    assert maybe_fire_ingest(agent, [], trigger="session_end") is False

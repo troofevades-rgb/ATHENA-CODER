@@ -60,6 +60,50 @@ def test_close_swallows_plugin_hook_exception(
     agent.close()
 
 
+def test_close_fires_session_end_ingest_for_top_level(
+    fake_provider: FakeProvider,
+    isolated_home: Path,
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A top-level session (parent_session_id is None) fires user-model
+    session-end ingestion on close — honoring the previously-unwired
+    ingest_on_session_end."""
+    import athena.user_model.ingest as ingest_mod
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        ingest_mod, "maybe_fire_ingest", lambda *a, **k: calls.append(k.get("trigger", ""))
+    )
+
+    agent = _make_agent(fake_provider, workspace)
+    assert agent.parent_session_id is None
+    agent.close()
+    assert "session_end" in calls
+
+
+def test_close_does_not_fire_ingest_for_fork(
+    fake_provider: FakeProvider,
+    isolated_home: Path,
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A fork/sub-agent (parent_session_id set) must NOT fire session-end
+    ingestion — forks close on the parent's thread, so they'd otherwise
+    trigger an extra extraction per sub-agent call."""
+    import athena.user_model.ingest as ingest_mod
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        ingest_mod, "maybe_fire_ingest", lambda *a, **k: calls.append(k.get("trigger", ""))
+    )
+
+    agent = _make_agent(fake_provider, workspace)
+    agent.parent_session_id = "parent-abc"  # mark as a fork child
+    agent.close()
+    assert calls == []
+
+
 def test_close_logs_plugin_failure_at_debug(
     fake_provider: FakeProvider,
     isolated_home: Path,

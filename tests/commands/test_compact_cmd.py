@@ -188,7 +188,7 @@ def test_no_ingest_thread_when_ingest_on_compact_disabled() -> None:
     )
     with (
         patch("athena.commands.compact.compress", return_value=result),
-        patch("athena.commands.compact.threading.Thread") as thread_mock,
+        patch("athena.user_model.ingest.threading.Thread") as thread_mock,
     ):
         _run(agent)
     thread_mock.assert_not_called()
@@ -208,7 +208,7 @@ def test_no_ingest_thread_when_backend_is_none() -> None:
     )
     with (
         patch("athena.commands.compact.compress", return_value=result),
-        patch("athena.commands.compact.threading.Thread") as thread_mock,
+        patch("athena.user_model.ingest.threading.Thread") as thread_mock,
     ):
         _run(agent)
     thread_mock.assert_not_called()
@@ -257,7 +257,7 @@ def test_ingest_thread_fires_when_enabled_and_backend_set() -> None:
     with (
         patch("athena.commands.compact.compress", return_value=result),
         patch(
-            "athena.commands.compact.threading.Thread",
+            "athena.user_model.ingest.threading.Thread",
             return_value=fake_thread,
         ) as thread_cls,
     ):

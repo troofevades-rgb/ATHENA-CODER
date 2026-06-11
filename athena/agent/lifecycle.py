@@ -1078,6 +1078,19 @@ class AgentLifecycle:
                 self.plugin_hooks.on_session_end(self.session_id, completed=True, interrupted=False)
             except Exception:  # noqa: BLE001
                 logger.debug("plugin on_session_end raised", exc_info=True)
+            # User-model fact extraction on session end (honors the
+            # previously-unwired cfg.user_model.ingest_on_session_end).
+            # parent_session_id is None ⇒ a top-level session, not a
+            # fork/sub-agent — forks close on the parent's (foreground)
+            # thread, so an origin check wouldn't exclude them. Fire-and-
+            # forget on a daemon thread; gated internally on the backend.
+            if self.parent_session_id is None:
+                try:
+                    from ..user_model.ingest import maybe_fire_ingest
+
+                    maybe_fire_ingest(self, list(self.messages), trigger="session_end")
+                except Exception:  # noqa: BLE001
+                    logger.debug("user-model session-end ingest raised", exc_info=True)
             # Drop this session's entry from the per-session review
             # nudge counter so long-lived daemons (gateway, scheduled
             # cron) don't accumulate stale ints forever.

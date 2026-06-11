@@ -430,10 +430,13 @@ class UserModelConfig:
 
     backend: str = "markdown"
     # Triggers for the post-session fact-extraction LLM call. Both
-    # fire-and-forget; if either is wedged it never blocks the user.
+    # fire-and-forget (daemon thread); if either is wedged it never
+    # blocks the user. Wired in athena/user_model/ingest.py:
+    # on_compact via /compact, on_session_end via Agent.close().
     ingest_on_compact: bool = True
     ingest_on_session_end: bool = True
-    # Per-N-turn ingestion for long sessions. 0 disables.
+    # Per-N-turn ingestion for long sessions. 0 disables. NOTE: not yet
+    # wired into the turn loop — reserved; leave at 0.
     ingest_every_n_turns: int = 0
     # Model used for extraction + query. None = use the main agent
     # model. Set to a smaller / cheaper model when the main model

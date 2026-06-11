@@ -13,8 +13,6 @@ extraction never blocks the REPL.
 
 from __future__ import annotations
 
-import threading
-import uuid
 from typing import Any
 
 from .. import ui
@@ -86,44 +84,7 @@ def cmd_compact(agent: Any, arg: str = "") -> str:
         f"{result.summary_tokens:,}-token summary)"
     )
 
-    _maybe_fire_user_model_ingest(agent, pre_compact_messages)
+    from ..user_model.ingest import maybe_fire_ingest
+
+    maybe_fire_ingest(agent, pre_compact_messages, trigger="compact")
     return ""
-
-
-def _maybe_fire_user_model_ingest(agent: Any, transcript: list[dict[str, Any]]) -> None:
-    """Kick off ``ingest_session`` on a detached thread when the
-    user-model backend is configured to fire on compaction. Catches
-    every exception inside the worker — a misbehaving extractor
-    must never bubble up to the REPL."""
-    cfg = getattr(agent, "cfg", None)
-    if cfg is None or not getattr(cfg, "user_model", None):
-        return
-    if not cfg.user_model.ingest_on_compact:
-        return
-    if cfg.user_model.backend in ("none", "", None):
-        return
-
-    def _worker() -> None:
-        import asyncio
-
-        try:
-            from ..tools import file_ops
-            from ..tools.memory_query_tool import _build_llm_call
-            from ..user_model import get_user_model_backend
-        except ImportError:
-            return
-        try:
-            backend = get_user_model_backend(
-                cfg,
-                llm_call=_build_llm_call(agent),
-                workspace=file_ops._WORKSPACE,
-            )
-        except (ValueError, NotImplementedError):
-            return
-        session_id = getattr(agent, "session_id", None) or uuid.uuid4().hex
-        try:
-            asyncio.run(backend.ingest_session(transcript, session_id=session_id))
-        except Exception:  # noqa: BLE001 — fire-and-forget
-            return
-
-    threading.Thread(target=_worker, name="athena-user-model-ingest", daemon=True).start()
