@@ -45,6 +45,10 @@ class _FakeAgent:
         self.run_calls: list[str] = []
         self._tool_trace: list[dict] = []
         self.goal: str | None = None
+        self.messages: list[dict] = []
+        # Messages the fake appends to self.messages DURING run_until_done
+        # (so they land after the ACP layer's pre-run length snapshot).
+        self._turn_messages: list[dict] = []
 
     def run_until_done(
         self,
@@ -53,6 +57,7 @@ class _FakeAgent:
         max_iterations: int | None = None,
     ) -> None:
         self.run_calls.append(user_input)
+        self.messages.extend(self._turn_messages)
 
     def last_assistant_message(self) -> str:
         return self.response
@@ -223,14 +228,15 @@ async def test_send_message_surfaces_tool_calls(
 ) -> None:
     server, writer = _server()
     fake = _FakeAgent()
-    fake._tool_trace = [
-        {"id": "c-1", "function": {"name": "Bash", "arguments": {"cmd": "ls"}}},
-        {"id": "c-2", "function": {"name": "Read", "arguments": {"path": "/x"}}},
-    ]
-    # Tool-role results correlated by tool_call_id.
-    fake.messages = [
-        {"role": "tool", "tool_call_id": "c-1", "content": "file listing"},
-        {"role": "tool", "tool_call_id": "c-2", "content": "file body"},
+    # The DEFAULT Ollama provider supplies NO tool-call ids — results are
+    # paired with calls by ORDER, from the turn's assistant + tool
+    # messages, with the [TOOL_RESULT.<nonce>] wrapper stripped.
+    fake._tool_result_nonce = "abc123"
+    fake._turn_messages = [
+        {"role": "assistant", "tool_calls": [{"function": {"name": "Bash", "arguments": {"cmd": "ls"}}}]},
+        {"role": "tool", "content": "[TOOL_RESULT.abc123]\nfile listing\n[/TOOL_RESULT.abc123]"},
+        {"role": "assistant", "tool_calls": [{"function": {"name": "Read", "arguments": {"path": "/x"}}}]},
+        {"role": "tool", "content": "file body"},
     ]
     register(server, agent_factory=lambda: fake)
     await _invoke(server, "session/new", {"session_id": "s"})
@@ -249,14 +255,52 @@ async def test_send_message_surfaces_tool_calls(
         and m["params"]["block"]["type"] == "tool_use"
     ]
     assert len(tool_starts) == 2
-    assert {b["params"]["block"]["name"] for b in tool_starts} == {"Bash", "Read"}
+    assert [b["params"]["block"]["name"] for b in tool_starts] == ["Bash", "Read"]
     # Each tool_call_start has a matching tool_result (closes the IDE
-    # block; otherwise the IDE shows a dangling spinner). Results carry
-    # the correlated content.
-    results = [m for m in writer.lines if m["method"] == "session/tool_result"]
-    assert len(results) == 2
-    by_id = {m["params"]["tool_use_id"]: m["params"]["result"] for m in results}
-    assert by_id == {"c-1": "file listing", "c-2": "file body"}
+    # block). Results are paired by order, with the nonce wrapper stripped
+    # — even though the calls have NO ids.
+    results = [m["params"]["result"] for m in writer.lines if m["method"] == "session/tool_result"]
+    assert results == ["file listing", "file body"]
+
+
+async def test_send_message_only_surfaces_current_turn_tool_calls() -> None:
+    """Regression: a second send_message must not re-emit the first
+    turn's tool calls (tool_call_trace returns the whole history). Only
+    THIS turn's calls — after the pre-run length snapshot — surface."""
+    server, writer = _server()
+    fake = _FakeAgent()
+    register(server, agent_factory=lambda: fake)
+    await _invoke(server, "session/new", {"session_id": "s"})
+
+    # Turn 1: one tool call.
+    fake._turn_messages = [
+        {"role": "assistant", "tool_calls": [{"function": {"name": "Bash", "arguments": {}}}]},
+        {"role": "tool", "content": "out1"},
+    ]
+    await _invoke(server, "session/send_message", {"session_id": "s", "message": "a"})
+
+    # _Writer.lines is a property rebuilt from the buffer each access, so
+    # snapshot the count to isolate turn 2's notifications.
+    n_before = len(writer.lines)
+
+    # Turn 2: a different tool call. The first turn's call is now history.
+    fake._turn_messages = [
+        {"role": "assistant", "tool_calls": [{"function": {"name": "Read", "arguments": {}}}]},
+        {"role": "tool", "content": "out2"},
+    ]
+    await _invoke(server, "session/send_message", {"session_id": "s", "message": "b"})
+
+    turn2 = writer.lines[n_before:]
+    starts = [
+        m["params"]["block"]["name"]
+        for m in turn2
+        if m["method"] == "session/content_block_start"
+        and m["params"]["block"]["type"] == "tool_use"
+    ]
+    # Only turn 2's call — turn 1's "Bash" is NOT re-emitted.
+    assert starts == ["Read"]
+    results = [m["params"]["result"] for m in turn2 if m["method"] == "session/tool_result"]
+    assert results == ["out2"]
 
 
 async def test_send_message_reports_cancelled_reason_when_flag_set(

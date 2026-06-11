@@ -111,6 +111,11 @@ def register(
         # let the IDE render the response in its dedicated panel.
         await sender.text_block_start("text-0")
 
+        # Snapshot the transcript length so we surface only THIS turn's
+        # tool calls below — tool_call_trace() returns the whole history,
+        # which would re-emit every prior call on every message.
+        msg_start = len(getattr(agent, "messages", None) or [])
+
         approval_callback = _build_approval_callback(server, sid)
         approval_token = set_approval_callback(approval_callback)
         try:
@@ -129,30 +134,30 @@ def register(
             await sender.text_delta(final)
         await sender.text_block_stop("text-0")
 
-        # Surface every tool call the turn produced so the IDE can
-        # render them in its activity panel. Buffered for the same
-        # reason as the text — real per-call streaming lands in a
-        # follow-up. Each tool_call_start is paired with a tool_result so
-        # the IDE closes the block: a start with no result leaves a
-        # dangling spinner. The result text is correlated from the
-        # tool-role messages by tool_call_id when available.
-        results_by_id: dict[str, str] = {}
-        for m in getattr(agent, "messages", None) or []:
-            if m.get("role") == "tool" and m.get("tool_call_id"):
-                results_by_id[str(m["tool_call_id"])] = str(m.get("content") or "")
-        for call in agent.tool_call_trace():
-            fn = call.get("function") or {}
-            call_id = call.get("id")
-            tool_id = call_id or _generate_tool_id()
-            await sender.tool_call_start(
-                tool_id,
-                fn.get("name", "?"),
-                fn.get("arguments") or {},
-            )
-            await sender.tool_call_result(
-                tool_id,
-                results_by_id.get(str(call_id), "") if call_id else "",
-            )
+        # Surface THIS turn's tool calls in the IDE activity panel, each
+        # start paired with its result so the IDE closes the block (a
+        # start with no result leaves a dangling spinner). Calls and their
+        # tool-role results are paired by ORDER, not id — the default
+        # Ollama provider supplies no tool-call ids, so id correlation
+        # would yield empty results for the primary deployment. The
+        # internal [TOOL_RESULT.<nonce>] containment wrapper is stripped
+        # and the result is size-capped before it reaches the editor.
+        new_messages = (getattr(agent, "messages", None) or [])[msg_start:]
+        nonce = getattr(agent, "_tool_result_nonce", None)
+        pending: list[dict[str, Any]] = []
+        for m in new_messages:
+            role = m.get("role")
+            if role == "assistant":
+                pending.extend(m.get("tool_calls") or [])
+            elif role == "tool":
+                call = pending.pop(0) if pending else {}
+                await _emit_tool_call(
+                    sender, call, _unwrap_tool_result(str(m.get("content") or ""), nonce)
+                )
+        # Calls with no recorded result (interrupted, etc.) still get a
+        # start + empty result so the IDE block doesn't dangle.
+        for call in pending:
+            await _emit_tool_call(sender, call, "")
         reason = "cancelled" if agent.cancel_pending else "stop"
         await sender.turn_completed(reason=reason)
         return {"completed": True, "reason": reason}
@@ -254,6 +259,33 @@ def _generate_session_id() -> str:
 
 def _generate_tool_id() -> str:
     return f"call-{secrets.token_hex(6)}"
+
+
+# Cap tool-result text in ACP notifications so a multi-MB result (a big
+# file read, a long shell dump) doesn't bloat the editor's JSON-RPC.
+_MAX_ACP_RESULT_LEN = 16_384
+
+
+def _unwrap_tool_result(content: str, nonce: str | None) -> str:
+    """Strip the internal ``[TOOL_RESULT.<nonce>]`` containment wrapper
+    (added by the agent for prompt-injection defense) so it doesn't leak
+    into the IDE, and cap the size."""
+    if nonce:
+        prefix = f"[TOOL_RESULT.{nonce}]\n"
+        suffix = f"\n[/TOOL_RESULT.{nonce}]"
+        if content.startswith(prefix) and content.endswith(suffix):
+            content = content[len(prefix) : len(content) - len(suffix)]
+    if len(content) > _MAX_ACP_RESULT_LEN:
+        content = content[:_MAX_ACP_RESULT_LEN] + "\n…(truncated)"
+    return content
+
+
+async def _emit_tool_call(sender: StreamingSender, call: dict[str, Any], result: str) -> None:
+    """Emit a tool_call_start + matching tool_result for one call."""
+    fn = call.get("function") or {}
+    tool_id = call.get("id") or _generate_tool_id()
+    await sender.tool_call_start(tool_id, fn.get("name", "?"), fn.get("arguments") or {})
+    await sender.tool_call_result(tool_id, result)
 
 
 def _list_available_models() -> list[dict[str, str]]:
