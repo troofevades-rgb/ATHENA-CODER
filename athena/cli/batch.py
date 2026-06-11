@@ -137,15 +137,22 @@ def _run_one(
     workspace_default: Path,
     output_dir: Path,
     force: bool,
-) -> tuple[ManifestEntry, dict[str, Any]]:
-    """Run one batch entry — used by both the serial path and
-    the ThreadPool path. Returns (manifest_entry, envelope_dict).
-    Skipped entries return a synthesized manifest_entry +
-    re-reads the existing envelope.
+) -> tuple[ManifestEntry, dict[str, Any], bool]:
+    """Run one batch entry — used by both the serial path and the
+    ThreadPool path. Returns ``(manifest_entry, envelope_dict,
+    was_skipped)``.
+
+    Resume-safety mirrors the serial runner: an existing AND readable
+    envelope is skipped (was_skipped=True); an UNREADABLE one is treated
+    as "outcome unknown" and re-run, NOT substituted with a fake
+    ``{"status": "ok"}`` (which made the manifest report success for a
+    run whose result was actually lost).
     """
     from ..batch.manifest import ManifestEntry
     from ..batch.runner import _safe_filename
     from ..headless import run_headless
+    from ..provenance import BATCH
+    from ..safety.thread_entry import non_foreground_thread
 
     # Callers (_run_parallel) pre-allocate run_ids before submitting work.
     assert entry.run_id is not None
@@ -153,38 +160,51 @@ def _run_one(
     if envelope_path.exists() and not force:
         try:
             existing = json.loads(envelope_path.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
-            existing = {
-                "run_id": entry.run_id,
-                "status": "ok",
-                "exit_code": 0,
-                "duration_s": 0.0,
-                "task": entry.task,
-                "error": None,
-            }
-        return ManifestEntry.from_run_result(
-            envelope=existing,
-            envelope_path=envelope_path,
-        ), existing
+        except (OSError, json.JSONDecodeError) as e:
+            logger.warning(
+                "batch: envelope %s unreadable (%s); re-running this entry",
+                envelope_path,
+                e,
+            )
+        else:
+            return (
+                ManifestEntry.from_run_result(
+                    envelope=existing,
+                    envelope_path=envelope_path,
+                ),
+                existing,
+                True,
+            )
 
     workspace = Path(entry.cwd).expanduser().resolve() if entry.cwd else workspace_default
-    result = run_headless(
-        task=entry.task,
-        cfg=cfg,
-        workspace=workspace,
-        model=entry.model,
-        run_id=entry.run_id,
-        timeout_s=entry.timeout_s,
-    )
+    # Parallel workers run on ThreadPoolExecutor threads with no
+    # interactive stdin. Enter non_foreground_thread so a
+    # confirmation-required tool gets AUTO_DENY instead of N workers all
+    # blocking on ui.confirm against the same stdin (a deadlock). The
+    # serial path runs on the foreground thread and intentionally keeps
+    # interactive approval.
+    with non_foreground_thread(origin=BATCH):
+        result = run_headless(
+            task=entry.task,
+            cfg=cfg,
+            workspace=workspace,
+            model=entry.model,
+            run_id=entry.run_id,
+            timeout_s=entry.timeout_s,
+        )
     envelope = result.to_dict()
     envelope_path.write_text(
         json.dumps(envelope, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    return ManifestEntry.from_run_result(
-        envelope=envelope,
-        envelope_path=envelope_path,
-    ), envelope
+    return (
+        ManifestEntry.from_run_result(
+            envelope=envelope,
+            envelope_path=envelope_path,
+        ),
+        envelope,
+        False,
+    )
 
 
 def _run_parallel(
@@ -236,7 +256,9 @@ def _run_parallel(
     results: dict[int, Any] = {}
     skipped_count = 0
 
-    def _task(idx: int, entry: BatchEntry) -> tuple[int, tuple[ManifestEntry, dict[str, Any]]]:
+    def _task(
+        idx: int, entry: BatchEntry
+    ) -> tuple[int, tuple[ManifestEntry, dict[str, Any], bool]]:
         return idx, _run_one(
             entry=entry,
             cfg=cfg,
@@ -250,8 +272,10 @@ def _run_parallel(
             futures = [ex.submit(_task, i, e) for i, e in enumerate(entries)]
             done_count = 0
             for fut in _as_completed(futures):
-                idx, (me, envelope) = fut.result()
+                idx, (me, envelope, was_skipped) = fut.result()
                 results[idx] = (me, envelope, entries[idx])
+                if was_skipped:
+                    skipped_count += 1
                 done_count += 1
                 if progress is not None:
                     progress(me, done_count, len(entries))
@@ -289,22 +313,11 @@ def _run_parallel(
             continue
         me, envelope, _e = results[i]
         manifest.entries.append(me)
-        # Distinguish "ran" from "skipped" by checking whether
-        # the per-run envelope file's contents look like a
-        # fresh run or a pre-existing one. Simplest signal: if
-        # an envelope file exists AND we entered the "skipped"
-        # path, the in-memory me already reflects that — but
-        # we don't track that flag through the future. So
-        # instead: count via by_status, and approximate
-        # skipped as "envelope existed BEFORE we started".
-        # Cleaner: have _run_one return a was_skipped bool.
         manifest.by_status[me.status] = manifest.by_status.get(me.status, 0) + 1
 
-    # We can't perfectly distinguish skipped from completed
-    # without threading a flag back; recompute by comparing
-    # the pre-batch + post-batch envelope-file mtimes is heavy.
-    # Pragmatic choice: count entries whose envelope path was
-    # already on disk at submission time (best-effort).
+    # skipped_count is now threaded back from _run_one's was_skipped
+    # flag (accumulated in the completion loop), so these stats are
+    # exact rather than the old best-effort approximation.
     manifest.completed = len(manifest.entries) - skipped_count
     manifest.skipped = skipped_count
 
@@ -323,8 +336,8 @@ def _run_parallel(
 
 
 def _as_completed(
-    futures: list[Future[tuple[int, tuple[ManifestEntry, dict[str, Any]]]]],
-) -> Iterator[Future[tuple[int, tuple[ManifestEntry, dict[str, Any]]]]]:
+    futures: list[Future[tuple[int, tuple[ManifestEntry, dict[str, Any], bool]]]],
+) -> Iterator[Future[tuple[int, tuple[ManifestEntry, dict[str, Any], bool]]]]:
     """Yield futures as they complete. Wraps concurrent.futures
     as_completed so the caller's `for fut in ...:` shape works
     without an extra import in the call site."""

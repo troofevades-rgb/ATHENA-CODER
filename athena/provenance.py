@@ -21,6 +21,11 @@ CURATOR: Final = "curator"
 MIGRATION: Final = "migration"
 SYSTEM: Final = "system"
 CRON: Final = "cron"
+# Autonomous batch run (``athena batch``). Like cron, it runs agents on
+# worker threads with no interactive stdin, so it enters via
+# non_foreground_thread to get AUTO_DENY. NOT in is_background() — the
+# batch output is the deliverable, not a silent side-pass.
+BATCH: Final = "batch"
 # User-invoked sub-agent (the Agent tool's fork). Distinct from the silent
 # background passes: its TOOL CALLS surface in the parent TUI, rendered
 # nested + dimmed, while its streaming prose stays suppressed. NOT in
@@ -34,6 +39,7 @@ _WRITE_ORIGINS: Final = {
     MIGRATION,
     SYSTEM,
     CRON,
+    BATCH,
     SUBAGENT,
 }
 

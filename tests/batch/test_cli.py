@@ -74,10 +74,12 @@ def stub_runner(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr(runner_mod, "run_headless", _stub)
     monkeypatch.setattr(headless_pkg, "run_headless", _stub)
-    # Also patch the CLI's direct import of run_headless
+    # The CLI's _run_one does `from ..headless import run_headless` at
+    # call time, so patching athena.headless.run_headless (above) makes
+    # the REAL _run_one use the stub — no need to replace _run_one
+    # itself (replacing it would skip the actual resume-safety +
+    # was_skipped + non_foreground_thread logic under test).
     import athena.cli.batch as batch_cli
-
-    monkeypatch.setattr(batch_cli, "_run_one", _wrap_run_one(_stub, batch_cli))
 
     # Make config + profile_dir predictable.
     monkeypatch.setattr(
@@ -86,45 +88,6 @@ def stub_runner(monkeypatch, tmp_path: Path):
         lambda profile="default": tmp_path,
     )
     return _stub
-
-
-def _wrap_run_one(stub, batch_cli):
-    """The CLI's _run_one imports run_headless internally; we
-    wrap it to use our stub so the batch CLI path doesn't
-    accidentally hit the real one."""
-    from athena.batch.manifest import ManifestEntry
-    from athena.batch.runner import _safe_filename
-
-    def _run_one(*, entry, cfg, workspace_default, output_dir, force):
-        envelope_path = output_dir / f"{_safe_filename(entry.run_id)}.json"
-        if envelope_path.exists() and not force:
-            existing = json.loads(envelope_path.read_text())
-            return ManifestEntry.from_run_result(
-                envelope=existing,
-                envelope_path=envelope_path,
-            ), existing
-        from pathlib import Path as _P
-
-        workspace = _P(entry.cwd).expanduser().resolve() if entry.cwd else workspace_default
-        result = stub(
-            entry.task,
-            cfg=cfg,
-            workspace=workspace,
-            model=entry.model,
-            run_id=entry.run_id,
-            timeout_s=entry.timeout_s,
-        )
-        envelope = result.to_dict()
-        envelope_path.write_text(
-            json.dumps(envelope, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        return ManifestEntry.from_run_result(
-            envelope=envelope,
-            envelope_path=envelope_path,
-        ), envelope
-
-    return _run_one
 
 
 def _run_cli(argv: list[str], capsys) -> tuple[int, str, str]:
@@ -348,7 +311,6 @@ def test_exit_1_when_any_entry_failed(
     # `from ..headless import run_headless`.
     monkeypatch.setattr(runner_mod, "run_headless", _failing_stub)
     monkeypatch.setattr(headless_pkg, "run_headless", _failing_stub)
-    monkeypatch.setattr(batch_cli, "_run_one", _wrap_run_one(_failing_stub, batch_cli))
     monkeypatch.setattr(batch_cli, "profile_dir", lambda profile="default": tmp_path)
 
     out_dir = tmp_path / "out"
@@ -419,6 +381,68 @@ def test_parallel_runs_complete_in_input_order(
     run_ids_in_manifest = [e["run_id"] for e in manifest["entries"]]
     assert run_ids_in_manifest == [f"r-{i:03d}" for i in range(10)]
     assert manifest["by_status"]["ok"] == 10
+
+
+def test_parallel_resume_reruns_corrupt_envelope(stub_runner, capsys, tmp_path: Path):
+    """Regression: the parallel path used to fabricate a fake
+    {"status":"ok"} record for an unreadable existing envelope, so the
+    manifest reported success for a run whose outcome was lost. A
+    corrupt envelope must be RE-RUN (and overwritten with a real
+    result), matching the serial runner."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    # A truncated / corrupt envelope on disk.
+    (out_dir / "r-001.json").write_text("{not valid json", encoding="utf-8")
+    tasks_file = _write_tasks(tmp_path, [{"task": "redo-me", "run_id": "r-001"}])
+    code, _out, _err = _run_cli(
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--parallel", "2", "--quiet"],
+        capsys,
+    )
+    assert code == 0
+    # The corrupt envelope was replaced by a real run, not a fake "ok".
+    env = json.loads((out_dir / "r-001.json").read_text())
+    assert env["task"] == "redo-me"
+    manifest = json.loads((out_dir / "manifest.json").read_text())
+    assert manifest["skipped"] == 0  # it ran, wasn't skipped
+    assert manifest["completed"] == 1
+
+
+def test_parallel_manifest_skipped_count_accurate(stub_runner, capsys, tmp_path: Path):
+    """Regression: skipped_count was initialized to 0 and never
+    incremented, so manifest.skipped was always 0 and skipped entries
+    were miscounted as completed. With one pre-existing (skipped) and
+    one fresh entry, the split must be exact."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    (out_dir / "r-done.json").write_text(
+        json.dumps(
+            {
+                "run_id": "r-done",
+                "status": "ok",
+                "exit_code": 0,
+                "duration_s": 0.0,
+                "task": "already",
+                "error": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    tasks_file = _write_tasks(
+        tmp_path,
+        [
+            {"task": "already", "run_id": "r-done"},  # skipped
+            {"task": "fresh", "run_id": "r-new"},  # runs
+        ],
+    )
+    code, _out, _err = _run_cli(
+        [str(tasks_file), "-o", str(out_dir), "-C", str(tmp_path), "--parallel", "2", "--quiet"],
+        capsys,
+    )
+    assert code == 0
+    manifest = json.loads((out_dir / "manifest.json").read_text())
+    assert manifest["total"] == 2
+    assert manifest["skipped"] == 1
+    assert manifest["completed"] == 1
 
 
 def test_parallel_writes_all_envelopes(stub_runner, capsys, tmp_path: Path):
