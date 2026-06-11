@@ -23,18 +23,22 @@ SERVER_INFO = {
 
 
 CAPABILITIES = {
-    # Stream content_block_delta notifications as the agent produces
-    # tokens. Required for a "typing" effect in Zed and similar IDEs.
+    # We emit content_block_delta notifications (currently a single
+    # delta after the buffered turn completes, wrapped in start/stop
+    # blocks so the IDE renders it in its response panel).
     "streaming": True,
-    # Surface tool calls via content_block_start / tool_result
-    # notifications.
+    # Surface tool calls via tool_call_start + a matching tool_result
+    # for each (the result closes the IDE's activity block — without it
+    # the IDE shows a dangling spinner).
     "tools": True,
     # Send permission_request to the client for dangerous tools;
     # await user decision.
     "approvals": True,
-    # File attachments come in via session/send_message's params and
-    # appear on the agent's MessageEvent as Path entries.
-    "file_attachments": True,
+    # NOTE: file attachments are NOT yet wired — session/send_message
+    # only extracts text (see _coerce_user_text). Advertising this had
+    # the IDE send attachments we silently dropped. Flip to True only
+    # once the attachment path lands.
+    "file_attachments": False,
     # /steer, /queue, /goal via session/slash_command.
     "slash_commands": True,
     # models/list returns every provider:model name the resolver

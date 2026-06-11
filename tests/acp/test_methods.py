@@ -227,6 +227,11 @@ async def test_send_message_surfaces_tool_calls(
         {"id": "c-1", "function": {"name": "Bash", "arguments": {"cmd": "ls"}}},
         {"id": "c-2", "function": {"name": "Read", "arguments": {"path": "/x"}}},
     ]
+    # Tool-role results correlated by tool_call_id.
+    fake.messages = [
+        {"role": "tool", "tool_call_id": "c-1", "content": "file listing"},
+        {"role": "tool", "tool_call_id": "c-2", "content": "file body"},
+    ]
     register(server, agent_factory=lambda: fake)
     await _invoke(server, "session/new", {"session_id": "s"})
     await _invoke(
@@ -245,6 +250,13 @@ async def test_send_message_surfaces_tool_calls(
     ]
     assert len(tool_starts) == 2
     assert {b["params"]["block"]["name"] for b in tool_starts} == {"Bash", "Read"}
+    # Each tool_call_start has a matching tool_result (closes the IDE
+    # block; otherwise the IDE shows a dangling spinner). Results carry
+    # the correlated content.
+    results = [m for m in writer.lines if m["method"] == "session/tool_result"]
+    assert len(results) == 2
+    by_id = {m["params"]["tool_use_id"]: m["params"]["result"] for m in results}
+    assert by_id == {"c-1": "file listing", "c-2": "file body"}
 
 
 async def test_send_message_reports_cancelled_reason_when_flag_set(

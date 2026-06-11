@@ -132,14 +132,26 @@ def register(
         # Surface every tool call the turn produced so the IDE can
         # render them in its activity panel. Buffered for the same
         # reason as the text — real per-call streaming lands in a
-        # follow-up.
+        # follow-up. Each tool_call_start is paired with a tool_result so
+        # the IDE closes the block: a start with no result leaves a
+        # dangling spinner. The result text is correlated from the
+        # tool-role messages by tool_call_id when available.
+        results_by_id: dict[str, str] = {}
+        for m in getattr(agent, "messages", None) or []:
+            if m.get("role") == "tool" and m.get("tool_call_id"):
+                results_by_id[str(m["tool_call_id"])] = str(m.get("content") or "")
         for call in agent.tool_call_trace():
             fn = call.get("function") or {}
-            tool_id = call.get("id") or _generate_tool_id()
+            call_id = call.get("id")
+            tool_id = call_id or _generate_tool_id()
             await sender.tool_call_start(
                 tool_id,
                 fn.get("name", "?"),
                 fn.get("arguments") or {},
+            )
+            await sender.tool_call_result(
+                tool_id,
+                results_by_id.get(str(call_id), "") if call_id else "",
             )
         reason = "cancelled" if agent.cancel_pending else "stop"
         await sender.turn_completed(reason=reason)
