@@ -321,6 +321,12 @@ class SlackAdapter(GatewayAdapter):
     async def _handle_interactive(self, payload: dict[str, Any]) -> None:
         if payload.get("type") != "block_actions":
             return
+        # Lockdown: only the operator / configured approvers may resolve.
+        # Any workspace user who can see the channel can click these
+        # buttons, so without this check a stranger could approve a
+        # Bash/Write confirmation. The clicking user is in payload["user"].
+        clicker = ((payload.get("user") or {}).get("id")) or None
+        click_ok = self._approval_click_allowed(clicker)
         actions = payload.get("actions") or []
         for action in actions:
             action_id = action.get("action_id") or ""
@@ -329,6 +335,13 @@ class SlackAdapter(GatewayAdapter):
                 continue
             _, request_id, decision = parts
             if decision not in {"allow", "deny"}:
+                continue
+            if not click_ok:
+                logger.info(
+                    "[%s] ignoring approval click from unauthorized user %s",
+                    self.name,
+                    clicker,
+                )
                 continue
             self.daemon.approvals.resolve(request_id, cast('Literal["allow", "deny"]', decision))
 
@@ -349,6 +362,13 @@ class SlackAdapter(GatewayAdapter):
                 request.session_id,
             )
             return
+        if not self._approval_authorized_ids():
+            logger.warning(
+                "[%s] approval prompt is UNLOCKED — no approval_user_ids/allowed_user_ids "
+                "configured, so any workspace user in the channel can approve. Set "
+                "[gateway.platforms.slack] approval_user_ids to lock it down.",
+                self.name,
+            )
         text, blocks = self._build_approval_blocks(request)
         try:
             await self._web.chat_postMessage(

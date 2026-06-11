@@ -17710,7 +17710,8 @@ function connectGateway() {
         protocol_version: PROTOCOL_VERSION,
         client_version: "tui-bundle",
         capabilities: CLIENT_CAPABILITIES,
-        last_seq: 0
+        last_seq: 0,
+        token: process.env["ATHENA_TUI_TOKEN"] ?? ""
       }
     });
   }

@@ -52,16 +52,20 @@ class _FakeApprovals:
 
 
 class _FakeDaemon:
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, platform_cfg: dict | None = None) -> None:
         self.router = _FakeRouter()
         self.approvals = _FakeApprovals()
         self.profile_dir = tmp_path / "profile"
         self.profile_dir.mkdir(parents=True, exist_ok=True)
+        if platform_cfg is not None:
+            self.cfg = SimpleNamespace(
+                gateway=SimpleNamespace(platforms={"slack": platform_cfg})
+            )
 
 
-def _adapter(tmp_path: Path) -> SlackAdapter:
+def _adapter(tmp_path: Path, *, platform_cfg: dict | None = None) -> SlackAdapter:
     return SlackAdapter(
-        _FakeDaemon(tmp_path),
+        _FakeDaemon(tmp_path, platform_cfg=platform_cfg),
         bot_token="xoxb-test",
         app_token="xapp-test",
     )
@@ -359,6 +363,32 @@ async def test_handle_interactive_routes_deny(tmp_path: Path) -> None:
         }
     )
     assert a.daemon.approvals.resolves == [("r-x", "deny")]
+
+
+async def test_handle_interactive_refuses_unauthorized_user(tmp_path: Path) -> None:
+    """With approval_user_ids set, a click from a workspace user not in
+    the set must not resolve the approval (channel lockdown)."""
+    a = _adapter(tmp_path, platform_cfg={"approval_user_ids": ["U111"]})
+    await a._handle_interactive(
+        {
+            "type": "block_actions",
+            "user": {"id": "U222"},
+            "actions": [{"action_id": f"{_ACTION_PREFIX}:r-abc:allow"}],
+        }
+    )
+    assert a.daemon.approvals.resolves == []
+
+
+async def test_handle_interactive_allows_authorized_user(tmp_path: Path) -> None:
+    a = _adapter(tmp_path, platform_cfg={"approval_user_ids": ["U111"]})
+    await a._handle_interactive(
+        {
+            "type": "block_actions",
+            "user": {"id": "U111"},
+            "actions": [{"action_id": f"{_ACTION_PREFIX}:r-abc:allow"}],
+        }
+    )
+    assert a.daemon.approvals.resolves == [("r-abc", "allow")]
 
 
 async def test_handle_interactive_ignores_unrelated_action_ids(

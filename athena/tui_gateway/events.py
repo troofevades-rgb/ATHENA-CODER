@@ -317,7 +317,7 @@ class ProtocolErrorEvent(_Event):
     opaque socket-closed.
 
     Defined codes: ``protocol_version_mismatch``, ``tui_heartbeat_lost``,
-    ``malformed_hello``.
+    ``malformed_hello``, ``unauthorized``.
     """
 
     code: str
@@ -426,6 +426,12 @@ class HelloCommand:
     client_version: str
     capabilities: list[str]
     last_seq: int = 0
+    # Shared secret the gateway minted for this launch and passed to
+    # the client via ATHENA_TUI_TOKEN. Validated during the handshake
+    # to authenticate the connecting process (chiefly the TCP-loopback
+    # transport, which is otherwise reachable by any local process).
+    # Empty when the gateway runs without a token (back-compat).
+    token: str = ""
     type: Literal["hello"] = "hello"
 
 
@@ -458,6 +464,7 @@ def command_from_json_rpc(method: str, params: dict[str, Any]) -> Command | None
             client_version=str(params.get("client_version", "")),
             capabilities=list(params.get("capabilities", []) or []),
             last_seq=int(params.get("last_seq", 0)),
+            token=str(params.get("token", "")),
         )
     if method == "pong":
         return PongCommand()

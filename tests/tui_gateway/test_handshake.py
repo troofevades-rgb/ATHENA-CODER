@@ -51,6 +51,7 @@ def _build_stub_gateway(transport):
     start()/handshake/heartbeats touch."""
     gw = srv.TuiGateway.__new__(srv.TuiGateway)
     gw._transport = transport
+    gw._auth_token = _STUB_TOKEN
     gw._proc = None
     gw._cmd_queue = queue.Queue()
     gw._reader_thread = None
@@ -83,8 +84,19 @@ def _build_stub_gateway(transport):
     return gw
 
 
+# Fixed token the stub gateway hands out; clients echo it back so the
+# auth check passes. A distinct value drives the rejection test.
+_STUB_TOKEN = "stub-token-deadbeef"
+
+
 def _spawn_client(
-    sock_path, *, send_pong=True, pongs_target=3, protocol_version=2, drain_after_hello=0
+    sock_path,
+    *,
+    send_pong=True,
+    pongs_target=3,
+    protocol_version=2,
+    drain_after_hello=0,
+    token=_STUB_TOKEN,
 ):
     """Background thread that simulates the Ink client. Returns
     a dict you can read after thread.join() with what it saw.
@@ -114,6 +126,7 @@ def _spawn_client(
                                 "client_version": "fake-ink-test",
                                 "capabilities": ["heartbeats", "seq"],
                                 "last_seq": 0,
+                                "token": token,
                             },
                         }
                     )
@@ -230,6 +243,78 @@ def test_mismatched_protocol_version_raises(fast_heartbeats):
             f"saw {[e.get('method') for e in state['events']]}"
         )
         assert err_events[0]["params"]["code"] == "protocol_version_mismatch"
+    finally:
+        transport.close()
+
+
+def test_bad_token_rejected(fast_heartbeats):
+    """A peer that can't present the gateway's per-launch token is
+    refused before any replay/frames leak. This is the TCP-loopback
+    lockdown: an unrelated local process connecting to the ephemeral
+    port gets nothing."""
+    transport = srv._UnixDomainTransport()
+    transport.bind()
+    try:
+        gw = _build_stub_gateway(transport)
+        _, env_value = transport.env_var()
+        client_t, state = _spawn_client(
+            env_value,
+            pongs_target=0,
+            token="wrong-token",
+            drain_after_hello=1,  # read the protocol.error before EOF
+        )
+        try:
+            with pytest.raises(srv._HandshakeError, match="unauthorized"):
+                _drive_gateway_through_handshake(gw, transport)
+        finally:
+            client_t.join(timeout=2.0)
+        err_events = [e for e in state["events"] if e.get("method") == "protocol.error"]
+        assert err_events, "client did not receive protocol.error for bad token"
+        assert err_events[0]["params"]["code"] == "unauthorized"
+    finally:
+        transport.close()
+
+
+def test_non_ascii_token_rejected_not_crashed(fast_heartbeats):
+    """Regression: secrets.compare_digest raises TypeError on non-ASCII
+    str operands. The client token comes off the wire, so a non-ASCII
+    token must be refused cleanly (bytes comparison), not crash the
+    handshake thread."""
+    transport = srv._UnixDomainTransport()
+    transport.bind()
+    try:
+        gw = _build_stub_gateway(transport)
+        _, env_value = transport.env_var()
+        client_t, state = _spawn_client(
+            env_value, pongs_target=0, token="café-ünïcode-tøken", drain_after_hello=1
+        )
+        try:
+            with pytest.raises(srv._HandshakeError, match="unauthorized"):
+                _drive_gateway_through_handshake(gw, transport)
+        finally:
+            client_t.join(timeout=2.0)
+        err_events = [e for e in state["events"] if e.get("method") == "protocol.error"]
+        assert err_events and err_events[0]["params"]["code"] == "unauthorized"
+    finally:
+        transport.close()
+
+
+def test_empty_token_rejected(fast_heartbeats):
+    """An old bundle that doesn't send a token at all (token="") is
+    refused — the gateway token is always non-empty."""
+    transport = srv._UnixDomainTransport()
+    transport.bind()
+    try:
+        gw = _build_stub_gateway(transport)
+        _, env_value = transport.env_var()
+        client_t, state = _spawn_client(
+            env_value, pongs_target=0, token="", drain_after_hello=1
+        )
+        try:
+            with pytest.raises(srv._HandshakeError, match="unauthorized"):
+                _drive_gateway_through_handshake(gw, transport)
+        finally:
+            client_t.join(timeout=2.0)
     finally:
         transport.close()
 

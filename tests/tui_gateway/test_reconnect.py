@@ -38,9 +38,13 @@ def slow_heartbeats(monkeypatch):
     monkeypatch.setattr(srv, "_DEAD_TIMEOUT_S", 100.0)
 
 
+_RECONNECT_TOKEN = "reconnect-stub-token"
+
+
 def _build_gateway(transport):
     gw = srv.TuiGateway.__new__(srv.TuiGateway)
     gw._transport = transport
+    gw._auth_token = _RECONNECT_TOKEN
     gw._proc = None
     gw._cmd_queue = _queue.Queue()
     gw._reader_thread = None
@@ -98,6 +102,7 @@ def _client_hello_and_drain(sock_path, *, last_seq, n_to_recv=None, timeout=1.5)
                         "client_version": "test",
                         "capabilities": [],
                         "last_seq": last_seq,
+                        "token": _RECONNECT_TOKEN,
                     },
                 }
             )

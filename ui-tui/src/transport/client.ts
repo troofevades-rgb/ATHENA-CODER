@@ -127,6 +127,12 @@ export function connectGateway(): GatewayClient {
   function sendHello(): void {
     if (helloSent) return;
     helloSent = true;
+    // Auth token the gateway minted for this launch and handed us via
+    // the environment. On TCP loopback (Windows default) it's the only
+    // thing stopping another local process from connecting to the
+    // ephemeral port and driving the session; the gateway refuses any
+    // hello whose token doesn't match. Empty string when unset (older
+    // gateway) keeps the handshake backward-compatible.
     writeFrame({
       jsonrpc: "2.0",
       method: "hello",
@@ -135,6 +141,7 @@ export function connectGateway(): GatewayClient {
         client_version: "tui-bundle",
         capabilities: CLIENT_CAPABILITIES,
         last_seq: 0,
+        token: process.env["ATHENA_TUI_TOKEN"] ?? "",
       },
     });
   }

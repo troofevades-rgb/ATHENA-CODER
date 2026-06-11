@@ -810,6 +810,11 @@
           "type": "integer",
           "minimum": 0,
           "default": 0
+        },
+        "token": {
+          "type": "string",
+          "default": "",
+          "description": "Per-launch shared secret the gateway minted and handed to the client via ATHENA_TUI_TOKEN. The gateway validates it during the handshake to authenticate the connecting process (the TCP-loopback transport is otherwise reachable by any local process). Empty when the gateway runs without a token (back-compat)."
         }
       },
       "required": [

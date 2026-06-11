@@ -377,16 +377,12 @@ class DiscordAdapter(GatewayAdapter):
 
     def _approval_authorized_ids(self) -> frozenset[str]:
         """Discord user ids permitted to click Approve/Deny on a tool
-        confirmation. Precedence: explicit ``approval_user_ids`` in the
-        platform config; otherwise the inbound ``allowed_user_ids``. The bot
-        OWNER is always included so the operator can approve with no config.
-        Empty result → no restriction (back-compat, logged at render time)."""
-        cfg = self._platform_config()
-        raw = cfg.get("approval_user_ids")
-        if isinstance(raw, (list, tuple, set, frozenset)):
-            ids = {str(x) for x in raw}
-        else:
-            ids = set(self._allowed_user_ids())
+        confirmation. Extends the shared base resolution (explicit
+        ``approval_user_ids`` else inbound ``allowed_user_ids``) with the
+        bot OWNER, resolved on ready, so the operator can approve with no
+        config. Empty result → no restriction (back-compat, logged at
+        render time)."""
+        ids = set(super()._approval_authorized_ids())
         if self._owner_id:
             ids.add(self._owner_id)
         return frozenset(ids)

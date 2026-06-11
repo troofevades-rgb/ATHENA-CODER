@@ -296,6 +296,13 @@ class TelegramAdapter(GatewayAdapter):
                 request.session_id,
             )
             return
+        if not self._approval_authorized_ids():
+            logger.warning(
+                "[%s] approval prompt is UNLOCKED — no approval_user_ids/allowed_user_ids "
+                "configured, so anyone who can see the chat can approve. Set "
+                "[gateway.platforms.telegram] approval_user_ids to lock it down.",
+                self.name,
+            )
         markup = self._build_approval_keyboard(request.request_id)
         body = self._format_approval_body(request)
         try:
@@ -366,17 +373,41 @@ class TelegramAdapter(GatewayAdapter):
         message edit one path back.
         """
         data = callback.data or ""
+        # Telegram requires exactly one answer() per callback within
+        # 15s. We tailor the ack text (silent for normal acks, an alert
+        # for a refused click) and send it once in the finally.
+        answer_text: str | None = None
         try:
             parts = data.split(_CALLBACK_SEPARATOR, 2)
             if len(parts) == 3 and parts[0] == _CALLBACK_PREFIX:
                 _, request_id, decision = parts
                 if decision in {"allow", "deny"}:
-                    self.daemon.approvals.resolve(
-                        request_id, cast(Literal["allow", "deny"], decision)
+                    # Lockdown: only the operator / configured approvers
+                    # may resolve. In a group chat any member can see and
+                    # click these buttons, so without this check a
+                    # stranger could approve a Bash/Write confirmation.
+                    clicker = getattr(
+                        getattr(callback, "from_user", None), "id", None
                     )
+                    if self._approval_click_allowed(
+                        None if clicker is None else str(clicker)
+                    ):
+                        self.daemon.approvals.resolve(
+                            request_id, cast(Literal["allow", "deny"], decision)
+                        )
+                    else:
+                        logger.info(
+                            "[%s] ignoring approval click from unauthorized user %s",
+                            self.name,
+                            clicker,
+                        )
+                        answer_text = "⛔ Only the operator can approve this action."
         finally:
             try:
-                await callback.answer()
+                if answer_text is not None:
+                    await callback.answer(answer_text, show_alert=True)
+                else:
+                    await callback.answer()
             except Exception:
                 logger.debug(
                     "[%s] callback.answer raised",

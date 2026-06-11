@@ -54,15 +54,22 @@ class _FakeApprovals:
 
 
 class _FakeDaemon:
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, platform_cfg: dict | None = None) -> None:
         self.router = _FakeRouter()
         self.approvals = _FakeApprovals()
         self.profile_dir = tmp_path / "profile"
         self.profile_dir.mkdir(parents=True, exist_ok=True)
+        # Mirror the real Config shape the adapter reads through
+        # _platform_config(): cfg.gateway.platforms["telegram"]. None →
+        # no cfg attribute at all, so _platform_config falls back to {}.
+        if platform_cfg is not None:
+            self.cfg = SimpleNamespace(
+                gateway=SimpleNamespace(platforms={"telegram": platform_cfg})
+            )
 
 
-def _adapter(tmp_path: Path) -> TelegramAdapter:
-    daemon = _FakeDaemon(tmp_path)
+def _adapter(tmp_path: Path, *, platform_cfg: dict | None = None) -> TelegramAdapter:
+    daemon = _FakeDaemon(tmp_path, platform_cfg=platform_cfg)
     return TelegramAdapter(daemon, bot_token="test-token")
 
 
@@ -253,12 +260,19 @@ async def test_on_message_swallows_normalization_exception(
 # ---- callback (approval button click) -------------------------------
 
 
+def _stub_callback(data: str, *, user_id: int = 999, answer=None):
+    """An aiogram CallbackQuery stand-in. ``from_user.id`` is what the
+    approval lockdown checks."""
+    return SimpleNamespace(
+        data=data,
+        from_user=SimpleNamespace(id=user_id),
+        answer=answer if answer is not None else AsyncMock(),
+    )
+
+
 async def test_callback_routes_allow_to_approvals(tmp_path: Path) -> None:
     a = _adapter(tmp_path)
-    cb = SimpleNamespace(
-        data=_CALLBACK_SEPARATOR.join((_CALLBACK_PREFIX, "abc123", "allow")),
-        answer=AsyncMock(),
-    )
+    cb = _stub_callback(_CALLBACK_SEPARATOR.join((_CALLBACK_PREFIX, "abc123", "allow")))
     await a._on_callback(cb)
     assert a.daemon.approvals.resolves == [("abc123", "allow")]
     cb.answer.assert_awaited_once()
@@ -266,17 +280,14 @@ async def test_callback_routes_allow_to_approvals(tmp_path: Path) -> None:
 
 async def test_callback_routes_deny(tmp_path: Path) -> None:
     a = _adapter(tmp_path)
-    cb = SimpleNamespace(
-        data=f"{_CALLBACK_PREFIX}:abc:deny",
-        answer=AsyncMock(),
-    )
+    cb = _stub_callback(f"{_CALLBACK_PREFIX}:abc:deny")
     await a._on_callback(cb)
     assert a.daemon.approvals.resolves == [("abc", "deny")]
 
 
 async def test_callback_ignores_unknown_prefix(tmp_path: Path) -> None:
     a = _adapter(tmp_path)
-    cb = SimpleNamespace(data="other:data", answer=AsyncMock())
+    cb = _stub_callback("other:data")
     await a._on_callback(cb)
     assert a.daemon.approvals.resolves == []
     cb.answer.assert_awaited_once()
@@ -284,18 +295,37 @@ async def test_callback_ignores_unknown_prefix(tmp_path: Path) -> None:
 
 async def test_callback_ignores_unknown_decision(tmp_path: Path) -> None:
     a = _adapter(tmp_path)
-    cb = SimpleNamespace(data=f"{_CALLBACK_PREFIX}:r:nope", answer=AsyncMock())
+    cb = _stub_callback(f"{_CALLBACK_PREFIX}:r:nope")
     await a._on_callback(cb)
     assert a.daemon.approvals.resolves == []
 
 
 async def test_callback_answer_exception_is_swallowed(tmp_path: Path) -> None:
     a = _adapter(tmp_path)
-    cb = SimpleNamespace(
-        data=f"{_CALLBACK_PREFIX}:r:allow",
+    cb = _stub_callback(
+        f"{_CALLBACK_PREFIX}:r:allow",
         answer=AsyncMock(side_effect=RuntimeError("network")),
     )
     # Must not raise — the resolve already happened.
+    await a._on_callback(cb)
+    assert a.daemon.approvals.resolves == [("r", "allow")]
+
+
+async def test_callback_from_unauthorized_user_refused(tmp_path: Path) -> None:
+    """When approval_user_ids is configured, a click from a user NOT in
+    the set is ignored (group-chat lockdown) and surfaces an alert."""
+    a = _adapter(tmp_path, platform_cfg={"approval_user_ids": ["111"]})
+    cb = _stub_callback(f"{_CALLBACK_PREFIX}:r:allow", user_id=222)
+    await a._on_callback(cb)
+    assert a.daemon.approvals.resolves == []
+    # Refusal surfaces as an alert, not a silent ack.
+    cb.answer.assert_awaited_once()
+    assert cb.answer.await_args.kwargs.get("show_alert") is True
+
+
+async def test_callback_from_authorized_user_resolves(tmp_path: Path) -> None:
+    a = _adapter(tmp_path, platform_cfg={"approval_user_ids": ["111"]})
+    cb = _stub_callback(f"{_CALLBACK_PREFIX}:r:allow", user_id=111)
     await a._on_callback(cb)
     assert a.daemon.approvals.resolves == [("r", "allow")]
 

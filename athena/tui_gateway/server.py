@@ -602,6 +602,16 @@ class TuiGateway:
         # free for keyboard input + UI render; the protocol
         # rides on this dedicated channel.
         self._transport: _Transport = _make_transport()
+        # Per-launch shared secret. Handed to the child via
+        # ATHENA_TUI_TOKEN and required back in its hello. This is the
+        # authentication the TCP-loopback transport lacks on its own:
+        # the ephemeral 127.0.0.1 port is reachable by any local
+        # process, so without a token a co-resident process could
+        # connect, receive the ring-buffer replay (conversation
+        # content), and inject user.input/confirm.reply commands. UDS
+        # already restricts access via 0600 file mode, but validating
+        # the token on both transports costs nothing and is uniform.
+        self._auth_token: str = secrets.token_hex(32)
         self._conn: socket.socket | None = None
         self._conn_reader: io.BufferedReader | None = None
         self._accept_timeout_s = accept_timeout_s
@@ -680,6 +690,9 @@ class TuiGateway:
 
         env = os.environ.copy()
         env[env_name] = env_value
+        # Hand the child its auth token out-of-band (environment, not
+        # the socket) so only the process we spawn knows it.
+        env["ATHENA_TUI_TOKEN"] = self._auth_token
         # Always capture Ink's stderr to a file so a silent post-
         # handshake death (Ink crash, raw-mode setup failure, missing
         # Node module, etc.) leaves a forensic trail. Previously stderr
@@ -1007,9 +1020,34 @@ class TuiGateway:
             client_version=str(params.get("client_version", "")),
             capabilities=list(params.get("capabilities", []) or []),
             last_seq=int(params.get("last_seq", 0)),
+            token=str(params.get("token", "")),
         )
 
-        # 3. Validate. Only protocol_version is hard-required to
+        # 3a. Authenticate BEFORE anything else leaks: a peer that
+        # can't present the token gets no replay, no further frames.
+        # Constant-time compare so a co-resident process can't recover
+        # the token byte-by-byte via response timing. The token is
+        # always non-empty (minted in __init__), so an old client that
+        # sends "" is correctly refused — rebuild the bundle.
+        # Compare as bytes: secrets.compare_digest raises TypeError on
+        # str operands containing non-ASCII, and the token comes
+        # straight off the wire from the client — a non-ASCII token
+        # would otherwise crash the handshake thread instead of cleanly
+        # refusing. (token_hex output is ASCII; encoding is harmless.)
+        if not secrets.compare_digest(
+            client_hello.token.encode("utf-8", "surrogatepass"),
+            self._auth_token.encode("utf-8"),
+        ):
+            self._send_protocol_error(
+                "unauthorized",
+                "client did not present a valid auth token",
+            )
+            raise _HandshakeError(
+                "unauthorized: client token mismatch "
+                f"(client_version={client_hello.client_version!r})"
+            )
+
+        # 3b. Validate. Only protocol_version is hard-required to
         # match; capabilities are advisory.
         my_pv = _protocol_version()
         if client_hello.protocol_version != my_pv:

@@ -313,6 +313,36 @@ class GatewayAdapter(ABC):
             return frozenset()
         return frozenset(str(x) for x in raw)
 
+    def _approval_authorized_ids(self) -> frozenset[str]:
+        """Platform user ids permitted to click Approve/Deny on a tool
+        confirmation. Precedence: explicit ``approval_user_ids`` in the
+        platform config; otherwise fall back to the inbound
+        ``allowed_user_ids``. Empty result → no restriction (back-compat
+        with the pre-0.3.0 open posture; the renderer logs a warning so
+        an operator running a group/multi-user bot notices).
+
+        Adapters with a resolvable bot owner (Discord) override this to
+        add the owner id so the operator can approve with zero config.
+        Telegram and Slack have no cheap owner lookup, so an operator on
+        those platforms MUST set ``approval_user_ids`` or
+        ``allowed_user_ids`` to lock approvals down.
+        """
+        cfg = self._platform_config()
+        raw = cfg.get("approval_user_ids")
+        if isinstance(raw, (list, tuple, set, frozenset)):
+            return frozenset(str(x) for x in raw)
+        return self._allowed_user_ids()
+
+    def _approval_click_allowed(self, clicker_id: str | None) -> bool:
+        """True when a button click from ``clicker_id`` may resolve an
+        approval. Open (back-compat) only when no authorized set is
+        configured; otherwise the clicker must be in it. ``None`` /
+        empty clicker id is refused whenever a set is configured."""
+        authorized = self._approval_authorized_ids()
+        if not authorized:
+            return True
+        return bool(clicker_id) and str(clicker_id) in authorized
+
     def _is_authorized(self, event: MessageEvent) -> bool:
         """Refuse-by-allowlist check applied at the top of
         :meth:`handle_inbound`. Empty allowlists -> always authorized

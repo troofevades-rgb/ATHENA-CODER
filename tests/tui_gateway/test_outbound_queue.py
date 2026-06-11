@@ -131,9 +131,13 @@ def slow_heartbeats(monkeypatch):
     monkeypatch.setattr(srv, "_DEAD_TIMEOUT_S", 100.0)
 
 
+_OUTBOUND_TOKEN = "outbound-stub-token"
+
+
 def _build_stub_gateway(transport, outbound=None):
     gw = srv.TuiGateway.__new__(srv.TuiGateway)
     gw._transport = transport
+    gw._auth_token = _OUTBOUND_TOKEN
     gw._proc = None
     gw._cmd_queue = _queue.Queue()
     gw._reader_thread = None
@@ -183,6 +187,7 @@ def _fake_ink_drain(sock_path, sentinel, state, done_evt):
                             "client_version": "stress",
                             "capabilities": [],
                             "last_seq": 0,
+                            "token": _OUTBOUND_TOKEN,
                         },
                     }
                 )
