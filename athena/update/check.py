@@ -172,6 +172,15 @@ def latest_git_tag(
     leading ``v`` is stripped from the returned version so
     comparison with ``athena.__version__`` works.
     """
+    # Default to athena's OWN repo, not the process CWD. Reading
+    # ``origin`` from whatever directory the user ran the command in
+    # would surface their project's tags as "the latest athena".
+    if repo_root is None:
+        from .detect import _find_git_root, _package_root
+
+        found = _find_git_root(_package_root())
+        if found is not None:
+            repo_root = str(found)
     try:
         proc = subprocess.run(
             ["git", "ls-remote", "--tags", "origin"],

@@ -249,6 +249,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print(f"error: SFT dataset not found: {sft_dataset}", file=sys.stderr)
         return 2
 
+    # Preflight: locate the training scripts before doing any work, so a
+    # pip/pipx install (which doesn't ship transform/scripts/) fails with
+    # an actionable message up front rather than mid-pipeline.
+    from ..transform.runner import TransformScriptsNotFound, _default_transform_dir
+
+    try:
+        _default_transform_dir()
+    except TransformScriptsNotFound as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+
     dpo_dataset = Path(args.dpo_dataset).expanduser().resolve() if args.dpo_dataset else None
     if dpo_dataset and not dpo_dataset.exists():
         print(f"warning: DPO dataset not found: {dpo_dataset}; skipping DPO", file=sys.stderr)

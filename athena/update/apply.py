@@ -166,9 +166,14 @@ def _run(
     argv: list[str],
     *,
     timeout: float = 300.0,
+    cwd: str | None = None,
 ) -> tuple[int, str, str]:
     """Capture stdout + stderr + returncode. Returns the
     triple even on failure; never raises into the caller.
+
+    ``cwd`` runs the command in that directory — used so the git
+    install path operates on athena's own repo, not whatever
+    directory the user invoked ``athena update`` from.
 
     Timeout default 300s (pip + git over slow network)."""
     try:
@@ -179,6 +184,7 @@ def _run(
             timeout=timeout,
             shell=False,
             check=False,
+            cwd=cwd,
         )
     except FileNotFoundError as e:
         return 127, "", f"executable not found: {e}"
@@ -372,8 +378,30 @@ def _install_via_git(
             message="git not on PATH",
         )
 
+    # Resolve the repo to operate on. The caller rarely passes one,
+    # and falling back to the process CWD was a real footgun: if the
+    # user ran ``athena update`` from inside their OWN project (a git
+    # repo), every git command below — and the ``pip install .`` — ran
+    # against THAT repo, checking out a tag of their project and
+    # installing it into athena's environment. Default to athena's own
+    # package git root instead.
+    if repo_root is None:
+        from .detect import _find_git_root, _package_root
+
+        found = _find_git_root(_package_root())
+        if found is None:
+            return ApplyResult(
+                status="error",
+                method="git",
+                message=(
+                    "could not locate athena's git repository; "
+                    "update via your source checkout instead"
+                ),
+            )
+        repo_root = str(found)
+
     # Fetch.
-    code, out, err = _run(["git", "-C", repo_root or ".", "fetch", "--tags"])
+    code, out, err = _run(["git", "-C", repo_root, "fetch", "--tags"])
     if code != 0:
         return ApplyResult(
             status="error",
@@ -387,7 +415,7 @@ def _install_via_git(
     if version:
         # Try v-prefix tag, fall back to bare version.
         for ref in (f"v{version}", version):
-            code, out, err = _run(["git", "-C", repo_root or ".", "checkout", ref])
+            code, out, err = _run(["git", "-C", repo_root, "checkout", ref])
             if code == 0:
                 break
         else:
@@ -400,7 +428,7 @@ def _install_via_git(
             )
     else:
         # Default branch HEAD.
-        code, out, err = _run(["git", "-C", repo_root or ".", "merge", "--ff-only", "@{u}"])
+        code, out, err = _run(["git", "-C", repo_root, "merge", "--ff-only", "@{u}"])
         if code != 0:
             return ApplyResult(
                 status="error",
@@ -412,8 +440,9 @@ def _install_via_git(
 
     # Reinstall — `pip install .` covers both editable + non-
     # editable. (EDITABLE was filtered out earlier so this
-    # branch is only the non-editable git case.)
-    code, out, err = _run([sys.executable, "-m", "pip", "install", "."])
+    # branch is only the non-editable git case.) Run IN the repo so
+    # pip builds athena, not whatever project the CWD happens to be.
+    code, out, err = _run([sys.executable, "-m", "pip", "install", "."], cwd=repo_root)
     if code != 0:
         return ApplyResult(
             status="error",

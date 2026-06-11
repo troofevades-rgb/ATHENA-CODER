@@ -34,10 +34,55 @@ logger = logging.getLogger(__name__)
 SubprocessRunner = Callable[..., int]
 
 
+class TransformScriptsNotFound(FileNotFoundError):
+    """Raised when the training scripts can't be located — almost
+    always because athena was pip/pipx-installed rather than run from
+    a source checkout. Carries an actionable message."""
+
+
 def _default_transform_dir() -> Path:
-    """Return the bundled ``transform/`` directory inside the repo."""
+    """Locate the ``transform/`` directory that holds the training
+    scripts.
+
+    Resolution order:
+
+      1. ``ATHENA_TRANSFORM_DIR`` env override — lets a packaged
+         install point at a cloned checkout's ``transform/``.
+      2. The repo-root sibling in a source checkout
+         (``athena/transform/runner.py`` → ``repo_root/transform``).
+
+    The GPU training scripts are intentionally NOT packaged into the
+    wheel (``pyproject`` ships only ``athena*``), so a pip/pipx install
+    resolves (2) to ``<site-packages>/transform``, which doesn't exist.
+    Rather than letting the subprocess fail on a missing script path,
+    raise :class:`TransformScriptsNotFound` with a clear fix.
+    """
+    import os
+
+    override = os.environ.get("ATHENA_TRANSFORM_DIR")
+    if override:
+        # Validate the override the same way as the checkout candidate,
+        # so the preflight's "fail up front" promise holds: a typo'd or
+        # script-less ATHENA_TRANSFORM_DIR must error here, not deep in
+        # the subprocess on a missing script path.
+        override_path = Path(override)
+        if (override_path / "scripts").is_dir():
+            return override_path
+        raise TransformScriptsNotFound(
+            f"ATHENA_TRANSFORM_DIR={override!r} has no scripts/ subdirectory; "
+            "point it at a checkout's transform/ directory."
+        )
     # athena/transform/runner.py → athena/transform → athena → repo root → transform
-    return Path(__file__).resolve().parents[2] / "transform"
+    candidate = Path(__file__).resolve().parents[2] / "transform"
+    if (candidate / "scripts").is_dir():
+        return candidate
+    raise TransformScriptsNotFound(
+        "athena's training scripts (transform/scripts/) were not found. "
+        "The closed training loop needs a SOURCE CHECKOUT — a pip/pipx "
+        "install does not ship the GPU training scripts. Clone the repo and "
+        "run `athena train` from there, or set ATHENA_TRANSFORM_DIR to a "
+        "checkout's transform/ directory."
+    )
 
 
 @dataclass

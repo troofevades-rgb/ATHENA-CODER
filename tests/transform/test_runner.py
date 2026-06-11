@@ -9,8 +9,11 @@ from pathlib import Path
 
 import pytest
 
+from athena.transform import runner as runner_mod
 from athena.transform.runner import (
     TrainingRun,
+    TransformScriptsNotFound,
+    _default_transform_dir,
     export_to_gguf,
     find_lora_adapter,
     run_dpo,
@@ -162,6 +165,61 @@ def test_export_to_gguf_optional_base_model(tmp_path: Path):
     cmd = captured["cmd"]
     base_idx = cmd.index("--base")
     assert cmd[base_idx + 1] == "Qwen/Qwen2.5-Coder-1.5B"
+
+
+# ---------------------------------------------------------------------------
+# transform-dir resolution (wheel-install regression)
+# ---------------------------------------------------------------------------
+
+
+def test_default_transform_dir_found_in_source_checkout():
+    """In a source checkout, the resolver finds repo_root/transform."""
+    d = _default_transform_dir()
+    assert (d / "scripts").is_dir()
+
+
+def test_default_transform_dir_env_override(tmp_path: Path, monkeypatch):
+    override = tmp_path / "my-transform"
+    (override / "scripts").mkdir(parents=True)
+    monkeypatch.setenv("ATHENA_TRANSFORM_DIR", str(override))
+    assert _default_transform_dir() == override
+
+
+def test_default_transform_dir_bad_override_raises(tmp_path: Path, monkeypatch):
+    """A pointed-but-script-less override must fail the preflight up
+    front, not hand back a path the subprocess then chokes on."""
+    override = tmp_path / "empty-transform"
+    override.mkdir()  # no scripts/ subdir
+    monkeypatch.setenv("ATHENA_TRANSFORM_DIR", str(override))
+    with pytest.raises(TransformScriptsNotFound, match="no scripts/"):
+        _default_transform_dir()
+
+
+def test_default_transform_dir_raises_on_wheel_layout(tmp_path: Path, monkeypatch):
+    """Regression: a pip/pipx install doesn't ship transform/scripts/,
+    so the resolver used to hand back a non-existent path and the
+    subprocess failed cryptically. Now it raises an actionable error."""
+    monkeypatch.delenv("ATHENA_TRANSFORM_DIR", raising=False)
+    # Point the resolver's __file__ base at a fake site-packages layout
+    # with no sibling transform/scripts/.
+    fake_pkg = tmp_path / "site-packages" / "athena" / "transform"
+    fake_pkg.mkdir(parents=True)
+    monkeypatch.setattr(runner_mod, "__file__", str(fake_pkg / "runner.py"))
+    with pytest.raises(TransformScriptsNotFound, match="SOURCE CHECKOUT"):
+        _default_transform_dir()
+
+
+def test_run_lora_surfaces_missing_scripts(trun: TrainingRun, monkeypatch):
+    """run_lora propagates the actionable error when scripts are absent
+    and no transform_dir override is given."""
+    monkeypatch.delenv("ATHENA_TRANSFORM_DIR", raising=False)
+
+    def _raise() -> Path:
+        raise TransformScriptsNotFound("no scripts")
+
+    monkeypatch.setattr(runner_mod, "_default_transform_dir", _raise)
+    with pytest.raises(TransformScriptsNotFound):
+        run_lora(trun, runner=lambda *a, **k: 0)
 
 
 # ---- find_lora_adapter -------------------------------------------------

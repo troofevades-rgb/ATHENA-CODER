@@ -53,10 +53,12 @@ class _RunRecorder:
 
     def __init__(self, responses: list[tuple[int, str, str]] | None = None):
         self.calls: list[list[str]] = []
+        self.cwds: list[str | None] = []
         self.responses = list(responses or [])
 
-    def __call__(self, argv: list[str], *, timeout: float = 300.0):
+    def __call__(self, argv: list[str], *, timeout: float = 300.0, cwd: str | None = None):
         self.calls.append(list(argv))
+        self.cwds.append(cwd)
         if self.responses:
             return self.responses.pop(0)
         return 0, "ok", ""
@@ -159,9 +161,53 @@ def test_install_via_git_with_version(monkeypatch, tmp_path: Path):
     assert recorder.calls[0][:3] == ["git", "-C", str(tmp_path)]
     assert recorder.calls[0][3:] == ["fetch", "--tags"]
     assert recorder.calls[1][3:] == ["checkout", "v0.3.0"]
-    # pip install . runs at the end.
+    # pip install . runs at the end, IN the repo (not the CWD).
     assert recorder.calls[2][0] == sys.executable
     assert recorder.calls[2][3:] == ["install", "."]
+    assert recorder.cwds[2] == str(tmp_path)
+
+
+def test_install_via_git_defaults_to_athena_repo_not_cwd(monkeypatch, tmp_path: Path):
+    """Regression: with no repo_root passed, the git path must operate
+    on athena's OWN repo (resolved from the package path), never the
+    process CWD. Running ``athena update`` from inside the user's own
+    git project previously checked out a tag of THEIR repo and pip-
+    installed it into athena's environment."""
+    athena_repo = tmp_path / "athena-checkout"
+    athena_repo.mkdir()
+    # _install_via_git imports _find_git_root from .detect at call time;
+    # patch the real submodule (the package re-exports a `detect`
+    # function, so import the module explicitly).
+    import importlib
+
+    detect_mod = importlib.import_module("athena.update.detect")
+    monkeypatch.setattr(detect_mod, "_find_git_root", lambda _start: athena_repo)
+    recorder = _RunRecorder([(0, "", ""), (0, "", ""), (0, "", "")])
+    monkeypatch.setattr(apply_module, "_run", recorder)
+    _which_yes(monkeypatch)
+
+    result = install(InstallMethod.GIT, version="0.3.0")  # no repo_root
+    assert result.status == "done"
+    # Every git command targets athena's repo, and pip installs there.
+    assert recorder.calls[0][:3] == ["git", "-C", str(athena_repo)]
+    assert recorder.cwds[-1] == str(athena_repo)
+
+
+def test_install_via_git_no_athena_repo_found(monkeypatch, tmp_path: Path):
+    """If athena's git root can't be located and no repo_root was
+    passed, refuse cleanly rather than falling back to the CWD."""
+    import importlib
+
+    detect_mod = importlib.import_module("athena.update.detect")
+    monkeypatch.setattr(detect_mod, "_find_git_root", lambda _start: None)
+    recorder = _RunRecorder()
+    monkeypatch.setattr(apply_module, "_run", recorder)
+    _which_yes(monkeypatch)
+
+    result = install(InstallMethod.GIT, version="0.3.0")  # no repo_root
+    assert result.status == "error"
+    assert "git repository" in result.message
+    assert recorder.calls == []
 
 
 def test_install_via_git_falls_back_to_bare_version(monkeypatch, tmp_path: Path):
