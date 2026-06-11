@@ -1442,7 +1442,7 @@ class AgentRuntime:
 
         clean = strip_cache_markers([message])[0]
         try:
-            self.session_store.append_turn(self.session_id, clean)
+            turn_index = self.session_store.append_turn(self.session_id, clean)
         except Exception as e:  # pragma: no cover — defensive
             ui.info(f"session append failed (continuing): {e}")
             return
@@ -1455,10 +1455,14 @@ class AgentRuntime:
         try:
             from ..recall import record_turn
 
-            # turn_index = current length minus the just-appended
-            # message (so this turn's persisted offset matches the
-            # JSONL line count after append).
-            turn_index = max(0, len(self.messages) - 1)
+            # Key the vector entry on the TRUE JSONL line index that
+            # append_turn just returned — the same value the FTS5 mirror
+            # indexes under. Computing it from len(self.messages) instead
+            # drifted off-by-one (the system prompt isn't persisted) and
+            # diverged further after /compact and ephemeral recall notes,
+            # so RRF could never merge a keyword hit with the vector
+            # entry for the same turn, and hydration resolved the wrong
+            # line.
             record_turn(
                 session_id=self.session_id,
                 turn_index=turn_index,

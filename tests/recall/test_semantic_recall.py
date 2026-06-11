@@ -59,8 +59,12 @@ class _StubSessionStore:
         # property tested below).
         return self._fts5_hits.get(query, [])[:k]
 
-    def load(self, session_id: str) -> list[dict]:
-        return self._sessions.get(session_id, [])
+    def load(self, session_id: str):
+        # The real SessionStore.load() is a GENERATOR, not a list. The
+        # hydration path must materialize it; returning a list here
+        # previously masked a "generator has no len()" crash in hybrid
+        # mode. Mirror the real contract so that stays caught.
+        yield from self._sessions.get(session_id, [])
 
 
 @pytest.fixture
@@ -73,7 +77,7 @@ def vector_store(tmp_path) -> VectorStore:
             "lunch options": [0.0, 0.0, 1.0],
             # Query close to the retry doc by meaning, but with
             # zero word overlap.
-            "when did we set up automatic re-attempts": [0.95, 0.05, 0.0],
+            "automatic reattempts question": [0.95, 0.05, 0.0],
             # Query that overlaps keywords with both relevant docs.
             "retry": [0.8, 0.1, 0.0],
         }
@@ -127,7 +131,7 @@ def test_semantic_finds_paraphrase_keyword_misses(vector_store, session_store, m
         # misses; semantic should find it via the embedding.
         hits = _ranked_hits(
             store=session_store,
-            query="when did we set up automatic re-attempts",
+            query="automatic reattempts question",
             k=3,
             workspace="/proj",
             mode="semantic",
@@ -181,6 +185,69 @@ def test_hybrid_combines_keyword_and_semantic(vector_store, session_store):
     session_ids = [h.session_id for h in hits]
     assert "sess-retry" in session_ids
     assert "sess-deploy" in session_ids
+
+
+# ---------------------------------------------------------------------------
+# Real SessionStore: crash + turn_index alignment regression
+# ---------------------------------------------------------------------------
+
+
+def test_hybrid_hydrates_real_store_generator(tmp_path, monkeypatch):
+    """Regression: against the REAL SessionStore (whose .load() is a
+    generator), a vector-only hit in hybrid mode used to raise
+    "object of type generator has no len()" and surface as
+    "session search failed". Now it hydrates cleanly."""
+    from athena.sessions.store import SessionMeta, SessionStore
+
+    store = SessionStore(profile_dir=tmp_path / "profile")
+    store.open_session(
+        SessionMeta(
+            session_id="sess-real",
+            profile="default",
+            model="m",
+            provider="p",
+            workspace="/proj",
+        )
+    )
+    idx0 = store.append_turn("sess-real", {"role": "user", "content": "hello there"})
+    idx1 = store.append_turn(
+        "sess-real",
+        {"role": "assistant", "content": "we discussed adding retry logic to the API client"},
+    )
+    assert (idx0, idx1) == (0, 1)  # append_turn returns true JSONL index
+
+    emb = _StubEmbedder(
+        {
+            "we discussed adding retry logic to the API client": [1.0, 0.0, 0.0],
+            "automatic reattempts question": [0.97, 0.03, 0.0],
+        }
+    )
+    vs = VectorStore(path=tmp_path / "v.json", embedder=emb)
+    # Key the vector entry on the TRUE JSONL index — the same value
+    # the FTS5 mirror stores — so hydration resolves the right turn.
+    vs.add(
+        f"sess-real#{idx1}",
+        "we discussed adding retry logic to the API client",
+        workspace="/proj",
+    )
+
+    set_active_vector_store(vs)
+    try:
+        hits = _ranked_hits(
+            store=store,
+            query="automatic reattempts question",
+            k=3,
+            workspace="/proj",
+            mode="hybrid",  # the default mode — the one that was broken
+        )
+    finally:
+        set_active_vector_store(None)
+
+    assert hits, "hybrid recall should surface the retry turn from the real store"
+    top = hits[0]
+    assert top.session_id == "sess-real"
+    assert top.turn_index == idx1
+    assert "retry logic" in (top.snippet or "")
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +308,7 @@ def test_output_shape_matches_search_sessions(vector_store, session_store):
     try:
         hits = _ranked_hits(
             store=session_store,
-            query="when did we set up automatic re-attempts",
+            query="automatic reattempts question",
             k=3,
             workspace="/proj",
             mode="semantic",

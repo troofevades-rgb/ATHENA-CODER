@@ -221,7 +221,12 @@ def _hydrate_session_hit(store: Any, doc_id: str) -> Any | None:
         return None
     session_id, turn_index = parsed
     try:
-        messages = store.load(session_id)
+        # store.load() is a generator (yields JSONL lines); materialize
+        # it so we can index + len(). Without the list() this raised
+        # "object of type generator has no len()", which surfaced as
+        # "session search failed" for the default hybrid mode whenever a
+        # vector-only hit reached hydration.
+        messages = list(store.load(session_id))
     except Exception:  # noqa: BLE001
         return None
     if turn_index < 0 or turn_index >= len(messages):
