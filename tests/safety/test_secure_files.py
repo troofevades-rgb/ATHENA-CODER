@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from athena.safety.secure_files import (
+    atomic_write_text,
     ensure_secure_dir,
     secure_read_json,
     secure_read_text,
@@ -53,6 +54,22 @@ def test_secure_write_replaces_existing_atomically(tmp_path: Path) -> None:
     secure_write_text(target, "v2")
     assert target.read_text() == "v2"
     assert _mode(target) == 0o600
+
+
+def test_atomic_write_text_overwrites_and_leaves_no_tmp(tmp_path: Path) -> None:
+    target = tmp_path / "config.toml"
+    atomic_write_text(target, "v1")
+    atomic_write_text(target, "v2")
+    assert target.read_text() == "v2"
+    # No leftover tmp siblings from the replace.
+    leftovers = [p for p in tmp_path.iterdir() if ".tmp." in p.name]
+    assert leftovers == []
+
+
+def test_atomic_write_text_creates_parent_dirs(tmp_path: Path) -> None:
+    target = tmp_path / "nested" / "deep" / "config.toml"
+    atomic_write_text(target, "x = 1")
+    assert target.read_text() == "x = 1"
 
 
 def test_secure_write_leaves_no_tmp_files(tmp_path: Path) -> None:

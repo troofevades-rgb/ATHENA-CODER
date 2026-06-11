@@ -296,7 +296,11 @@ class CrossSessionCache:
 
     def _save(self) -> None:
         payload = {k: e.to_dict() for k, e in self._index.items()}
-        self.index_path.write_text(
+        # Atomic: a crash mid-write must not corrupt the index (a
+        # truncated JSON would make _load discard the whole cache).
+        from ..safety.secure_files import atomic_write_text
+
+        atomic_write_text(
+            self.index_path,
             json.dumps(payload, indent=2, sort_keys=True),
-            encoding="utf-8",
         )

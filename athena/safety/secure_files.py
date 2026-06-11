@@ -143,6 +143,27 @@ def secure_write_json(path: Path | str, obj: Any, *, mode: int = 0o600) -> None:
     secure_write_text(path, text, mode=mode)
 
 
+def atomic_write_text(path: Path | str, text: str, *, encoding: str = "utf-8") -> None:
+    """Atomically write ``text`` to ``path`` via a sibling tmp file +
+    ``os.replace`` (Windows-retry aware). A crash mid-write leaves the
+    old file intact rather than a truncated one.
+
+    Unlike :func:`secure_write_text` this does NOT force 0o600 — use it
+    for NON-secret files (config.toml, caches) where a torn write must
+    be prevented but owner-only permissions aren't wanted.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.parent / f"{path.name}.tmp.{os.getpid()}.{secrets.token_hex(4)}"
+    try:
+        tmp_path.write_text(text, encoding=encoding)
+        _atomic_replace(tmp_path, path)
+    except Exception:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_path)
+        raise
+
+
 def secure_read_text(path: Path | str) -> str:
     path = Path(path)
     if path.exists():

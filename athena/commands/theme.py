@@ -103,15 +103,13 @@ def _save(agent: Any) -> None:
     """
     from pathlib import Path
 
+    from ..safety.secure_files import atomic_write_text
+
     cfg_path = Path.home() / ".athena" / "config.toml"
     active = ui.theme()
     if not cfg_path.exists():
         # Create with a minimal header line.
-        cfg_path.parent.mkdir(parents=True, exist_ok=True)
-        cfg_path.write_text(
-            f'theme = "{active.name}"\n',
-            encoding="utf-8",
-        )
+        atomic_write_text(cfg_path, f'theme = "{active.name}"\n')
         ui.info(f"wrote new config at {cfg_path} with theme = {active.name!r}")
         return
 
@@ -135,7 +133,7 @@ def _save(agent: Any) -> None:
         insert_at = first_section if first_section is not None else len(out)
         out.insert(insert_at, f'theme = "{active.name}"')
 
-    cfg_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    atomic_write_text(cfg_path, "\n".join(out) + "\n")
     ui.info(f"saved theme = {active.name!r} to {cfg_path}")
 
 
