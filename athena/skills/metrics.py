@@ -196,12 +196,9 @@ class SkillMetricsStore:
                     v = rec.get(label)
                     if isinstance(v, int) and v > 0:
                         metric.outcomes[label] = metric.outcomes.get(label, 0) + v
-                if isinstance(ts, str) and (
-                    metric.last_used_at is None or ts > metric.last_used_at
-                ):
-                    # Outcome events also update last_used (the agent
-                    # invoked the skill at this moment).
-                    pass  # don't overwrite; views are the canonical signal
+                # NB: outcome events intentionally do NOT touch
+                # last_used_at — view events are the canonical "the agent
+                # invoked the skill" signal.
         for name, sids in sessions_by_name.items():
             out[name].sessions_used_in = len(sids)
         return out
