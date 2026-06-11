@@ -35,7 +35,7 @@ slow / flaky one doesn't gate the others.
 | Workflow | What it gates | Notes |
 |---|---|---|
 | `tests.yml` | Test suite on Linux, Python 3.10 + 3.11 | 3.12 / 3.13 disabled pending pytest-asyncio fixture cleanup (tracked in `tests.yml` comment block). |
-| `lint.yml` | `ruff check`, `ruff format --check`, `mypy`, version-sync | `ruff` runs on Ubuntu + Windows + macOS (the platform matrix catches Windows-specific path / encoding regressions). `mypy` is advisory (`continue-on-error: true`) -- ~283 known violations in `strict = true` mode tracked in T1-04. `version-sync` enforces `pyproject.toml` ↔ `athena.__version__` parity. |
+| `lint.yml` | `ruff check`, `ruff format --check`, `mypy`, version-sync | `ruff` runs on Ubuntu + Windows + macOS (the platform matrix catches Windows-specific path / encoding regressions). `mypy` is **required** -- `strict = true` is clean across the package and gates merge. `version-sync` enforces `pyproject.toml` ↔ `athena.__version__` parity. |
 | `coverage.yml` | `--cov-fail-under=65` | Coverage threshold; global athena ~75%, agent/ subtree ~62%. |
 | `osv-scanner.yml` | OSV vulnerability scan against dependencies | Currently pinned to `google/osv-scanner-action@v2.3.8`. |
 | `supply-chain.yml` | Lockfile drift, dependency integrity | |
@@ -57,11 +57,13 @@ separate PR that updates this file alongside the workflow change.
    Most failures stem from a missing dev extra (`pip install -e
    ".[dev,gateway,observability,vision]"` covers everything the
    suite imports at collection time).
-3. **mypy is advisory** -- failures don't gate merge. Fix them
-   incrementally as you touch the affected file.
-4. **coverage drop** -- the 65 threshold has buffer; a real drop means
-   you added uncovered branches. Add a focused test rather than
-   bumping the threshold down.
+3. **mypy is required** -- `strict = true` is clean across the package
+   and gates merge. Fix new errors before pushing; for a genuinely hard
+   case add a scoped per-module override in `pyproject.toml` (with a
+   comment) rather than disabling the gate.
+4. **coverage drop** -- the 78 threshold sits just under measured (~80%);
+   a real drop means you added uncovered branches. Add a focused test
+   rather than bumping the threshold down.
 5. **OSV / supply-chain failure** -- dependency CVE or lockfile drift.
    Update the offending dep + re-run locally before pushing.
 

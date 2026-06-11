@@ -33,11 +33,12 @@ jobs:
           pip install -e ".[dev,gateway,observability,vision]"
       - name: Run coverage
         run: |
-          # T1-04: bumped from 60 to 65 once tests/agent/ landed.
-          # Global athena coverage measured at ~75% post-T1-04; agent/
-          # subtree at 62%. 65 keeps a comfortable buffer for both.
+          # Gate sits just under measured coverage so a real regression
+          # fails CI, not 15 points below it. Measured at ~80% (35,320
+          # statements); 78 leaves a small buffer for flaky-line drift.
+          # Raise alongside coverage; never let the gap reopen.
           pytest --cov=athena --cov-report=term-missing --cov-report=xml \
-                 --cov-fail-under=65
+                 --cov-fail-under=78
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v7

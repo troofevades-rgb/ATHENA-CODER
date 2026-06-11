@@ -95,18 +95,17 @@ def test_ruff_lint_runs_on_cross_platform_matrix() -> None:
     assert "macos-latest" in os_list
 
 
-def test_mypy_advisory_status_documented() -> None:
-    """mypy runs with ``continue-on-error: true`` (advisory only;
-    doesn't gate merge) per the T1-04 plan. The CONTRIBUTING.md
-    table says so explicitly. If a future PR flips mypy to
-    required, update both the workflow AND the doc together --
-    this test catches the silent flip."""
+def test_mypy_is_required_not_advisory() -> None:
+    """mypy --strict is clean across the package, so the job is
+    REQUIRED — ``continue-on-error`` must NOT be set, otherwise
+    strictness erodes silently. If a future PR needs to relax a hard
+    case, it should add a scoped per-module override in pyproject, not
+    reopen continue-on-error for the whole job. This test catches the
+    silent flip back to advisory."""
     data = _load_workflow("lint.yml")
     mypy_job = data["jobs"]["mypy"]
-    # Either ``continue-on-error: true`` is set (advisory mode)
-    # OR the doc has been updated to remove the "advisory" note.
-    # We check the former here; doc verification is human-only.
-    assert mypy_job.get("continue-on-error") is True, (
-        "mypy job is no longer advisory. Update CONTRIBUTING.md's "
-        "CI table to drop the 'advisory' note in the same commit."
+    assert mypy_job.get("continue-on-error") in (None, False), (
+        "mypy job was flipped back to advisory (continue-on-error). "
+        "mypy --strict is clean; keep it gating. Use a documented "
+        "per-module override in pyproject for any genuinely hard case."
     )

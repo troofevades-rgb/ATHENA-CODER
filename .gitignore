@@ -17,6 +17,19 @@ dist/
 .coverage.*
 coverage.xml
 htmlcov/
+htmlcov_phase1/
+coverage*.json
+
+# Vendored JS toolchain — only _tui_bundle/main.js ships in the wheel;
+# node_modules is build-time only and must never be committed.
+athena/_tui_bundle/node_modules/
+ui-tui/node_modules/
+ui-tui/dist/
+
+# Scratch / VM-build workspaces that have leaked into the repo root.
+iso_work/
+hyperv_iso_workspace/
+athena-stderr.log
 
 # Editor / OS
 .vscode/

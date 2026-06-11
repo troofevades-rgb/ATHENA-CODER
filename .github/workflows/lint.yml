@@ -36,11 +36,11 @@ jobs:
 
   mypy:
     runs-on: ubuntu-latest
-    # T1-01 lands mypy as advisory (visible in PR checks, doesn't gate
-    # merge). athena currently has ~283 violations of `strict = true`
-    # spread across ~81 modules; T1-04 ratchets this back to required
-    # after a focused cleanup pass.
-    continue-on-error: true
+    # mypy --strict is clean across the athena package, so this job is
+    # REQUIRED — nothing gates strictness otherwise and it would erode
+    # silently. If a legitimately hard case appears, narrow it with a
+    # per-module override in pyproject (documented), not by reopening
+    # continue-on-error for the whole job.
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
