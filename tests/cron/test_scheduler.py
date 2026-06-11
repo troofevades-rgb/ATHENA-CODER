@@ -33,20 +33,31 @@ def test_start_is_idempotent(scheduler: CronScheduler):
     assert scheduler._started is True
 
 
-def test_paused_start_registers_without_firing_due_job(tmp_path: Path):
+def test_paused_start_does_not_fire_a_due_job(tmp_path: Path, monkeypatch):
     """Regression: short-lived CLI commands open a scheduler just to
     read next_run_time. An unpaused start fires any job inside the 600s
     misfire grace window (e.g. an agent-mode job → a full LLM turn)
     right there in the CLI process. A paused start must register the
-    trigger (so next_run_time works) but never execute it."""
+    trigger (so next_run_time works) but never execute a DUE job.
+
+    This test has teeth: it forces the job's next_run_time into the past
+    (a genuine misfire) and proves (a) paused doesn't run it, then (b)
+    resuming DOES — so the paused assertion isn't vacuous."""
     import time
+    from datetime import datetime, timedelta, timezone
+
+    jobs_db = tmp_path / "j.db"
+    # The watchdog runner (the APScheduler target) re-resolves its store
+    # via _profile_cron_paths(); point it at this test's isolated DB so
+    # the resumed run actually finds the job and writes the marker.
+    monkeypatch.setattr(
+        "athena.cli.cron._profile_cron_paths",
+        lambda: (tmp_path / "s.db", jobs_db),
+    )
 
     marker = tmp_path / "fired.txt"
-    # A watchdog job whose script writes a marker, scheduled every
-    # minute so its next fire time is within the misfire grace window.
-    s = CronScheduler(
-        db_path=tmp_path / "s.db", jobs_db_path=tmp_path / "j.db"
-    )
+    s = CronScheduler(db_path=tmp_path / "s.db", jobs_db_path=jobs_db)
+    # A watchdog job whose script writes the marker when it runs.
     job = CronJob(
         cron_expr="* * * * *",
         mode="watchdog",
@@ -55,11 +66,23 @@ def test_paused_start_registers_without_firing_due_job(tmp_path: Path):
     try:
         s.start(paused=True)
         s.add_job(job)
-        # Give a real (unpaused) scheduler plenty of time to misfire;
-        # paused, nothing should run.
-        time.sleep(1.5)
         assert s.next_run_time(job.id) is not None  # trigger registered
-        assert not marker.exists(), "paused scheduler executed a job"
+        # Force a genuine misfire: next_run_time 1s in the past, well
+        # within the 600s grace window. An unpaused scheduler would run
+        # this on its next wakeup.
+        past = datetime.now(timezone.utc) - timedelta(seconds=1)
+        s._sched.modify_job(job.id, next_run_time=past)
+
+        # Paused: the due job must NOT fire.
+        time.sleep(1.0)
+        assert not marker.exists(), "paused scheduler executed a due job"
+
+        # Teeth: prove the job was genuinely due — resuming fires it.
+        s._sched.resume()
+        deadline = time.monotonic() + 5.0
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        assert marker.exists(), "resumed scheduler should run the due job"
     finally:
         s.stop()
 

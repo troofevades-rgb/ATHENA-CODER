@@ -198,7 +198,13 @@ def _deliver_gateway(
 # whichever the result actually carries (legacy ``output``/``error``
 # kept first for any external producer).
 _OUTPUT_KEYS = ("output", "response", "stdout")
-_ERROR_KEYS = ("error", "reason", "stderr")
+# ``error`` / ``reason`` are only ever set on a FAILURE path (by the
+# runners or an external producer), so they're always rendered. ``stderr``
+# is different: a watchdog run populates it even on success (git/pip/npm
+# write warnings there while exiting 0), so it's only surfaced as an
+# error when the run actually failed — otherwise the "error:" block would
+# contradict a "success" status.
+_FAILURE_KEYS = ("error", "reason")
 
 
 def _first_present(result: dict[str, Any], keys: tuple[str, ...]) -> str:
@@ -209,13 +215,26 @@ def _first_present(result: dict[str, Any], keys: tuple[str, ...]) -> str:
     return ""
 
 
+def _run_failed(result: dict[str, Any]) -> bool:
+    """True when the run actually failed. ``status`` is the primary
+    signal; a non-zero ``exit_code`` (watchdog) is a backstop."""
+    status = str(result.get("status") or "").lower()
+    if status in ("error", "failed", "failure", "timeout"):
+        return True
+    exit_code = result.get("exit_code")
+    if isinstance(exit_code, int) and exit_code != 0:
+        return True
+    return False
+
+
 def _format_cron_body(job: CronJob, result: dict[str, Any]) -> str:
     """Render the cron result for a chat message.
 
     Keep it terse — chats are not log files. Includes the job
-    description (when set), a status hint, and the run's output / error
-    (read from the keys the runners actually emit — see ``_OUTPUT_KEYS``
-    / ``_ERROR_KEYS``).
+    description (when set), a status hint, the run's output, and an error
+    block from ``error``/``reason`` (or, only when the run FAILED,
+    ``stderr``) — so a successful run that wrote warnings to stderr isn't
+    mislabeled as an error.
     """
     head = job.description or f"cron {job.id}"
     lines = [f"*{head}*"]
@@ -228,7 +247,10 @@ def _format_cron_body(job: CronJob, result: dict[str, Any]) -> str:
             body = body[:1500] + "…"
         lines.append("")
         lines.append(body)
-    err = _first_present(result, _ERROR_KEYS)
+    err = _first_present(result, _FAILURE_KEYS)
+    if not err and _run_failed(result):
+        # Failed but no explicit error/reason — fall back to stderr.
+        err = str(result.get("stderr") or "").strip()
     if err:
         if len(err) > 500:
             err = err[:500] + "…"

@@ -51,14 +51,27 @@ def test_format_body_agent_error_uses_reason() -> None:
     assert "error:" in body
 
 
-def test_format_body_watchdog_uses_stdout_and_stderr() -> None:
-    """Watchdog mode emits ``stdout``/``stderr``."""
+def test_format_body_watchdog_success_shows_stdout_not_stderr_as_error() -> None:
+    """A SUCCESSFUL watchdog run that wrote warnings to stderr (git/pip/
+    npm do this while exiting 0) must show stdout as the body and must
+    NOT render an `error:` block contradicting the success status."""
     body = delivery._format_cron_body(
         _job("gateway://telegram/1"),
         {"status": "success", "exit_code": 0, "stdout": "build ok", "stderr": "a warning"},
     )
     assert "build ok" in body
-    assert "a warning" in body
+    assert "error:" not in body
+    assert "a warning" not in body
+
+
+def test_format_body_watchdog_failure_shows_stderr_as_error() -> None:
+    """A FAILED watchdog run (non-zero exit) surfaces stderr as error."""
+    body = delivery._format_cron_body(
+        _job("gateway://telegram/1"),
+        {"status": "error", "exit_code": 2, "stdout": "", "stderr": "boom: missing dep"},
+    )
+    assert "error:" in body
+    assert "boom: missing dep" in body
 
 
 def test_format_body_legacy_output_error_still_works() -> None:
