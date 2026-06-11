@@ -415,6 +415,12 @@ class AgentRuntime:
         # cfg.narrate_reprompt_attempts (0 disables → old warn-only).
         narrate_reprompts = 0
         narrate_reprompt_max = max(0, int(getattr(self.cfg, "narrate_reprompt_attempts", 1) or 0))
+        # False-refusal recovery: how many times we've reframed a
+        # zero-tool-call turn whose reply looked like a policy refusal of
+        # the (legitimate, local, operator-owned) request. Bounded by
+        # cfg.refusal_reprompt_attempts (0 disables).
+        refusal_reprompts = 0
+        refusal_reprompt_max = max(0, int(getattr(self.cfg, "refusal_reprompt_attempts", 1) or 0))
 
         for step in range(max_steps):
             # T2-04: check token watermark before each provider call.
@@ -497,7 +503,11 @@ class AgentRuntime:
             # duplication), and (3) the JSONL transcript. Strip
             # once here, at the point where assistant_text becomes
             # part of the durable session state.
-            from ..text_utils import detect_narrated_intent, strip_think_blocks
+            from ..text_utils import (
+                detect_false_refusal,
+                detect_narrated_intent,
+                strip_think_blocks,
+            )
 
             clean_text = strip_think_blocks(assistant_text or "")
             assistant_msg: dict[str, Any] = {"role": "assistant", "content": clean_text}
@@ -564,6 +574,45 @@ class AgentRuntime:
                         "model described a next step but took no action this "
                         "turn (narrated intent without a tool call)"
                     )
+                # False-refusal recovery: the model declined the request
+                # itself (a policy-style refusal) on a turn that did no
+                # work — a common small/local-model misfire on perfectly
+                # legitimate development tasks. Re-prompt once (bounded)
+                # with a TRUTHFUL reframe: this is the operator's own
+                # local project and routine dev help is in scope. The
+                # model can still decline for a concrete reason. Skipped
+                # when the turn already narrated (handled above) so the
+                # two recoveries don't stack on one reply.
+                elif (
+                    turn_tool_calls == 0
+                    and refusal_reprompts < refusal_reprompt_max
+                    and detect_false_refusal(clean_text)
+                ):
+                    refusal_reprompts += 1
+                    ui.warn(
+                        "model refused without acting — reframing as legitimate "
+                        f"local dev work and retrying ({refusal_reprompts}/"
+                        f"{refusal_reprompt_max})"
+                    )
+                    nudge = {
+                        "role": "user",
+                        "content": (
+                            "[athena] This is the operator's OWN local project, "
+                            "running on their OWN machine, and you are their "
+                            "coding assistant — building, debugging, and editing "
+                            "their software (including bots, automation, and "
+                            "tooling) is routine, legitimate development work and "
+                            "is in scope. Do not refuse it as if it were a "
+                            "harmful request. If you have a CONCRETE technical "
+                            "blocker (a missing file, an ambiguous spec, an "
+                            "unsafe destructive operation), state exactly what it "
+                            "is and what you need. Otherwise, carry out the "
+                            "requested change now by calling the appropriate tool."
+                        ),
+                    }
+                    self.messages.append(nudge)
+                    self._persist_message(nudge)
+                    continue
                 self._fire_stop("completed")
                 self._maybe_fire_review()
                 # T5-07: surface the final assistant text for the

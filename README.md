@@ -38,7 +38,7 @@ Athena gives you a full agentic coding loop in your terminal — native tool cal
 
 - **Runs on your models.** Ollama by default; Anthropic, OpenAI, Google, OpenRouter, and Nous Portal through one credential pool with automatic key rotation on 429.
 - **A real coding agent.** Native tool calls (no prompt-engineered fakes), surgical file edits, gated Bash, ripgrep search, plan mode, in-flight `/steer`, and a persistent `/goal` invariant.
-- **Tuned for small / local models.** Recovers when the model narrates instead of acting, repairs malformed tool calls, breaks stuck loops, and (opt-in) escalates only the hard moments to a stronger model.
+- **Tuned for small / local models.** Recovers when the model narrates instead of acting, reframes a spurious refusal of legitimate work on your own project, repairs malformed tool calls, breaks stuck loops, and (opt-in) escalates only the hard moments to a stronger model.
 - **MCP client.** stdio **and** HTTP/SSE (OAuth 2.1 PKCE) — any MCP server's tools sit alongside the built-ins.
 - **Multimodal.** Vision, OCR, video analysis + generation, audio, document parsing, browser automation (Playwright), and computer-use.
 - **Autonomy & memory.** Sub-agent forks, per-turn background review, a 7-day curator pass, file-based skills, and semantic recall across sessions.
@@ -159,6 +159,7 @@ context_window = 32768
 
 # Reliability for small / local models
 narrate_reprompt_attempts = 1     # re-prompt N times when the model narrates without calling a tool (0 disables)
+refusal_reprompt_attempts = 1     # re-prompt N times when the model spuriously refuses a legitimate task on your own project (0 disables)
 routing_enabled = false           # opt-in: escalate to a stronger model when the local one gets stuck
 routing_escalation_model = ""     # e.g. "anthropic/claude-sonnet-4-5"; required when routing_enabled
 recall_auto = false               # opt-in: inject relevant past turns / memory into context each turn
@@ -248,6 +249,7 @@ Everything below runs **locally by default** — your own Ollama models, on-disk
 
 **Reliability for small / local models**
 - Re-prompts when the model narrates an action without calling a tool
+- Reframes a spurious refusal — a small model that pattern-matches a legitimate task on your own project into "I can't help with that" gets one truthful nudge to reconsider before the refusal is surfaced (`refusal_reprompt_attempts`)
 - Repairs malformed tool calls (suggests the right tool / argument names)
 - Circuit breakers for stuck loops and consecutive provider errors
 - Semantic recall — past turns + memory embedded into a local vector index and auto-injected (`recall_auto`)

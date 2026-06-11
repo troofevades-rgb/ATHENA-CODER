@@ -230,6 +230,15 @@ class Config:
     # small/local-model failure that otherwise wastes the turn. 0 disables
     # (warn-only, the prior behaviour).
     narrate_reprompt_attempts: int = 1
+    # False-refusal recovery. When a turn makes ZERO tool calls and the
+    # model's reply looks like a POLICY refusal of the request ("I can't
+    # help with that", "against my guidelines") rather than a real task
+    # blocker, re-prompt this many times with a truthful reframe — this
+    # is the operator's own local project, legitimate dev work — before
+    # accepting the refusal. Small/local models frequently misfire a
+    # routine coding task into a refusal; this recovers the turn. The
+    # model can still decline after the nudge. 0 disables.
+    refusal_reprompt_attempts: int = 1
     # Struggle-based model escalation (OFF by default). When the local
     # model gets stuck — the identical-tool-call circuit breaker would
     # trip — escalate the rest of the turn to ``routing_escalation_model``

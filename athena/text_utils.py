@@ -111,3 +111,62 @@ def detect_narrated_intent(text: str) -> bool:
     if _NARRATION_EXCLUDE.search(tail):
         return False
     return bool(_NARRATION_INTENT.search(tail))
+
+
+# Policy-refusal phrasings — the model DECLINED the request itself
+# ("I can't help with that", "I must decline", "against my guidelines")
+# rather than hitting a concrete task limit. Small / quantised local
+# models frequently surface-pattern a perfectly legitimate dev task into
+# one of these; pairing a match with a zero-tool-call turn lets the agent
+# loop offer ONE reframing re-prompt (see runtime.py) before giving up.
+_REFUSAL = re.compile(
+    r"\b("
+    r"i (?:can'?t|cannot|won'?t|will not|am not able to|'?m not able to|"
+    r"am unable to|'?m unable to) (?:be able to )?"
+    r"(?:help|assist|provide|create|write|generate|continue|comply|"
+    r"do that|do this|fulfil?l|support|engage)"
+    r"|i (?:must|have to|will|need to) (?:decline|refuse|respectfully decline)"
+    r"|i'?m not (?:comfortable|willing|able to help)"
+    r"|i (?:do not|don'?t) feel comfortable"
+    r"|(?:goes |that )?against (?:my |the )?(?:guidelines|policy|policies|"
+    r"principles|programming|values)"
+    r"|(?:i'?m |i am )?(?:sorry|afraid)[^.!?\n]{0,40}"
+    r"(?:can'?t|cannot|won'?t|unable|not able|must decline)"
+    r"|as an ai[^.!?\n]{0,60}(?:can'?t|cannot|won'?t|unable|not able)"
+    r")",
+    re.IGNORECASE,
+)
+# Task-CAPABILITY limitations, NOT policy refusals — the model is willing
+# but blocked by a concrete fact ("I can't find the file"). Never treat
+# these as refusals: nudging here would just loop on a real blocker.
+_REFUSAL_EXCLUDE = re.compile(
+    r"can'?t find|couldn'?t find|can'?t locate|couldn'?t locate|"
+    r"can'?t access|don'?t have access|can'?t reach|can'?t connect|"
+    r"can'?t reproduce|can'?t determine|can'?t see|can'?t read|"
+    r"unable to find|unable to locate|unable to access|unable to read|"
+    r"can'?t open|no such file|does not exist|doesn'?t exist",
+    re.IGNORECASE,
+)
+
+
+def detect_false_refusal(text: str) -> bool:
+    """True when ``text`` looks like a POLICY refusal of the request
+    (the model declined to help) rather than a concrete task-capability
+    limitation ("I can't find the file").
+
+    Consult ONLY for a zero-tool-call turn — a refusal that produced no
+    action. This drives a single, bounded reframing re-prompt for the
+    common small/local-model failure of spuriously refusing legitimate
+    development work; it is NOT a judgment that the request is safe, and
+    the model can still decline after the nudge. Conservative: if any
+    task-capability phrase is present we do NOT treat it as a refusal, so
+    real blockers ("can't find X") never trigger a nudge loop.
+    """
+    if not text:
+        return False
+    t = text.strip()
+    if not t:
+        return False
+    if _REFUSAL_EXCLUDE.search(t):
+        return False
+    return bool(_REFUSAL.search(t))
