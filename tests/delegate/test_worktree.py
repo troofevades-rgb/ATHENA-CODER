@@ -175,14 +175,13 @@ def test_worktree_surfaces_git_failure(tmp_path: Path, monkeypatch):
 
 
 def test_diff_captured_against_base(tmp_path: Path, monkeypatch):
-    """capture_diff runs `git diff <base> HEAD` AND `git diff
-    <base>` in the worktree and returns the captured text."""
-    expected_committed = "diff --git a/x b/x\n+committed change\n"
-    expected_working = "diff --git a/y b/y\n+working change\n"
+    """capture_diff stages everything (`git add -A`) then runs
+    `git diff --cached <base>` in the worktree, returning the text."""
+    full_diff = "diff --git a/x b/x\n+committed change\ndiff --git a/y b/y\n+working change\n"
     stub = _GitStub(
         responses=[
-            {"returncode": 0, "stdout": expected_committed},
-            {"returncode": 0, "stdout": expected_working},
+            {"returncode": 0, "stdout": ""},  # git add -A
+            {"returncode": 0, "stdout": full_diff},  # git diff --cached <base>
         ]
     )
     monkeypatch.setattr(
@@ -204,12 +203,14 @@ def test_diff_captured_against_base(tmp_path: Path, monkeypatch):
     assert "committed change" in diff
     assert "working change" in diff
 
-    # Both git invocations were rooted in the worktree, not the
-    # main repo.
+    # Both git invocations were rooted in the worktree, not the main repo.
     assert len(stub.calls) == 2
-    for argv, cwd in stub.calls:
-        assert cwd == str(handle.worktree)
-        assert argv[0] == "git" and argv[1] == "diff"
+    add_argv, add_cwd = stub.calls[0]
+    diff_argv, diff_cwd = stub.calls[1]
+    assert add_argv == ["git", "add", "-A"]
+    assert diff_argv == ["git", "diff", "--cached", "HEAD~1"]
+    assert add_cwd == str(handle.worktree)
+    assert diff_cwd == str(handle.worktree)
 
 
 def test_diff_empty_when_no_changes(tmp_path: Path, monkeypatch):
@@ -230,16 +231,19 @@ def test_diff_empty_when_no_changes(tmp_path: Path, monkeypatch):
     assert capture_diff(handle) == ""
 
 
-def test_diff_dedupes_committed_and_working(tmp_path: Path, monkeypatch):
-    """If the committed-vs-base diff is identical to the
-    working-vs-base diff (delegate committed everything; nothing
-    uncommitted), only one copy goes into the result — no
-    duplication."""
-    same = "diff --git a/x b/x\n+only change\n"
+def test_diff_includes_untracked_files(tmp_path: Path, monkeypatch):
+    """Regression: a delegate whose entire output is NEW (untracked)
+    files used to return an empty diff — `git diff <base>` omits
+    untracked files. Staging with `git add -A` first makes them appear.
+    Verify the staged diff is what's returned and that `add -A` runs."""
+    new_file_diff = (
+        "diff --git a/new.py b/new.py\nnew file mode 100644\n"
+        "--- /dev/null\n+++ b/new.py\n+print('hello')\n"
+    )
     stub = _GitStub(
         responses=[
-            {"returncode": 0, "stdout": same},
-            {"returncode": 0, "stdout": same},
+            {"returncode": 0, "stdout": ""},  # git add -A (stages untracked)
+            {"returncode": 0, "stdout": new_file_diff},  # git diff --cached
         ]
     )
     monkeypatch.setattr(
@@ -257,8 +261,10 @@ def test_diff_dedupes_committed_and_working(tmp_path: Path, monkeypatch):
         base_ref="HEAD",
     )
     diff = capture_diff(handle)
-    # The "only change" line should appear exactly once.
-    assert diff.count("+only change") == 1
+    assert "new file mode" in diff
+    assert "new.py" in diff
+    # The stage step that makes untracked files visible actually ran.
+    assert stub.calls[0][0] == ["git", "add", "-A"]
 
 
 # ---------------------------------------------------------------------------

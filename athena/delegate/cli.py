@@ -118,32 +118,23 @@ def prepare_worktree(
 
 
 def capture_diff(handle: WorktreeHandle) -> str:
-    """Return the diff the delegate produced — ``git diff <base>``
-    run from inside the worktree. Empty string when the delegate
-    didn't change anything (still a valid outcome to surface).
+    """Return the TOTAL diff the delegate produced vs the base ref —
+    committed, uncommitted, AND newly-created untracked files. Empty
+    string when the delegate changed nothing (a valid outcome).
 
-    Includes both committed AND uncommitted changes via
-    ``git diff <base>`` (which compares HEAD vs base) followed by
-    the worktree's unstaged diff — concatenated. This way a
-    delegate that committed AND a delegate that just edited
-    files both get fully captured.
+    Implementation: stage everything (``git add -A``) then
+    ``git diff --cached <base>``. Staging makes untracked files appear
+    in the diff — ``git diff <base>`` alone silently OMITS them, so a
+    delegate whose entire output was new uncommitted files reported "no
+    changes". The worktree is disposable (torn down by
+    :func:`cleanup_worktree`), so mutating its index is harmless and we
+    skip restoring it.
     """
-    committed = _git(handle.worktree, "diff", handle.base_ref, "HEAD")
-    # Unstaged + untracked. We add then diff --cached so newly-
-    # created files show up too, then restore the index by
-    # reset --mixed afterwards is overkill — instead use
-    # `git diff <base> -- .` which compares the working tree
-    # against the base ref directly.
-    working = _git(handle.worktree, "diff", handle.base_ref)
-    pieces: list[str] = []
-    if committed.stdout.strip():
-        pieces.append(committed.stdout)
-    if working.stdout.strip():
-        # Skip if it's identical to the committed diff (delegate
-        # only committed, didn't leave uncommitted edits).
-        if not committed.stdout or committed.stdout != working.stdout:
-            pieces.append(working.stdout)
-    return "\n".join(pieces).rstrip()
+    # Best-effort stage; even if it fails the diff below still captures
+    # tracked changes.
+    _git(handle.worktree, "add", "-A")
+    result = _git(handle.worktree, "diff", "--cached", handle.base_ref)
+    return str(result.stdout or "").rstrip()
 
 
 def cleanup_worktree(handle: WorktreeHandle, *, repo_path: Path) -> bool:
