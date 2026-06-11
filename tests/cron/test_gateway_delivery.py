@@ -28,6 +28,50 @@ def setup_function(_func) -> None:
     registry._clear_for_tests()
 
 
+# ---- body rendering reads the keys the runners ACTUALLY emit ----------
+
+
+def test_format_body_agent_success_uses_response() -> None:
+    """Regression: agent mode emits ``response``, not ``output`` — the
+    renderer used to read ``output`` and drop the actual answer."""
+    body = delivery._format_cron_body(
+        _job("gateway://telegram/1"),
+        {"status": "success", "response": "the answer is 42", "tool_calls": []},
+    )
+    assert "the answer is 42" in body
+    assert "success" in body
+
+
+def test_format_body_agent_error_uses_reason() -> None:
+    body = delivery._format_cron_body(
+        _job("gateway://telegram/1"),
+        {"status": "error", "reason": "RuntimeError: boom"},
+    )
+    assert "RuntimeError: boom" in body
+    assert "error:" in body
+
+
+def test_format_body_watchdog_uses_stdout_and_stderr() -> None:
+    """Watchdog mode emits ``stdout``/``stderr``."""
+    body = delivery._format_cron_body(
+        _job("gateway://telegram/1"),
+        {"status": "success", "exit_code": 0, "stdout": "build ok", "stderr": "a warning"},
+    )
+    assert "build ok" in body
+    assert "a warning" in body
+
+
+def test_format_body_legacy_output_error_still_works() -> None:
+    """An external producer using the legacy output/error keys is still
+    rendered (back-compat)."""
+    body = delivery._format_cron_body(
+        _job("gateway://telegram/1"),
+        {"status": "ok", "output": "legacy out", "error": "legacy err"},
+    )
+    assert "legacy out" in body
+    assert "legacy err" in body
+
+
 # ---- target parsing ---------------------------------------------------
 
 

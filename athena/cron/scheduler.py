@@ -65,10 +65,21 @@ class CronScheduler:
 
     # ---- Lifecycle ----
 
-    def start(self) -> None:
+    def start(self, *, paused: bool = False) -> None:
+        """Start the scheduler and re-register persisted jobs.
+
+        ``paused=True`` starts the APScheduler main loop in paused state:
+        jobs are registered (so ``next_run_time`` is computable and the
+        SQLAlchemy jobstore is populated) but NONE fire. Short-lived CLI
+        commands (`athena cron list/enable/disable`) MUST use this — an
+        unpaused start in a CLI process executes any job whose fire time
+        fell inside the 600s misfire grace window while no daemon ran,
+        including agent-mode jobs that spin up a full LLM turn, just for
+        a read-only listing. Only the long-lived daemon starts unpaused.
+        """
         if self._started:
             return
-        self._sched.start()
+        self._sched.start(paused=paused)
         self._started = True
         # Re-register every persisted job into the APScheduler instance.
         # Per-job try/except so ONE corrupt cron_expr can't take down

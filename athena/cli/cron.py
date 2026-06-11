@@ -155,7 +155,9 @@ def _cmd_list(args: argparse.Namespace) -> int:
         return 0
     scheduler = _open_scheduler()
     try:
-        scheduler.start()
+        # Paused: register triggers so next_run_time is computable, but
+        # never fire a misfired job inside this read-only listing.
+        scheduler.start(paused=True)
         for j in jobs:
             next_run = scheduler.next_run_time(j.id) if j.enabled else None
             next_str = next_run.isoformat() if next_run else "—"
@@ -203,7 +205,9 @@ def _cmd_enable(args: argparse.Namespace) -> int:
         if job is None:
             print(f"error: no job matching {args.job_id!r}", file=sys.stderr)
             return 2
-        scheduler.start()
+        # Paused: mutate the jobstore without firing other jobs' misfires
+        # in this short-lived CLI process.
+        scheduler.start(paused=True)
         scheduler.enable(job.id)
     finally:
         scheduler.stop()
@@ -218,7 +222,9 @@ def _cmd_disable(args: argparse.Namespace) -> int:
         if job is None:
             print(f"error: no job matching {args.job_id!r}", file=sys.stderr)
             return 2
-        scheduler.start()
+        # Paused: mutate the jobstore without firing other jobs' misfires
+        # in this short-lived CLI process.
+        scheduler.start(paused=True)
         scheduler.disable(job.id)
     finally:
         scheduler.stop()

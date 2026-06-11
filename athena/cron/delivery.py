@@ -192,26 +192,44 @@ def _deliver_gateway(
         _deliver_log(job, result)
 
 
+# The runners don't emit ``output``/``error`` keys. Agent mode emits
+# ``response`` (success) / ``reason`` (failure); watchdog mode emits
+# ``stdout`` / ``stderr`` / ``reason``. Pull the human-facing body from
+# whichever the result actually carries (legacy ``output``/``error``
+# kept first for any external producer).
+_OUTPUT_KEYS = ("output", "response", "stdout")
+_ERROR_KEYS = ("error", "reason", "stderr")
+
+
+def _first_present(result: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        value = result.get(key)
+        if value:
+            return str(value).strip()
+    return ""
+
+
 def _format_cron_body(job: CronJob, result: dict[str, Any]) -> str:
     """Render the cron result for a chat message.
 
     Keep it terse — chats are not log files. Includes the job
-    description (when set), a status hint, and either the
-    ``output`` or ``error`` field if present.
+    description (when set), a status hint, and the run's output / error
+    (read from the keys the runners actually emit — see ``_OUTPUT_KEYS``
+    / ``_ERROR_KEYS``).
     """
     head = job.description or f"cron {job.id}"
     lines = [f"*{head}*"]
     status = result.get("status")
     if status:
         lines.append(f"_status: {status}_")
-    if "output" in result and result["output"]:
-        body = str(result["output"]).strip()
+    body = _first_present(result, _OUTPUT_KEYS)
+    if body:
         if len(body) > 1500:
             body = body[:1500] + "…"
         lines.append("")
         lines.append(body)
-    if "error" in result and result["error"]:
-        err = str(result["error"]).strip()
+    err = _first_present(result, _ERROR_KEYS)
+    if err:
         if len(err) > 500:
             err = err[:500] + "…"
         lines.append("")

@@ -33,6 +33,37 @@ def test_start_is_idempotent(scheduler: CronScheduler):
     assert scheduler._started is True
 
 
+def test_paused_start_registers_without_firing_due_job(tmp_path: Path):
+    """Regression: short-lived CLI commands open a scheduler just to
+    read next_run_time. An unpaused start fires any job inside the 600s
+    misfire grace window (e.g. an agent-mode job → a full LLM turn)
+    right there in the CLI process. A paused start must register the
+    trigger (so next_run_time works) but never execute it."""
+    import time
+
+    marker = tmp_path / "fired.txt"
+    # A watchdog job whose script writes a marker, scheduled every
+    # minute so its next fire time is within the misfire grace window.
+    s = CronScheduler(
+        db_path=tmp_path / "s.db", jobs_db_path=tmp_path / "j.db"
+    )
+    job = CronJob(
+        cron_expr="* * * * *",
+        mode="watchdog",
+        script=f"python -c \"open(r'{marker}','w').write('x')\"",
+    )
+    try:
+        s.start(paused=True)
+        s.add_job(job)
+        # Give a real (unpaused) scheduler plenty of time to misfire;
+        # paused, nothing should run.
+        time.sleep(1.5)
+        assert s.next_run_time(job.id) is not None  # trigger registered
+        assert not marker.exists(), "paused scheduler executed a job"
+    finally:
+        s.stop()
+
+
 def test_add_and_remove_job(scheduler: CronScheduler):
     scheduler.start()
     job = CronJob(cron_expr="* * * * *", mode="agent", prompt="hi")
