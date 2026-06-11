@@ -37,19 +37,18 @@ from .resolution import (
 logger = logging.getLogger(__name__)
 
 
-# Default config.toml content seeded into new profiles. Empty by
-# design — Config()'s dataclass defaults cover every field; the
-# file just exists so users have somewhere obvious to override.
+# Default config.toml content seeded into new profiles. NOTE:
+# athena currently loads ONLY the global ~/.athena/config.toml
+# (config.load_config reads CONFIG_PATH); this per-profile file is
+# reserved for a future per-profile override layer and is not read
+# yet. The seeded comment must not promise otherwise — an earlier
+# version did, and paired with the flat-layout migration moving the
+# global config here, users' settings silently reset to defaults.
 _DEFAULT_CONFIG_TOML = """\
-# Profile-specific overrides. Any field defined in athena.config.Config
-# can be set here; missing fields fall through to that dataclass's
-# defaults.
-#
-# Examples:
-#   model = "claude-haiku-4-5-20251001"
-#   auto_approve_tools = true
-#   [curator]
-#   interval_hours = 168
+# Reserved for profile-specific overrides (NOT YET LOADED).
+# athena currently reads only the global ~/.athena/config.toml.
+# This file exists so a future per-profile config layer has an
+# obvious home; editing it today has no effect.
 """
 
 

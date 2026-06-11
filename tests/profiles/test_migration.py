@@ -50,7 +50,7 @@ def _seed_legacy(home: Path, items: list[str]) -> None:
 
 
 def test_migration_needed_when_legacy_items_exist(fake_home: Path) -> None:
-    _seed_legacy(fake_home, ["skills", "sessions.db"])
+    _seed_legacy(fake_home, ["memory", "sessions.db"])
     assert migration.migration_needed(fake_home) is True
 
 
@@ -58,7 +58,7 @@ def test_migration_not_needed_when_profiles_dir_exists(
     fake_home: Path,
 ) -> None:
     """Once profiles/ exists, migration is permanently done."""
-    _seed_legacy(fake_home, ["skills"])
+    _seed_legacy(fake_home, ["memory"])
     (fake_home / "profiles").mkdir()
     assert migration.migration_needed(fake_home) is False
 
@@ -79,27 +79,55 @@ def test_migration_only_triggered_by_profile_items(fake_home: Path) -> None:
 # ---- run_migration ------------------------------------------------
 
 
-def test_run_migration_moves_skills(fake_home: Path) -> None:
-    (fake_home / "skills" / "my-skill").mkdir(parents=True)
-    (fake_home / "skills" / "my-skill" / "SKILL.md").write_text(
-        "x",
-        encoding="utf-8",
-    )
+def test_run_migration_moves_memory_tree(fake_home: Path) -> None:
+    (fake_home / "memory").mkdir(parents=True)
+    (fake_home / "memory" / "fact.md").write_text("x", encoding="utf-8")
     result = migration.run_migration(fake_home)
-    assert "skills" in result["moved"]
-    assert (fake_home / "profiles" / "default" / "skills" / "my-skill" / "SKILL.md").exists()
-    assert not (fake_home / "skills").exists()
+    assert "memory" in result["moved"]
+    assert (fake_home / "profiles" / "default" / "memory" / "fact.md").exists()
+    assert not (fake_home / "memory").exists()
 
 
 def test_run_migration_moves_files(fake_home: Path) -> None:
-    (fake_home / "config.toml").write_text(
-        "model = 'qwen2.5'",
-        encoding="utf-8",
-    )
+    (fake_home / "goal.txt").write_text("ship it", encoding="utf-8")
     (fake_home / "sessions.db").write_text("binary", encoding="utf-8")
     migration.run_migration(fake_home)
-    assert (fake_home / "profiles" / "default" / "config.toml").read_text() == "model = 'qwen2.5'"
+    assert (fake_home / "profiles" / "default" / "goal.txt").read_text() == "ship it"
     assert (fake_home / "profiles" / "default" / "sessions.db").exists()
+
+
+def test_run_migration_leaves_globally_read_items_in_place(
+    fake_home: Path,
+) -> None:
+    """Regression: config.toml, skills/, mcp.json, and
+    training_state.json are read at GLOBAL paths by every consumer
+    (config.load_config, skills.discovery, cli/train). An earlier
+    migration moved them into profiles/default/, silently resetting
+    the user's settings and hiding their skill library on first run
+    after upgrade. They must stay put until their readers become
+    profile-aware."""
+    (fake_home / "config.toml").write_text("model = 'qwen2.5'", encoding="utf-8")
+    (fake_home / "skills" / "my-skill").mkdir(parents=True)
+    (fake_home / "skills" / "my-skill" / "SKILL.md").write_text("x", encoding="utf-8")
+    (fake_home / "mcp.json").write_text("{}", encoding="utf-8")
+    (fake_home / "training_state.json").write_text("{}", encoding="utf-8")
+    # A genuinely profile-scoped item so the migration actually runs.
+    (fake_home / "sessions").mkdir()
+
+    result = migration.run_migration(fake_home)
+
+    assert result["moved"] == ["sessions"]
+    assert (fake_home / "config.toml").read_text() == "model = 'qwen2.5'"
+    assert (fake_home / "skills" / "my-skill" / "SKILL.md").exists()
+    assert (fake_home / "mcp.json").exists()
+    assert (fake_home / "training_state.json").exists()
+    assert not (fake_home / "profiles" / "default" / "mcp.json").exists()
+    # NB: profiles/default/config.toml may exist afterwards (the
+    # ensure_profile bootstrap seeds a stub) but it must not contain
+    # the user's settings.
+    profile_cfg = fake_home / "profiles" / "default" / "config.toml"
+    if profile_cfg.exists():
+        assert "qwen2.5" not in profile_cfg.read_text()
 
 
 def test_run_migration_preserves_global_items(fake_home: Path) -> None:
@@ -109,7 +137,7 @@ def test_run_migration_preserves_global_items(fake_home: Path) -> None:
     (fake_home / "logs").mkdir()
     (fake_home / "mcp_tokens").mkdir()
     # Also a profile-level item to actually trigger the move.
-    (fake_home / "skills").mkdir()
+    (fake_home / "memory").mkdir()
     migration.run_migration(fake_home)
     # Globals untouched.
     assert (fake_home / "credentials.json").exists()
@@ -130,9 +158,9 @@ def test_run_migration_ensures_default_layout(fake_home: Path) -> None:
 
 def test_run_migration_idempotent(fake_home: Path) -> None:
     """Calling twice is safe — second call moves nothing."""
-    _seed_legacy(fake_home, ["skills"])
+    _seed_legacy(fake_home, ["memory"])
     first = migration.run_migration(fake_home)
-    assert "skills" in first["moved"]
+    assert "memory" in first["moved"]
     second = migration.run_migration(fake_home)
     assert second["moved"] == []
 
@@ -140,19 +168,19 @@ def test_run_migration_idempotent(fake_home: Path) -> None:
 def test_run_migration_skips_collision(fake_home: Path) -> None:
     """If the target already has a same-named entry (partial prior
     migration), don't clobber. Log it as failed and move on."""
-    (fake_home / "skills").mkdir()
-    (fake_home / "skills" / "marker.txt").write_text("from-legacy")
+    (fake_home / "memory").mkdir()
+    (fake_home / "memory" / "marker.txt").write_text("from-legacy")
     # Pre-create a conflicting destination.
-    target = fake_home / "profiles" / "default" / "skills"
+    target = fake_home / "profiles" / "default" / "memory"
     target.mkdir(parents=True)
     (target / "marker.txt").write_text("already-here", encoding="utf-8")
 
     result = migration.run_migration(fake_home)
-    assert "skills" in result["failed"]
+    assert "memory" in result["failed"]
     # Existing content preserved.
     assert (target / "marker.txt").read_text() == "already-here"
     # Source still on disk for manual resolution.
-    assert (fake_home / "skills" / "marker.txt").exists()
+    assert (fake_home / "memory" / "marker.txt").exists()
 
 
 def test_run_migration_per_item_isolation(
@@ -160,30 +188,30 @@ def test_run_migration_per_item_isolation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A failure on one item must not block the others."""
-    _seed_legacy(fake_home, ["skills", "memory"])
+    _seed_legacy(fake_home, ["memory", "sessions"])
 
     real_move = migration.shutil.move
     moved_args: list[str] = []
 
     def maybe_failing_move(src: str, dst: str) -> str:
         moved_args.append(src)
-        if "skills" in src:
+        if "memory" in src:
             raise OSError("simulated failure")
         return real_move(src, dst)
 
     monkeypatch.setattr(migration.shutil, "move", maybe_failing_move)
     result = migration.run_migration(fake_home)
-    assert "memory" in result["moved"]
-    assert "skills" in result["failed"]
+    assert "sessions" in result["moved"]
+    assert "memory" in result["failed"]
 
 
 # ---- maybe_run_migration ----------------------------------------
 
 
 def test_maybe_run_migration_triggers_on_legacy(fake_home: Path) -> None:
-    _seed_legacy(fake_home, ["skills"])
+    _seed_legacy(fake_home, ["memory"])
     assert migration.maybe_run_migration(fake_home) is True
-    assert (fake_home / "profiles" / "default" / "skills").exists()
+    assert (fake_home / "profiles" / "default" / "memory").exists()
 
 
 def test_maybe_run_migration_skips_when_not_needed(fake_home: Path) -> None:
@@ -193,6 +221,6 @@ def test_maybe_run_migration_skips_when_not_needed(fake_home: Path) -> None:
 
 
 def test_maybe_run_migration_idempotent(fake_home: Path) -> None:
-    _seed_legacy(fake_home, ["skills"])
+    _seed_legacy(fake_home, ["memory"])
     assert migration.maybe_run_migration(fake_home) is True
     assert migration.maybe_run_migration(fake_home) is False

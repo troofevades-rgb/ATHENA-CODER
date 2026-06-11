@@ -19,6 +19,18 @@ Items that stay at ``~/.athena/`` (user-global, not profile-scope):
 ``mcp_tokens/``, ``plugins/``, ``logs/``, ``plugins_state.json``, plus
 the new profile machinery (``profiles/``, ``active_profile``).
 
+``config.toml``, ``skills/``, ``mcp.json``, and
+``training_state.json`` also stay global — NOT because that's the
+aspirational design, but because every reader still resolves them at
+the global path (``config.load_config`` reads only ``CONFIG_PATH``,
+``skills.discovery`` walks ``~/.athena/skills``, mcp.json loads from
+``~/.athena`` + workspace, ``cli/train.py`` reads
+``CONFIG_DIR/training_state.json``). An earlier revision moved them
+into ``profiles/default/`` anyway, which silently reset every
+setting, hid the user's skill library, and dropped their MCP servers
+on the first run after upgrade. If per-profile config/skills ever
+ship, the READERS must change first; only then may these move.
+
 ``credentials.json`` is NOT moved by this migration even though
 credentials are now profile-scoped: ``credential_pool.profile_pool``
 seeds the ``default`` profile from the legacy global file lazily on
@@ -41,13 +53,13 @@ logger = logging.getLogger(__name__)
 
 
 # Items that belong inside a profile after migration. Both files and
-# directories. Ordered for deterministic logging.
+# directories. Ordered for deterministic logging. Every entry here
+# MUST have profile-aware readers — see the module docstring for the
+# orphaning bug that rule exists to prevent.
 _PROFILE_ITEMS: tuple[str, ...] = (
-    "skills",
     "memory",
     "sessions",
     "sessions.db",
-    "mcp.json",
     "goal.txt",
     "cron.db",
     "cron_jobs.db",
@@ -55,11 +67,9 @@ _PROFILE_ITEMS: tuple[str, ...] = (
     "gateway_routes.db",
     "gateway_attachments",
     "matrix_store",
-    "training_state.json",
     "labels",
     "datasets",
     "models",
-    "config.toml",
 )
 
 # Items that explicitly stay at ``~/.athena/``. Used to verify the
@@ -74,7 +84,12 @@ _GLOBAL_ITEMS: frozenset[str] = frozenset(
         "logs",
         "profiles",
         "active_profile",
-        "memory",  # the providers dir lives under profile/memory/
+        # Read at global paths by every consumer; moving them orphans
+        # the user's state (see module docstring).
+        "config.toml",
+        "skills",
+        "mcp.json",
+        "training_state.json",
     }
 )
 
