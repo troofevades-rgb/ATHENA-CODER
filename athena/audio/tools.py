@@ -33,8 +33,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import subprocess
+import tempfile
 import wave
 from collections.abc import Callable
 from pathlib import Path
@@ -145,6 +147,65 @@ def _audio_duration_s(path: Path) -> float | None:
         except Exception:  # noqa: BLE001
             pass
     return None
+
+
+def _extract_clip(src: Path, start_s: float, end_s: float) -> Path | None:
+    """Extract ``[start_s, end_s)`` of ``src`` into a temporary mono
+    16 kHz WAV via ffmpeg. Returns the temp path (the CALLER deletes it)
+    or ``None`` when ffmpeg is unavailable or the extraction fails.
+
+    This is what makes chunked transcription correct: the backend
+    transcribes whatever file it's handed from t=0 and only re-bases
+    timestamps via ``chunk_offset_s``. Handing it the FULL file per
+    window (the previous behaviour) transcribed the whole recording N
+    times with shifted timestamps. Each window must be a real slice.
+    """
+    if not shutil.which("ffmpeg"):
+        return None
+    fd, tmp = tempfile.mkstemp(suffix=".wav", prefix="athena-audioclip-")
+    os.close(fd)
+    tmp_path = Path(tmp)
+    try:
+        # -ss/-t before -i = fast input seek; output starts at t=0 and
+        # the backend adds chunk_offset_s to restore absolute time.
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-y",
+                "-v",
+                "error",
+                "-ss",
+                f"{max(0.0, start_s):.3f}",
+                "-t",
+                f"{max(0.0, end_s - start_s):.3f}",
+                "-i",
+                str(src),
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                str(tmp_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if proc.returncode != 0 or not tmp_path.exists() or tmp_path.stat().st_size == 0:
+            logger.warning(
+                "ffmpeg clip extraction failed (%.2f-%.2fs) rc=%s: %s",
+                start_s,
+                end_s,
+                proc.returncode,
+                (proc.stderr or "").strip()[:200],
+            )
+            tmp_path.unlink(missing_ok=True)
+            return None
+        return tmp_path
+    except Exception as e:  # noqa: BLE001
+        logger.warning("ffmpeg clip extraction raised: %s", e)
+        tmp_path.unlink(missing_ok=True)
+        return None
 
 
 def _chunk_boundaries(
@@ -270,8 +331,18 @@ def transcribe_track(
     chunk_s = float(getattr(cfg, "audio_chunk_seconds", 30.0))
     overlap_s = float(getattr(cfg, "audio_chunk_overlap_s", 2.0))
 
-    if duration is None or duration <= chunk_s:
-        # Single-shot — no chunking, no offset.
+    # Chunking requires ffmpeg to slice each window; without it we can't
+    # produce real clips, and handing the backend the full file per
+    # window transcribes the whole recording N times. A single full-file
+    # pass is correct (if slower / more memory) — whisper handles long
+    # files internally — so fall back to that.
+    if duration is None or duration <= chunk_s or not shutil.which("ffmpeg"):
+        if duration is not None and duration > chunk_s and not shutil.which("ffmpeg"):
+            logger.info(
+                "audio: ffmpeg not found; transcribing %.0fs file in one pass "
+                "(install ffmpeg to enable chunked transcription)",
+                duration,
+            )
         if progress is not None:
             progress(1, 1)
         return backend.transcribe(
@@ -283,13 +354,30 @@ def transcribe_track(
 
     windows = _chunk_boundaries(duration, chunk_s=chunk_s, overlap_s=overlap_s)
     chunks: list[TranscribeResult] = []
-    for i, (start, _end) in enumerate(windows, start=1):
-        res = backend.transcribe(
-            p,
-            language=language,
-            diarize=diarize,
-            chunk_offset_s=start,
-        )
+    for i, (start, end) in enumerate(windows, start=1):
+        clip = _extract_clip(p, start, end)
+        if clip is None:
+            # Slicing failed mid-stream (transient ffmpeg error). Rather
+            # than fall back to the broken whole-file-per-window path,
+            # do one correct full-file pass and return it.
+            logger.warning(
+                "audio: clip extraction failed at window %d/%d; "
+                "falling back to a single full-file pass",
+                i,
+                len(windows),
+            )
+            if progress is not None:
+                progress(len(windows), len(windows))
+            return backend.transcribe(p, language=language, diarize=diarize, chunk_offset_s=0.0)
+        try:
+            res = backend.transcribe(
+                clip,
+                language=language,
+                diarize=diarize,
+                chunk_offset_s=start,
+            )
+        finally:
+            clip.unlink(missing_ok=True)
         chunks.append(res)
         if progress is not None:
             progress(i, len(windows))

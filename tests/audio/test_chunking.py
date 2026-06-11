@@ -188,6 +188,31 @@ def _cfg(tmp_path: Path, **overrides: Any) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
+@pytest.fixture
+def fake_slicer(monkeypatch, tmp_path):
+    """Stub out the real ffmpeg slice so chunking tests don't depend on
+    an ffmpeg binary. Each call writes a tiny distinct WAV clip and
+    records the (start, end) it was asked for, so a test can assert the
+    backend received a real per-window slice — not the full source file
+    (the bug being fixed: full path per window → N whole-file
+    transcriptions)."""
+    import athena.audio.tools as tools_mod
+
+    calls: list[tuple[float, float]] = []
+    counter = {"n": 0}
+
+    def _fake_extract(src: Path, start_s: float, end_s: float):
+        calls.append((start_s, end_s))
+        counter["n"] += 1
+        clip = make_wav(tmp_path / f"clip_{counter['n']}.wav", duration_s=0.1)
+        return clip
+
+    # Make the ffmpeg-availability gate pass + replace the extractor.
+    monkeypatch.setattr(tools_mod.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(tools_mod, "_extract_clip", _fake_extract)
+    return calls
+
+
 def test_short_audio_makes_one_backend_call(tmp_path: Path):
     """A short file (under chunk_s) goes through as one
     backend call, no chunking, no offset."""
@@ -196,9 +221,11 @@ def test_short_audio_makes_one_backend_call(tmp_path: Path):
     transcribe_track(wav, cfg=_cfg(tmp_path), backend=backend)
     assert len(backend.transcribe_calls) == 1
     assert backend.transcribe_calls[0]["chunk_offset_s"] == 0.0
+    # The whole (short) file is what the backend sees.
+    assert backend.transcribe_calls[0]["path"] == str(wav)
 
 
-def test_long_audio_makes_one_call_per_chunk(tmp_path: Path):
+def test_long_audio_makes_one_call_per_chunk(tmp_path: Path, fake_slicer):
     """A long file gets one backend call per chunk window.
     Use a very small chunk_s so we can synth a long-feeling
     audio without actually writing 90 seconds of WAV."""
@@ -216,7 +243,56 @@ def test_long_audio_makes_one_call_per_chunk(tmp_path: Path):
     assert offsets == sorted(offsets)
 
 
-def test_absolute_timestamps_after_stitching(tmp_path: Path):
+def test_each_chunk_gets_a_distinct_sliced_clip(tmp_path: Path, fake_slicer):
+    """Regression: the backend used to receive the FULL source path on
+    every window (so it transcribed the whole recording N times). It
+    must now receive a distinct sliced clip per window, never the
+    original file, and the slicer must be asked for each chunk window."""
+    wav = make_wav(tmp_path / "a.wav", duration_s=2.0)
+    cfg = _cfg(tmp_path, audio_chunk_seconds=0.5, audio_chunk_overlap_s=0.0)
+    backend = StubAudioBackend(per_chunk_segments=1)
+    transcribe_track(wav, cfg=cfg, backend=backend)
+
+    paths = [c["path"] for c in backend.transcribe_calls]
+    # None of the backend calls saw the original full file.
+    assert all(pth != str(wav) for pth in paths)
+    # Every clip path is distinct (a real per-window slice).
+    assert len(set(paths)) == len(paths)
+    # The slicer was asked for exactly the chunk windows.
+    assert fake_slicer == [(0.0, 0.5), (0.5, 1.0), (1.0, 1.5), (1.5, 2.0)]
+
+
+def test_no_ffmpeg_falls_back_to_single_full_pass(tmp_path: Path, monkeypatch):
+    """Without ffmpeg we can't slice; a long file must get ONE correct
+    full-file pass (offset 0), not N whole-file passes."""
+    import athena.audio.tools as tools_mod
+
+    monkeypatch.setattr(tools_mod.shutil, "which", lambda _name: None)
+    wav = make_wav(tmp_path / "a.wav", duration_s=2.0)
+    cfg = _cfg(tmp_path, audio_chunk_seconds=0.5, audio_chunk_overlap_s=0.0)
+    backend = StubAudioBackend(per_chunk_segments=1)
+    transcribe_track(wav, cfg=cfg, backend=backend)
+    assert len(backend.transcribe_calls) == 1
+    assert backend.transcribe_calls[0]["chunk_offset_s"] == 0.0
+    assert backend.transcribe_calls[0]["path"] == str(wav)
+
+
+def test_clip_extraction_failure_falls_back_to_single_pass(tmp_path: Path, monkeypatch):
+    """A transient slice failure mid-stream must fall back to one
+    full-file pass, never the broken whole-file-per-window path."""
+    import athena.audio.tools as tools_mod
+
+    monkeypatch.setattr(tools_mod.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(tools_mod, "_extract_clip", lambda *a, **k: None)
+    wav = make_wav(tmp_path / "a.wav", duration_s=2.0)
+    cfg = _cfg(tmp_path, audio_chunk_seconds=0.5, audio_chunk_overlap_s=0.0)
+    backend = StubAudioBackend(per_chunk_segments=1)
+    transcribe_track(wav, cfg=cfg, backend=backend)
+    assert len(backend.transcribe_calls) == 1
+    assert backend.transcribe_calls[0]["chunk_offset_s"] == 0.0
+
+
+def test_absolute_timestamps_after_stitching(tmp_path: Path, fake_slicer):
     """The stub returns one segment at relative t=0.0 per
     chunk; after stitching, the segments should land at the
     chunks' absolute start times."""
@@ -229,7 +305,7 @@ def test_absolute_timestamps_after_stitching(tmp_path: Path):
     assert starts == [0.0, 0.5, 1.0, 1.5]
 
 
-def test_progress_callback_fires_per_chunk(tmp_path: Path):
+def test_progress_callback_fires_per_chunk(tmp_path: Path, fake_slicer):
     wav = make_wav(tmp_path / "a.wav", duration_s=2.0)
     cfg = _cfg(tmp_path, audio_chunk_seconds=0.5, audio_chunk_overlap_s=0.0)
     backend = StubAudioBackend(per_chunk_segments=1)
