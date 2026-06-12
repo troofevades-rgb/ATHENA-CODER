@@ -44,6 +44,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   resets the moment genuinely new information appears, so real iterative work is
   unaffected. It trips under the `circuit_breaker:` prefix, so a stalled
   autonomous `/goal` pauses instead of grinding to the token cap.
+- Forks no longer pursue the parent's `/goal`. A fork's child Agent loaded
+  `goal_state` from the same profile as the parent, so with an active `/goal`
+  every fork (Agent-tool sub-agent, background review, curator) entered the
+  goal-continuation loop *after* finishing its assigned sub-task and kept
+  injecting synthetic "keep working toward GOAL" turns — drifting off-task and
+  burning minutes (dogfood: an Agent sub-agent ran ~22 minutes and returned a
+  confident, unrelated answer). `fork()` now pins `child.goal_state = None`; a
+  fork does one task and returns. The goal *text* still rides along in the
+  pinned system prompt as context.
+- The `Agent` sub-agent tool now flags an abnormal finish. A fork returns its
+  last assistant message regardless of how the turn ended, so a sub-agent that
+  hit its step limit or a circuit breaker (e.g. the thrash loop above) had its
+  partial/off-task last message laundered up to the parent as if it were a
+  finished answer. `ForkResult` now carries `stop_reason`, and the tool prepends
+  a `[WARNING: …]` (naming the reason) when the sub-agent didn't finish via
+  `completed`.
+- `read_tool_result` now returns an actionable message instead of a bare
+  `ERROR: Blob not found`. A well-formed handle with no blob behind it almost
+  always means the handle was guessed/hallucinated or came from a cleaned-up
+  session; the new message tells the model not to invent handles and to re-run
+  the producing tool, so it stops re-issuing the same failing call.
 
 ## [0.3.0] - 2026-06-05
 

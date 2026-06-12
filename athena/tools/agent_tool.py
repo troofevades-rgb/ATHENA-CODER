@@ -180,4 +180,34 @@ def Agent(
 
     if result.error:
         return f"ERROR running sub-agent: {result.error}"
-    return result.final_response or "(no assistant response)"
+
+    response = result.final_response or "(no assistant response)"
+    # Surface an ABNORMAL finish. A fork returns its last assistant
+    # message regardless of how the turn ended; a sub-agent that hit its
+    # step limit or a circuit breaker (e.g. thrashing on a search that
+    # never returns anything) leaves a partial or off-task last message.
+    # Without this flag that text gets laundered up to the parent as if
+    # it were a finished answer — the dogfood failure where a sub-agent
+    # thrashed for 22 minutes and returned a confident, unrelated reply.
+    reason = result.stop_reason
+    if reason != "completed":
+        labels = {
+            "step_limit": "hit its step limit before finishing the task",
+            "circuit_breaker:no_progress": (
+                "was halted for making no progress — it kept calling tools "
+                "without learning anything new"
+            ),
+            "circuit_breaker:identical_tool_calls": (
+                "was halted for repeating the same tool call in a loop"
+            ),
+            "circuit_breaker:provider_errors": (
+                "was halted after repeated provider errors"
+            ),
+        }
+        why = labels.get(reason or "", "did not finish cleanly")
+        return (
+            f"[WARNING: the {subagent_type} sub-agent {why}. The summary below "
+            "may be incomplete, off-task, or unreliable — verify it independently "
+            f"rather than treating it as a finished result.]\n\n{response}"
+        )
+    return response

@@ -72,6 +72,10 @@ def test_tool_returns_error_for_invalid_handle(
 
         result = read_tool_result("not a handle")
         assert result.startswith("ERROR:")
+        # Pin the actionable guidance the fix added to the ValueError
+        # branch so it can't be silently deleted/mangled (mirrors the
+        # missing-blob test).
+        assert "16-character hex hash" in result
     finally:
         _current_agent.reset(token)
 
@@ -86,6 +90,12 @@ def test_tool_returns_error_for_missing_blob(
 
         result = read_tool_result("0000000000000000")
         assert result.startswith("ERROR:")
+        # A valid-format-but-missing hash almost always means a guessed /
+        # hallucinated handle; the message must tell the model that and
+        # stop it re-issuing the same call (the dogfood "Blob not found"
+        # loop).
+        assert "don't guess" in result.lower() or "do not guess" in result.lower()
+        assert "re-run the tool" in result.lower()
     finally:
         _current_agent.reset(token)
 

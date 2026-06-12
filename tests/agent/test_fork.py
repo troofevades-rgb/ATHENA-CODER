@@ -309,6 +309,50 @@ def test_fork_shares_client_when_auxiliary_false(parent_agent: Agent) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_fork_disables_goal_loop(parent_agent: Agent, monkeypatch) -> None:
+    """A fork must do ONE assigned task and return — it must never enter
+    the persistent /goal continuation loop. The child Agent loads
+    goal_state from the SAME profile as the parent, so an active /goal
+    would otherwise make every fork keep injecting synthetic "keep working
+    toward GOAL" turns after its sub-task (the dogfood 22-minute off-task
+    drift). fork() pins child.goal_state = None to prevent that."""
+    import athena.agent.core as core_mod
+    from athena.goal.state import GoalState, save_state
+
+    # Persist an ACTIVE goal in the shared profile so the child's
+    # _load_goal_state() would pick it up if fork() didn't clear it.
+    save_state(parent_agent._profile_dir(), GoalState(text="big standing objective"))
+
+    captured: dict[str, Agent] = {}
+    real_agent = core_mod.Agent
+
+    class _CapturingAgent(real_agent):  # type: ignore[valid-type,misc]
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            captured["child"] = self
+
+    monkeypatch.setattr(core_mod, "Agent", _CapturingAgent)
+
+    parent_agent.fork(enabled_toolsets=["core"], system_addendum="")
+
+    child = captured["child"]
+    # Direct proof of the fix: the goal loop driver is disabled on the fork.
+    assert child.goal_state is None
+    # Behavioural proof: the fork ran exactly one turn (one assistant
+    # message). Had the goal loop run, the non-"GOAL ACHIEVED" response
+    # would have triggered synthetic continuations and many more.
+    assistant_msgs = [m for m in child.messages if m.get("role") == "assistant"]
+    assert len(assistant_msgs) == 1
+
+
+def test_fork_reports_clean_stop_reason(parent_agent: Agent) -> None:
+    """ForkResult.stop_reason carries how the fork's turn ended so callers
+    can tell a clean finish from a thrashed / capped one. A fork whose
+    model returns a final message with no tool calls completes cleanly."""
+    result = parent_agent.fork(enabled_toolsets=["core"], system_addendum="")
+    assert result.stop_reason == "completed"
+
+
 def test_fork_sets_in_fork_context_for_clarify(parent_agent: Agent) -> None:
     """The fork's runner sets athena.tools.clarify.in_fork_context to
     True before run_until_done, so a clarify call inside the fork

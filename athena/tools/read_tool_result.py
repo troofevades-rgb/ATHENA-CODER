@@ -65,6 +65,19 @@ def read_tool_result(
     try:
         return cast(str, storage.read(handle, max_bytes=int(max_bytes), offset=int(offset)))
     except FileNotFoundError as e:
-        return f"ERROR: {e}"
+        # A well-formed hash with no blob behind it almost always means
+        # the handle was guessed/hallucinated or came from a different
+        # (cleaned-up) session — not a transient error to retry verbatim.
+        # Tell the model exactly that so it stops re-issuing the same call.
+        return (
+            f"ERROR: {e}. No stored result matches that handle. A handle is "
+            "only valid if it appeared verbatim as a `[tool_result:<hash> …]` "
+            "marker earlier in THIS conversation — don't guess or invent one. "
+            "If you need the data, re-run the tool that produced it."
+        )
     except ValueError as e:
-        return f"ERROR: {e}"
+        return (
+            f"ERROR: {e}. Pass either the full `[tool_result:<hash> …]` handle "
+            "or its bare 16-character hex hash, exactly as it appeared in the "
+            "conversation."
+        )

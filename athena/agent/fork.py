@@ -70,6 +70,13 @@ class ForkResult:
     error: str | None = None
     duration_s: float = 0.0
     child_session_id: str | None = None
+    # How the fork's turn ended: ``"completed"`` is a clean finish;
+    # ``"step_limit"`` / ``"circuit_breaker:*"`` mean it was halted
+    # before finishing (its final message may be partial or off-task);
+    # ``None`` means the turn never fired a stop (e.g. interrupted).
+    # Callers surface this so a thrashed sub-agent isn't mistaken for a
+    # clean result. Read from ``child._last_stop_reason`` after the join.
+    stop_reason: str | None = None
 
 
 def fork(
@@ -138,6 +145,17 @@ def fork(
     # If we built an auxiliary client, the child owns it (close on shutdown).
     # If we passed the parent's client, the child does NOT own it.
     child._owns_client = auxiliary_client
+
+    # A fork does ONE assigned task and returns — it must never enter the
+    # persistent /goal continuation loop. The child Agent loads goal_state
+    # from the SAME profile as the parent, so without this an active /goal
+    # would make every fork (Agent-tool sub-agent, background review,
+    # curator) keep injecting synthetic "keep working toward GOAL" turns
+    # after finishing its sub-task — drifting off-task and burning minutes
+    # on the parent's goal instead of returning. (The goal TEXT still rides
+    # along in the pinned system prompt below as useful context; only the
+    # continuation-loop driver is disabled.)
+    child.goal_state = None
 
     result = ForkResult(final_response="", child_session_id=child.session_id)
 
@@ -229,6 +247,7 @@ def fork(
         result.final_response = child.last_assistant_message()
         result.tool_calls = child.tool_call_trace()
         result.actions = _extract_actions(child.messages)
+        result.stop_reason = getattr(child, "_last_stop_reason", None)
         result.stdout = stdout_buf.getvalue()
         result.stderr = stderr_buf.getvalue()
         return result
